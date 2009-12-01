@@ -1,0 +1,15 @@
+
+
+NOW:
+ - Test bingham_pdf()
+
+
+SOON:
+ - Test bingham_discretize()
+
+
+
+DONE:
+ + Use safe_alloc()
+ + Fast normalization constant lookup
+ + Use graph traversal to avoid saving redundant faces to PLY files.
