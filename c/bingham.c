@@ -565,7 +565,7 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
       pmf->mass[i] = pmf->volumes[i] * exp(bingham_L(B, &pmf->points[i], 1));
       tot_mass += pmf->mass[i];
     }
-    mult(pmf->mass, pmf->mass, 1/tot_mass, n);
+    //mult(pmf->mass, pmf->mass, 1/tot_mass, n);
   }
   else {
     printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
@@ -606,7 +606,7 @@ void bingham_discretize_mres(bingham_pmf_t *pmf, bingham_t *B, double resolution
       pmf->mass[i] = pmf->volumes[i] * exp(bingham_L(B, &pmf->points[i], 1));
       tot_mass += pmf->mass[i];
     }
-    mult(pmf->mass, pmf->mass, 1/tot_mass, n);
+    //mult(pmf->mass, pmf->mass, 1/tot_mass, n);
   }
   else {
     printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
@@ -641,6 +641,11 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
       double *v2 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][2] ];
       double *v3 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][3] ];
       double *S[4] = {v0, v1, v2, v3};
+
+      //double x1[4], x2[4];
+      //avg(x1, v0, v1, 4);
+      //avg(x2, v2, v3, 4);
+      //avg(X[i], x1, x2, 4);
 
       sample_simplex(X[i], S, pmf->d, pmf->d);
     }

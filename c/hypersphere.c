@@ -129,7 +129,7 @@ octetramesh_t *hypersphere_tessellation_octetra(int n)
 
   reproject_vertices(mesh->vertices, mesh->nv, mesh->d);
   printf("\nProjection...\n");
-  octetramesh_print_stats(octetramesh_stats(mesh));
+  //octetramesh_print_stats(octetramesh_stats(mesh));
 
   return mesh;
 }

@@ -259,14 +259,24 @@ void test_bingham_discretize(int argc, char *argv[])
   printf("tot_mass = %f\n", tot_mass);
 
   int i;
-  int colors[pmf.n];
+
+  printf("break 1\n");
+  int *colors; safe_malloc(colors, pmf.n, int);
+  printf("break 2\n");
+
   double max_mass = max(pmf.mass, pmf.n);
   for (i = 0; i < pmf.n; i++)
     colors[i] = (int)(255*(pmf.mass[i] / max_mass));
 
-  printf("Calling tetramesh_meshgraph()...\n");
-
+  printf("Calling tetramesh_meshgraph()...");
+  double t = get_time_ms();
   meshgraph_t *graph = tetramesh_meshgraph(pmf.tetramesh);
+  printf("%f ms\n", get_time_ms() - t);
+
+  printf("Calling tetramesh_graph()...");
+  t = get_time_ms();
+  tetramesh_graph(pmf.tetramesh);
+  printf("%f ms\n", get_time_ms() - t);
 
   printf("Calling tetramesh_save_PLY_colors()...\n");
 
@@ -295,6 +305,10 @@ void test_bingham_mres(int argc, char *argv[])
 
   bingham_pmf_t pmf;
   bingham_discretize_mres(&pmf, &B, resolution);
+
+  // check if pmf sums to 1
+  double tot_mass = sum(pmf.mass, pmf.n);
+  printf("tot_mass = %f\n", tot_mass);
 
   int i;
   int colors[pmf.n];
@@ -369,6 +383,35 @@ void test_bingham_pdf(int argc, char *argv[])
 }
 
 
+void test_bingham_sample(int argc, char *argv[])
+{
+  if (argc < 6) {
+    printf("usage: %s <z1> <z2> <z3> <num_cells> <num_samples>\n", argv[0]);
+    exit(1);
+  }
+
+  double z1 = atof(argv[1]);
+  double z2 = atof(argv[2]);
+  double z3 = atof(argv[3]);
+  int ncells = atoi(argv[4]);
+  int nsamples = atoi(argv[5]);
+
+  double Z[3] = {z1, z2, z3};
+  double V[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
+
+  bingham_t B;
+  bingham_new(&B, 4, Vp, Z);
+
+  bingham_pmf_t pmf;
+  bingham_discretize(&pmf, &B, ncells);
+
+  double **X = new_matrix2(nsamples, 4);
+  bingham_sample(X, &pmf, nsamples);
+
+  bingham_fit(&B, X, nsamples, 4);
+}
+
 void test_bingham_init()
 {
   double t0 = get_time_ms();
@@ -385,12 +428,14 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
-  test_bingham_discretize(argc, argv);
+  test_bingham_sample(argc, argv);
+
+  //test_bingham_discretize(argc, argv);
+  //test_bingham_mres(argc, argv);
 
 
   //test_hypersphere_mres(argc, argv);
   //test_bingham_mres(argc, argv);
-  //test_sample_2d(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);

@@ -63,6 +63,9 @@ void tetramesh_free(tetramesh_t *mesh);
 // Get the meshgraph of a tetramesh.
 meshgraph_t *tetramesh_meshgraph(tetramesh_t *mesh);
 
+// Get the graph of a tetramesh.
+graph_t *tetramesh_graph(tetramesh_t *mesh);
+
 // Save a tetrahedral mesh to PLY file.
 void tetramesh_save_PLY(tetramesh_t *mesh, meshgraph_t *graph, char *filename);
 void tetramesh_save_PLY_colors(tetramesh_t *mesh, meshgraph_t *graph, char *filename, int *colors);

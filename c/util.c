@@ -846,12 +846,23 @@ void sample_simplex(double x[], double **S, int n, int d)
 {
   int i;
 
+  //dbug
+  //printf("S = [\n");
+  //for (i = 0; i < n; i++)
+  //  printf("%f, %f, %f, %f\n", S[i][0], S[i][1], S[i][2], S[i][3]);
+  //printf("]\n");
+
   // get n-1 uniform samples, u, on [0,1], and sort them
   double u[n];
   for (i = 0; i < n-1; i++)
     u[i] = frand();
-  qsort((void *)u, n-1, sizeof(double), dcomp);
   u[n-1] = 1;
+
+  //printf("u = [%f  %f  %f  %f]\n", u[0], u[1], u[2], u[3]);  //dbug
+
+  qsort((void *)u, n-1, sizeof(double), dcomp);
+
+  //printf("u (sorted) = [%f  %f  %f  %f]\n", u[0], u[1], u[2], u[3]);  //dbug
 
   // mixing coefficients are the order statistics of u
   double c[n];
@@ -859,13 +870,19 @@ void sample_simplex(double x[], double **S, int n, int d)
   for (i = 1; i < n; i++)
     c[i] = u[i] - u[i-1];
 
+  //printf("c = [%f  %f  %f  %f]\n", c[0], c[1], c[2], c[3]);  //dbug
+
   // x = sum(c[i]*S[i])
   mult(x, S[0], c[0], d);
-  for (i = 0; i < n; i++) {
+  for (i = 1; i < n; i++) {
     double y[d];
     mult(y, S[i], c[i], d);
     add(x, x, y, d);
   }
+
+  //printf("x = [%f  %f  %f  %f]\n", x[0], x[1], x[2], x[3]);  //dbug
+
+  //sleep(1);
 }
 
 
