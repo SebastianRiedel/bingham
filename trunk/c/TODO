@@ -1,15 +1,17 @@
 
 
 NOW:
- - Test bingham_pdf()
-
+ - Cache hypersphere tessellations
 
 SOON:
- - Test bingham_discretize()
-
+ - Triangular meshing of S2
 
 
 DONE:
+ + Fix sample_simplex()
+ + Test bingham_sample()
+ + Test bingham_pdf()
+ + Test bingham_discretize()
  + Use safe_alloc()
  + Fast normalization constant lookup
  + Use graph traversal to avoid saving redundant faces to PLY files.
