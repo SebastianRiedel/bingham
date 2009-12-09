@@ -254,6 +254,10 @@ void test_bingham_discretize(int argc, char *argv[])
   bingham_pmf_t pmf;
   bingham_discretize(&pmf, &B, ncells);
 
+  // check if pmf sums to 1
+  double tot_mass = sum(pmf.mass, pmf.n);
+  printf("tot_mass = %f\n", tot_mass);
+
   int i;
   int colors[pmf.n];
   double max_mass = max(pmf.mass, pmf.n);
@@ -264,7 +268,7 @@ void test_bingham_discretize(int argc, char *argv[])
 
   meshgraph_t *graph = tetramesh_meshgraph(pmf.tetramesh);
 
-  printf("Calling tetramesh_sace_PLY_colors()...\n");
+  printf("Calling tetramesh_save_PLY_colors()...\n");
 
   tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
 }
@@ -379,17 +383,18 @@ void test_bingham_init()
 
 int main(int argc, char *argv[])
 {
+  test_bingham_init();
+
+  test_bingham_discretize(argc, argv);
+
+
   //test_hypersphere_mres(argc, argv);
   //test_bingham_mres(argc, argv);
-  //test_bingham_discretize(argc, argv);
   //test_sample_2d(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
-
   //test_bingham_pdf(argc, argv);
-
-  test_bingham_init();
-  test_fit(argc, argv);
+  //test_fit(argc, argv);
 
 
   return 0;
