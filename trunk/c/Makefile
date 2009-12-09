@@ -8,7 +8,7 @@ CC=gcc
 LINK=ar rcs
 CFLAGS=-Wall -I$(IDIR)
 
-LIBS=-lm -lgsl -lgslcblas #-lduma
+LFLAGS=-lm -lgsl -lgslcblas #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
 	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h
@@ -27,13 +27,13 @@ libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hyperspher
 	$(LINK) $@ $^
 
 test_tetramesh: test_tetramesh.o tetramesh.o octetramesh.o hypersphere.o util.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 test_bingham: test_bingham.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 test_util: test_util.o util.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 .PHONY: clean install
 
