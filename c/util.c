@@ -422,6 +422,19 @@ double dist(double x[], double y[], int n)
 }
 
 
+// computes the norm^2 of x-y
+double dist2(double x[], double y[], int n)
+{
+  double d = 0.0;
+  int i;
+
+  for (i = 0; i < n; i++)
+    d += (x[i]-y[i])*(x[i]-y[i]);
+
+  return d;
+}
+
+
 // computes the dot product of z and y
 double dot(double x[], double y[], int n)
 {
@@ -652,7 +665,25 @@ double triangle_area(double x[], double y[], double z[], int n)
 
 
 // calculate the volume of a tetrahedron
-double tetrahedron_volume(double x[], double y[], double z[], double w[], int n)
+double tetrahedron_volume(double x1[], double x2[], double x3[], double x4[], int n)
+{
+  double U = dist2(x1, x2, n);
+  double V = dist2(x1, x3, n);
+  double W = dist2(x2, x3, n);
+  double u = dist2(x3, x4, n);
+  double v = dist2(x2, x4, n);
+  double w = dist2(x1, x4, n);
+
+  double a = v+w-U;
+  double b = w+u-V;
+  double c = u+v-W;
+
+  return sqrt( (4*u*v*w - u*a*a - v*b*b - w*c*c + a*b*c) / 12.0 );
+}
+
+
+// calculate the volume of a tetrahedron
+inline double tetrahedron_volume_old(double x[], double y[], double z[], double w[], int n)
 {
   // make an orthonormal basis in the xyz plane (with x at the origin)
   double u[n], v[n], v_proj[n];
@@ -846,31 +877,19 @@ void sample_simplex(double x[], double **S, int n, int d)
 {
   int i;
 
-  //dbug
-  //printf("S = [\n");
-  //for (i = 0; i < n; i++)
-  //  printf("%f, %f, %f, %f\n", S[i][0], S[i][1], S[i][2], S[i][3]);
-  //printf("]\n");
-
   // get n-1 uniform samples, u, on [0,1], and sort them
   double u[n];
   for (i = 0; i < n-1; i++)
     u[i] = frand();
   u[n-1] = 1;
 
-  //printf("u = [%f  %f  %f  %f]\n", u[0], u[1], u[2], u[3]);  //dbug
-
   qsort((void *)u, n-1, sizeof(double), dcomp);
-
-  //printf("u (sorted) = [%f  %f  %f  %f]\n", u[0], u[1], u[2], u[3]);  //dbug
 
   // mixing coefficients are the order statistics of u
   double c[n];
   c[0] = u[0];
   for (i = 1; i < n; i++)
     c[i] = u[i] - u[i-1];
-
-  //printf("c = [%f  %f  %f  %f]\n", c[0], c[1], c[2], c[3]);  //dbug
 
   // x = sum(c[i]*S[i])
   mult(x, S[0], c[0], d);
@@ -879,10 +898,6 @@ void sample_simplex(double x[], double **S, int n, int d)
     mult(y, S[i], c[i], d);
     add(x, x, y, d);
   }
-
-  //printf("x = [%f  %f  %f  %f]\n", x[0], x[1], x[2], x[3]);  //dbug
-
-  //sleep(1);
 }
 
 

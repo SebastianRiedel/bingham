@@ -15,7 +15,7 @@ _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 LIBS = libbingham.a
-TARGETS = $(LIBS) test_tetramesh test_bingham test_util
+TARGETS = $(LIBS) test_bingham test_util
 
 
 all: $(TARGETS)
@@ -26,9 +26,6 @@ $(ODIR)/%.o: %.c $(DEPS)
 libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(LINK) $@ $^
 
-test_tetramesh: test_tetramesh.o tetramesh.o octetramesh.o hypersphere.o util.o
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
-
 test_bingham: test_bingham.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
@@ -38,7 +35,7 @@ test_util: test_util.o util.o
 .PHONY: clean install
 
 clean:
-	rm -f $(TARGETS) $(ODIR)/*.o *.a *~ core *.exe $(IDIR)/*~
+	rm -f $(TARGETS) $(ODIR)/*.o *.a *~ core *.exe $(IDIR)/*~ $(IDIR)/*/*~
 
 install:
 	if [ ! -d $(INSTALL_DIR)/include/bingham ] ; then mkdir $(INSTALL_DIR)/include/bingham ; fi

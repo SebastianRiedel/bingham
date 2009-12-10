@@ -37,7 +37,6 @@ double bingham_pdf(double x[], bingham_t *B);
 void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_sample(double **X, bingham_pmf_t *pmf, int n);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
-void bingham_discretize_mres(bingham_pmf_t *pmf, bingham_t *B, double resolution);
 
 
 

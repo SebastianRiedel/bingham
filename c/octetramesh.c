@@ -49,7 +49,7 @@ tetramesh_t *octetramesh_to_tetramesh(octetramesh_t *mesh)
  */
 graph_t *octetramesh_graph(octetramesh_t *mesh)
 {
-  printf("octetramesh_graph()\n");
+  //printf("octetramesh_graph()\n");
 
   int i, i0, i1, i2, i3, i4, i5;
   graph_t *g;
@@ -310,11 +310,11 @@ void octetramesh_subdivide_select(octetramesh_t *dst, octetramesh_t *src, int *t
   int p0, p1, p2, p3, p4, p5;
   int q0, q01, q02, q03, q04, q12, q23, q34, q41, q51, q52, q53, q54, q13;
 
-  printf("break 1\n");
+  //printf("break 1\n");
 
   graph_t *graph = octetramesh_graph(src);
 
-  printf("break 2\n");
+  //printf("break 2\n");
 
   int ne = graph->ne;
   int nv = src->nv;
@@ -322,42 +322,42 @@ void octetramesh_subdivide_select(octetramesh_t *dst, octetramesh_t *src, int *t
   int no = src->no;
   int d = src->d;
 
-  printf("break 3\n");
+  //printf("break 3\n");
 
-  printf("ne = %d\n", ne);
+  //printf("ne = %d\n", ne);
 
   // mark edges for subdivision
   int edgemask[ne];
 
-  printf("break 3.1\n");
+  //printf("break 3.1\n");
 
   select_edges(edgemask, src, graph, tetmask, octmask);
 
-  printf("break 4\n");
+  //printf("break 4\n");
 
   // create an edge map from the full edge list to the selected edge list
   int edgemap[ne];
   findinv(edgemap, edgemask, ne);
 
-  printf("break 5\n");
+  //printf("break 5\n");
 
   // create an oct map from the full octahedron list to the selected octahedron list
   int octmap[no];
   findinv(octmap, octmask, no);
 
-  printf("break 6\n");
+  //printf("break 6\n");
 
   int tdiv = count(tetmask, nt);   // # of tetrahedra to subdivide
   int odiv = count(octmask, no);   // # of octahedra to subdivide
   int ediv = count(edgemask, ne);  // # of edges to subdivide
 
-  printf("break 7\n");
+  //printf("break 7\n");
 
   int nv2 = nv + ediv + odiv;  // old vertices + midpoints + octahedral centers
   int nt2 = (nt - tdiv) + 4*tdiv + 8*odiv;
   int no2 = (no - odiv) + tdiv + 6*odiv;
 
-  printf("nv2 = %d, nt2 = %d, no2 = %d\n", nv2, nt2, no2);
+  //printf("nv2 = %d, nt2 = %d, no2 = %d\n", nv2, nt2, no2);
 
   // allocate space for the new mesh and copy old vertices, midpoints, and octahedral centers into dst
   octetramesh_new(dst, nv2, nt2, no2, d);
@@ -476,7 +476,7 @@ void octetramesh_subdivide_select(octetramesh_t *dst, octetramesh_t *src, int *t
     }
   }
 
-  printf("tcnt = %d, ocnt = %d\n", tcnt, ocnt);
+  //printf("tcnt = %d, ocnt = %d\n", tcnt, ocnt);
 
   graph_free(graph);
 }
@@ -655,7 +655,7 @@ void octetramesh_subdivide_mres(octetramesh_t *dst, octetramesh_t *src,
     //printf("F = (%f, %f, %f, %f, %f, %f) --> %d\n", F[0], F[1], F[2], F[3], F[4], F[5], octmask[i]);
   }
 
-  printf("count(tetmask) = %d, count(octmask) = %d\n", count(tetmask, nt), count(octmask, no));
+  //printf("count(tetmask) = %d, count(octmask) = %d\n", count(tetmask, nt), count(octmask, no));
 
   if (count(tetmask, nt) == 0 && count(octmask, no) == 0) {
     memcpy(dst, src, sizeof(octetramesh_t));

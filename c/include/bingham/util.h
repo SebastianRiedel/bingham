@@ -32,6 +32,7 @@ double max(double x[], int n);                                        // compute
 double min(double x[], int n) ;                                       // computes the min of x
 double norm(double x[], int n);                                       // computes the norm of x
 double dist(double x[], double y[], int n);                           // computes the norm of x-y
+double dist2(double x[], double y[], int n);                          // computes the norm^2 of x-y
 double dot(double x[], double y[], int n);                            // computes the dot product of z and y
 void add(double z[], double x[], double y[], int n);                  // adds two vectors, z = x+y
 void sub(double z[], double x[], double y[], int n);                  // subtracts two vectors, z = x-y

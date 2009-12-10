@@ -1,13 +1,19 @@
 
 
 NOW:
- - Cache hypersphere tessellations
-
-SOON:
  - Triangular meshing of S2
 
 
+SOON:
+ - Test speed of bingham_pdf()
+ - Test for memory leaks (continuous operation)
+
+
 DONE:
+ + Improve speed of bingham_discretize()
+ + Test speed of bingham_discretize()
+ + Test speed of bingham_sample()
+ + Cache hypersphere tessellations
  + Fix sample_simplex()
  + Test bingham_sample()
  + Test bingham_pdf()

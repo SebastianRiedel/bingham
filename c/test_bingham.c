@@ -283,7 +283,7 @@ void test_bingham_discretize(int argc, char *argv[])
   tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
 }
 
-
+/*
 void test_bingham_mres(int argc, char *argv[])
 {
   if (argc < 5) {
@@ -320,26 +320,7 @@ void test_bingham_mres(int argc, char *argv[])
 
   tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mres.ply", colors);
 }
-
-
-static double func(double *x, void *fdata)
-{
-  return x[0]*x[0]*x[0]*x[0];
-}
-
-void test_hypersphere_mres(int argc, char *argv[])
-{
-  if (argc < 2) {
-    printf("usage: %s <resolution>\n", argv[0]);
-    exit(1);
-  }
-
-  double resolution = atof(argv[1]);
-
-  octetramesh_t *oct = hypersphere_tessellation_octetra_mres(func, (void *)0, resolution);
-
-  octetramesh_save_PLY(oct, "mres.ply");
-}
+*/
 
 
 void test_bingham_pdf(int argc, char *argv[])
@@ -404,10 +385,14 @@ void test_bingham_sample(int argc, char *argv[])
   bingham_new(&B, 4, Vp, Z);
 
   bingham_pmf_t pmf;
+  double t0 = get_time_ms();
   bingham_discretize(&pmf, &B, ncells);
+  printf("Created PMF with %d cells in %.0f ms\n", pmf.n, get_time_ms() - t0);
 
+  t0 = get_time_ms();
   double **X = new_matrix2(nsamples, 4);
   bingham_sample(X, &pmf, nsamples);
+  printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
 
   bingham_fit(&B, X, nsamples, 4);
 }
@@ -420,7 +405,7 @@ void test_bingham_init()
 
   double t1 = get_time_ms();
 
-  printf("Initialized bingham library in %.2f ms.\n", t1-t0);
+  printf("Initialized bingham library in %.0f ms\n", t1-t0);
 }
 
 
@@ -431,11 +416,6 @@ int main(int argc, char *argv[])
   test_bingham_sample(argc, argv);
 
   //test_bingham_discretize(argc, argv);
-  //test_bingham_mres(argc, argv);
-
-
-  //test_hypersphere_mres(argc, argv);
-  //test_bingham_mres(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
