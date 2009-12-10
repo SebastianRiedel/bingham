@@ -376,6 +376,7 @@ static void bingham_MLE_NN(bingham_t *B, double **X, int n)
 void bingham_init()
 {
   bingham_constants_init();
+  hypersphere_init();
 }
 
 
@@ -476,19 +477,6 @@ double bingham_pdf(double x[], bingham_t *B)
 
 
 /*
- * Function pointer to bingham_pdf.
- */
-static double bingham_pdf_callback(double *x, void *B)
-{
-  int d = ((bingham_t *)B)->d;
-  double y[d];
-  mult(y, x, 1/norm(x, d), d);
-
-  return bingham_pdf(y, (bingham_t *)B);
-}
-
-
-/*
  * Fit a bingham to a set of samples.
  */
 void bingham_fit(bingham_t *B, double **X, int n, int d)
@@ -546,10 +534,13 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
   if (d == 4) {
 
     // mesh
-    octetramesh_t *oct = hypersphere_tessellation_octetra(ncells);
-    pmf->tetramesh = octetramesh_to_tetramesh(oct);
-    octetramesh_free(oct);
-    free(oct);
+    //octetramesh_t *oct = hypersphere_tessellation_octetra(ncells);
+    //pmf->tetramesh = octetramesh_to_tetramesh(oct);
+    //octetramesh_free(oct);
+    //free(oct);
+    pmf->tetramesh = tessellate_S3(ncells);
+
+    double t0 = get_time_ms();  //dbug
 
     // points and volumes
     int n = pmf->tetramesh->nt;
@@ -558,6 +549,10 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     safe_malloc(pmf->volumes, n, double);
     tetramesh_centroids(pmf->points, pmf->volumes, pmf->tetramesh);
 
+    printf("Created points and volumes in %.0f ms\n", get_time_ms() - t0);  //dbug
+
+    t0 = get_time_ms();  //dbug
+
     // probability mass
     safe_malloc(pmf->mass, n, double);
     double tot_mass = 0;
@@ -565,18 +560,85 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
       pmf->mass[i] = pmf->volumes[i] * exp(bingham_L(B, &pmf->points[i], 1));
       tot_mass += pmf->mass[i];
     }
-    //mult(pmf->mass, pmf->mass, 1/tot_mass, n);
+    mult(pmf->mass, pmf->mass, 1/tot_mass, n);
+
+    printf("Computed probabilities in %.0f ms\n", get_time_ms() - t0);  //dbug
+
   }
   else {
     printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
     return;
-  }    
+  }
 }
 
 
 /*
- * Discretize a Bingham distribution into a multi-resolution grid.
+ * Simulate samples from a discrete Bingham distribution.
  */
+void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
+{
+  int i;
+
+  // compute the CDF
+  double *cdf;  safe_malloc(cdf, pmf->n, double);
+
+  memset(cdf, 0, pmf->n * sizeof(double));
+  cdf[0] = pmf->mass[0];
+  for (i = 1; i < pmf->n; i++)
+    cdf[i] = cdf[i-1] + pmf->mass[i];
+
+  // sample from the inverse CDF
+  for (i = 0; i < n; i++) {
+    double u = frand();
+    int cell = binary_search_cdf(u, cdf, pmf->n);
+
+    if (pmf->d == 4) {
+
+      double *v0 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][0] ];
+      double *v1 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][1] ];
+      double *v2 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][2] ];
+      double *v3 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][3] ];
+      double *S[4] = {v0, v1, v2, v3};
+
+      //double x1[4], x2[4];
+      //avg(x1, v0, v1, 4);
+      //avg(x2, v2, v3, 4);
+      //avg(X[i], x1, x2, 4);
+
+      sample_simplex(X[i], S, pmf->d, pmf->d);
+    }
+    else {
+      printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", pmf->d);
+      free(cdf);
+      return;
+    }
+  }
+
+  free(cdf);
+}
+
+
+
+
+//------------ DEPRECATED ------------//
+
+
+/*
+ * Function pointer to bingham_pdf.
+ *
+static double bingham_pdf_callback(double *x, void *B)
+{
+  int d = ((bingham_t *)B)->d;
+  double y[d];
+  mult(y, x, 1/norm(x, d), d);
+
+  return bingham_pdf(y, (bingham_t *)B);
+}
+*/
+
+/*
+ * Discretize a Bingham distribution into a multi-resolution grid.
+ *
 void bingham_discretize_mres(bingham_pmf_t *pmf, bingham_t *B, double resolution)
 {
   int i, d = B->d;
@@ -613,46 +675,5 @@ void bingham_discretize_mres(bingham_pmf_t *pmf, bingham_t *B, double resolution
     return;
   }    
 }
-
-
-/*
- * Simulate samples from a discrete Bingham distribution.
- */
-void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
-{
-  int i;
-
-  // compute the CDF
-  double cdf[pmf->n];
-  memset(cdf, 0, pmf->n * sizeof(double));
-  cdf[0] = pmf->mass[0];
-  for (i = 1; i < pmf->n; i++)
-    cdf[i] = cdf[i-1] + pmf->mass[i];
-
-  // sample from the inverse CDF
-  for (i = 0; i < n; i++) {
-    double u = frand();
-    int cell = binary_search_cdf(u, cdf, pmf->n);
-
-    if (pmf->d == 4) {
-
-      double *v0 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][0] ];
-      double *v1 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][1] ];
-      double *v2 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][2] ];
-      double *v3 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][3] ];
-      double *S[4] = {v0, v1, v2, v3};
-
-      //double x1[4], x2[4];
-      //avg(x1, v0, v1, 4);
-      //avg(x2, v2, v3, 4);
-      //avg(X[i], x1, x2, 4);
-
-      sample_simplex(X[i], S, pmf->d, pmf->d);
-    }
-    else {
-      printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", pmf->d);
-      return;
-    }
-  }
-}
+*/
 

@@ -29,6 +29,8 @@ void bingham_constants_init()
   if (dY_tree_3d)  // already initialized
     return;
 
+  double t0 = get_time_ms();
+
   int i, j, k;
   const int n = BINGHAM_TABLE_LENGTH;
 
@@ -60,6 +62,8 @@ void bingham_constants_init()
   dY_tree_3d = kdtree(dY3d, cnt, 3);
 
   free_matrix2(dY3d);
+
+  printf("Initialized bingham constants in %.0f ms\n", get_time_ms() - t0);
 }
 
 
