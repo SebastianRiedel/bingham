@@ -336,29 +336,43 @@ static void bingham_MLE_grad_desc(bingham_t *B, double **X, int n)
 
 
 /*
- * Compute MLE parameters concentration parameters B->Z given n samples X with principal components B->V
+ * Compute MLE parameters concentration parameters B->Z given scatter matrix S with principal components B->V
  * using NN lookup.
  */
-static void bingham_MLE_NN(bingham_t *B, double **X, int n)
+static void bingham_MLE_NN(bingham_t *B, double **S)
 {
-  int i, j, d = B->d;
-  double dvx;
+  int d = B->d;
 
   if (d != 4) {
     printf("Error: bingham_MLE_NN() is only implemented for d = 4!  Exiting...\n");
     exit(1);
   }
 
-  double dY[d-1];
-  memset(dY, 0, (d-1)*sizeof(double));
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < d-1; j++) {
-      dvx = dot(B->V[j], X[i], d);
-      dY[j] += dvx*dvx;
-    }
-  }
+  double sv0[d], sv1[d], sv2[d];
 
-  mult(dY, dY, 1/(double)n, d-1);
+  sv0[0] = dot(S[0], B->V[0], d);
+  sv0[1] = dot(S[1], B->V[0], d);
+  sv0[2] = dot(S[2], B->V[0], d);
+  sv0[3] = dot(S[3], B->V[0], d);
+
+  sv1[0] = dot(S[0], B->V[1], d);
+  sv1[1] = dot(S[1], B->V[1], d);
+  sv1[2] = dot(S[2], B->V[1], d);
+  sv1[3] = dot(S[3], B->V[1], d);
+
+  sv2[0] = dot(S[0], B->V[2], d);
+  sv2[1] = dot(S[1], B->V[2], d);
+  sv2[2] = dot(S[2], B->V[2], d);
+  sv2[3] = dot(S[3], B->V[2], d);
+
+  double dY[d-1];
+  dY[0] = dot(B->V[0], sv0, d);
+  dY[1] = dot(B->V[1], sv1, d);
+  dY[2] = dot(B->V[2], sv2, d);
+
+  //printf("dY = [%f %f %f]\n", dY[0], dY[1], dY[2]);
+
+  //mult(dY, dY, 1/(double)n, d-1);
 
   bingham_dY_params_3d(B->Z, &B->F, dY);
 
@@ -481,42 +495,58 @@ double bingham_pdf(double x[], bingham_t *B)
  */
 void bingham_fit(bingham_t *B, double **X, int n, int d)
 {
-  // use PCA to get B->V
   double **Xt = new_matrix2(d, n);
   transpose(Xt, X, n, d);
-  double **X2 = new_matrix2(d, d);
-  matrix_mult(X2, Xt, X, d, n, d);
+  double **S = new_matrix2(d, d);
+  matrix_mult(S, Xt, X, d, n, d);
+  mult(S[0], S[0], 1/(double)n, d*d);
+
+  bingham_fit_scatter(B, S, d);
+
+  free_matrix2(S);
+}
+
+
+/*
+ * Fit a bingham to the scatter matrix (X'*X) of a set of samples.
+ */
+void bingham_fit_scatter(bingham_t *B, double **S, int d)
+{
+  // use PCA to get B->V
   double *eigenvals;
   safe_malloc(eigenvals, d, double);
   double **V = new_matrix2(d, d);
-  eigen_symm(eigenvals, V, X2, d);
+  eigen_symm(eigenvals, V, S, d);
 
-  // use gradient descent to get B->Z
+  //printf("eigenvals = [%f %f %f %f]\n", eigenvals[0], eigenvals[1], eigenvals[2], eigenvals[3]);
+  //printf("V = [%f %f %f %f ; %f %f %f %f ; %f %f %f %f ; %f %f %f %f]\n",
+  //	 V[0][0], V[0][1], V[0][2], V[0][3],
+  //	 V[1][0], V[1][1], V[1][2], V[1][3],
+  //	 V[2][0], V[2][1], V[2][2], V[2][3],
+  //	 V[3][0], V[3][1], V[3][2], V[3][3]);
+
   B->d = d;
   B->V = V;
   safe_calloc(B->Z, d-1, double);
 
   // init B->Z
-  int i;
-  for (i = 0; i < d-1; i++)
-    B->Z[i] = -1;
+  //int i;
+  //for (i = 0; i < d-1; i++)
+  //  B->Z[i] = -1;
 
-  double t0, t1, L;
-  t0 = get_time_ms();
-  bingham_MLE_NN(B, X, n);
-  t1 = get_time_ms();
-  L = bingham_L(B, X, n);
-  printf("Computed MLE (NN) in %.2f ms:  Z = (%f, %f, %f)  --> L = %f\n", t1-t0, B->Z[0], B->Z[1], B->Z[2], L);
+  //double t0, t1, L;
+  //t0 = get_time_ms();
+  bingham_MLE_NN(B, S);
+  //t1 = get_time_ms();
+  //L = bingham_L(B, X, n);
+  //printf("Computed MLE (NN) in %.2f ms:  Z = (%f, %f, %f)  --> L = %f\n", t1-t0, B->Z[0], B->Z[1], B->Z[2], L);
 
-  t0 = get_time_ms();
-  bingham_MLE_grad_desc(B, X, n);
-  t1 = get_time_ms();
-  L = bingham_L(B, X, n);
-  printf("Computed MLE (grad) in %.2f ms:  Z = (%f, %f, %f) --> L = %f\n", t1-t0, B->Z[0], B->Z[1], B->Z[2], L);
+  //t0 = get_time_ms();
+  //bingham_MLE_grad_desc(B, X, n);
+  //t1 = get_time_ms();
+  //L = bingham_L(B, X, n);
+  //printf("Computed MLE (grad) in %.2f ms:  Z = (%f, %f, %f) --> L = %f\n", t1-t0, B->Z[0], B->Z[1], B->Z[2], L);
 
-
-  free(Xt);
-  free(X2);
   free(eigenvals);
 }
 

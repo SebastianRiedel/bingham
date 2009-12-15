@@ -755,7 +755,11 @@ void solve(double x[], double A[], double b[], int n)
 // compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
 void eigen_symm(double z[], double **V, double **X, int n)
 {
-  gsl_matrix_view m = gsl_matrix_view_array(X[0], n, n);
+  double A[n*n];
+  //safe_malloc(A, n*n, double);
+  memcpy(A, X[0], n*n*sizeof(double));
+
+  gsl_matrix_view m = gsl_matrix_view_array(A, n, n);
   gsl_vector *eval = gsl_vector_alloc(n);
   gsl_matrix *evec = gsl_matrix_alloc(n, n);
   gsl_eigen_symmv_workspace *w = gsl_eigen_symmv_alloc(n);
@@ -765,7 +769,11 @@ void eigen_symm(double z[], double **V, double **X, int n)
   gsl_eigen_symmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
 
   memcpy(z, eval->data, n*sizeof(double));
-  memcpy(V[0], evec->data, n*n*sizeof(double));
+
+  double **Vt = new_matrix2(n,n);
+  memcpy(Vt[0], evec->data, n*n*sizeof(double));
+  transpose(V, Vt, n, n);
+  free_matrix2(Vt);
 
   gsl_vector_free(eval);
   gsl_matrix_free(evec);

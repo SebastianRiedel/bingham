@@ -7,23 +7,23 @@
 
 
 typedef struct {
-  int d;       // dimensions
-  double **V;  // axes
-  double *Z;   // concentrations
-  double F;    // normalization constant
+  int d;       /* dimensions */
+  double **V;  /* axes */
+  double *Z;   /* concentrations */
+  double F;    /* normalization constant */
 } bingham_t;
 
 typedef struct {
-  int n;                // number of grid cells
-  int d;                // dimensions
-  double resolution;    // grid resolution
-  union {               // cell mesh
+  int n;                /* number of grid cells */
+  int d;                /* dimensions */
+  double resolution;    /* grid resolution */
+  union {               /* cell mesh */
     tetramesh_t *tetramesh;
-    //trimesh_t *trimesh;
+    /* trimesh_t *trimesh; */
   };
-  double **points;      // cell centroids
-  double *volumes;      // cell volumes
-  double *mass;         // cell probability mass
+  double **points;      /* cell centroids */
+  double *volumes;      /* cell volumes */
+  double *mass;         /* cell probability mass */
 } bingham_pmf_t;
 
 
@@ -35,6 +35,7 @@ void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1,
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
 void bingham_fit(bingham_t *B, double **X, int n, int d);
+void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_sample(double **X, bingham_pmf_t *pmf, int n);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
 
