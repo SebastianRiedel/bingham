@@ -46,7 +46,7 @@ static int binary_search_cdf(double x, double *A, int n)
 /*
  * Computes the average log likelihood of the parameters B->Z and B->V given n samples X.
  */
-static double bingham_L(bingham_t *B, double **X, int n)
+double bingham_L(bingham_t *B, double **X, int n)
 {
   int i, j, d = B->d;
   double dvx;
