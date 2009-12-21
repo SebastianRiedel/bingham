@@ -421,6 +421,28 @@ double bingham_F(bingham_t *B)
 
 
 /*
+ * Copy the contents of one bingham distribution into another.
+ * Note: bingham_copy() blindly allocates space for dst->V and dst->Z
+ * without freeing them first, so it should only be called on a freshly
+ * allocated bingham_t struct.
+ */
+void bingham_copy(bingham_t *dst, bingham_t *src)
+{
+  int d = src->d;
+
+  dst->d = d;
+
+  dst->V = new_matrix2(d-1, d);
+  memcpy(dst->V[0], src->V[0], d*(d-1)*sizeof(double));
+
+  safe_malloc(dst->Z, d-1, double);
+  memcpy(dst->Z, src->Z, (d-1)*sizeof(double));
+
+  dst->F = src->F;
+}
+
+
+/*
  * Create a new Bingham distribution.
  *
  * @param B Bingham distribution to create

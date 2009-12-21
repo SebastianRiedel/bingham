@@ -1,6 +1,7 @@
 
 
 NOW:
+ - Add function "F = bingham_F_lookup_3d(Z)" to bingham_constants.c
  - Triangular meshing of S2
 
 

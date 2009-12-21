@@ -94,6 +94,7 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY)
 
 
 
+
 ///////////////////////////////////////////////////////////////////
 //                                                               //
 //****************  Hypergeometric 1F1 Functions  ***************//
