@@ -38,6 +38,7 @@ void bingham_new(bingham_t *B, int d, double **V, double *Z);
 void bingham_new_S1(bingham_t *B, double *v1, double z1);
 void bingham_new_S2(bingham_t *B, double *v1, double *v2, double z1, double z2);
 void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1, double z2, double z3);
+void bingham_copy(bingham_t *dst, bingham_t *src);
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
 double bingham_L(bingham_t *B, double **X, int n);
