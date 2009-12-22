@@ -1,4 +1,4 @@
-function plot_bingham_3d(V, Z, F)
+function plot_bingham_3d(V, Z, F, Q)
 % plot_bingham_3d(V, Z, F)
 
 
@@ -26,3 +26,16 @@ C = C./max(max(C));
 surf(SX,SY,SZ,C, 'EdgeColor', 'none');
 axis vis3d;
 colormap(.5*gray+.5);
+
+
+if nargin >= 4
+   n = size(Q,1);
+   cmap = jet;
+   P = zeros(1, n);
+   for j=1:n
+      P(j) = bingham_pdf(Q(j,:), V, Z, F);
+   end
+   P = P./max(P);
+   C = cmap(round(1+63*P), :);
+   plot_quaternions(Q, C);
+end
