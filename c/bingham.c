@@ -609,6 +609,7 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     safe_malloc(pmf->mass, n, double);
     double tot_mass = 0;
     for (i = 0; i < n; i++) {
+      mult(pmf->points[i], pmf->points[i], 1/norm(pmf->points[i], d), d);
       pmf->mass[i] = pmf->volumes[i] * exp(bingham_L(B, &pmf->points[i], 1));
       tot_mass += pmf->mass[i];
     }
