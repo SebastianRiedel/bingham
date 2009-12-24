@@ -832,7 +832,7 @@ void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d)
 
   safe_realloc(BM->B, BM->n, bingham_t);
   safe_realloc(BM->w, BM->n, double);
-  normalize(BM->w, BM->w, BM->n);
+  mult(BM->w, BM->w, 1/sum(BM->w, BM->n), BM->n);
 }
 
 

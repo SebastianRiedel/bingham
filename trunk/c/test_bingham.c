@@ -377,31 +377,37 @@ void test_bingham_discretize(int argc, char *argv[])
 
   // check if pmf sums to 1
   double tot_mass = sum(pmf.mass, pmf.n);
-  printf("tot_mass = %f\n", tot_mass);
+  //printf("tot_mass = %f\n", tot_mass);
 
   int i;
 
-  printf("break 1\n");
+  //printf("break 1\n");
   int *colors; safe_malloc(colors, pmf.n, int);
-  printf("break 2\n");
+  //printf("break 2\n");
 
   double max_mass = max(pmf.mass, pmf.n);
   for (i = 0; i < pmf.n; i++)
     colors[i] = (int)(255*(pmf.mass[i] / max_mass));
 
-  printf("Calling tetramesh_meshgraph()...");
+  //printf("Calling tetramesh_meshgraph()...");
   double t = get_time_ms();
   meshgraph_t *graph = tetramesh_meshgraph(pmf.tetramesh);
-  printf("%f ms\n", get_time_ms() - t);
+  //printf("%f ms\n", get_time_ms() - t);
 
-  printf("Calling tetramesh_graph()...");
+  //printf("Calling tetramesh_graph()...");
   t = get_time_ms();
   tetramesh_graph(pmf.tetramesh);
-  printf("%f ms\n", get_time_ms() - t);
+  //printf("%f ms\n", get_time_ms() - t);
 
-  printf("Calling tetramesh_save_PLY_colors()...\n");
+  //printf("Calling tetramesh_save_PLY_colors()...\n");
 
   tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
+
+  // print out the points
+  printf("pmf.points = [ ");
+  for (i = 0; i < pmf.n; i++)
+    printf("%f %f %f %f ; ", pmf.points[i][0], pmf.points[i][1], pmf.points[i][2], pmf.points[i][3]);
+  printf("];\n");
 }
 
 /*
@@ -528,7 +534,7 @@ void test_bingham_init()
 
   double t1 = get_time_ms();
 
-  printf("Initialized bingham library in %.0f ms\n", t1-t0);
+  //printf("Initialized bingham library in %.0f ms\n", t1-t0);
 }
 
 
@@ -536,10 +542,10 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
-  test_fit_quaternions(argc, argv);
+  //test_fit_quaternions(argc, argv);
 
   //test_bingham_sample(argc, argv);
-  //test_bingham_discretize(argc, argv);
+  test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
