@@ -91,7 +91,7 @@ void hypersphere_init()
     tessellations[i] = octetramesh_to_tetramesh(mesh);
   }
 
-  printf("Initialized %d hypersphere tessellations (up to %d cells) in %.0f ms\n", levels, tessellations[levels-1]->nt, get_time_ms() - t0);
+  fprintf(stderr, "Initialized %d hypersphere tessellations (up to %d cells) in %.0f ms\n", levels, tessellations[levels-1]->nt, get_time_ms() - t0);
 }
 
 

@@ -63,7 +63,7 @@ void bingham_constants_init()
 
   free_matrix2(dY3d);
 
-  printf("Initialized bingham constants in %.0f ms\n", get_time_ms() - t0);
+  fprintf(stderr, "Initialized bingham constants in %.0f ms\n", get_time_ms() - t0);
 }
 
 
