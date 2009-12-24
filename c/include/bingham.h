@@ -32,6 +32,11 @@ typedef struct {
   double *mass;         /* cell probability mass */
 } bingham_pmf_t;
 
+typedef struct {
+  bingham_t *B;         /* array of binghams */
+  double *w;            /* weights */
+  int n;                /* number of binghams */
+} bingham_mix_t;
 
 void bingham_init();
 void bingham_new(bingham_t *B, int d, double **V, double *Z);
@@ -39,6 +44,7 @@ void bingham_new_S1(bingham_t *B, double *v1, double z1);
 void bingham_new_S2(bingham_t *B, double *v1, double *v2, double z1, double z2);
 void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1, double z2, double z3);
 void bingham_copy(bingham_t *dst, bingham_t *src);
+void bingham_free(bingham_t *B);
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
 double bingham_L(bingham_t *B, double **X, int n);
@@ -46,6 +52,7 @@ void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_sample(double **X, bingham_pmf_t *pmf, int n);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
+void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
 
 
 

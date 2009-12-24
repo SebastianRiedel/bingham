@@ -323,6 +323,15 @@ double surface_area_sphere(int d)
 }
 
 
+// logical not of a binary array
+void not(int y[], int x[], int n)
+{
+  int i;
+  for (i = 0; i < n; i++)
+    y[i] = !x[i];
+}
+
+
 // count the non-zero elements of x
 int count(int x[], int n)
 {
@@ -472,6 +481,16 @@ void mult(double y[], double x[], double c, int n)
 }
 
 
+// sets y = x/norm(x)
+void normalize(double y[], double x[], int n)
+{
+  double d = norm(x, n);
+  int i;
+  for (i = 0; i < n; i++)
+    y[i] = x[i]/d;
+}
+
+
 // multiplies two vectors, z = x.*y
 void vmult(double z[], double x[], double y[], int n)
 {
@@ -572,16 +591,47 @@ void ilist_free(ilist_t *x)
 }
 
 
-// returns a random double in [0,1]
-double frand()
+static void init_rand()
 {
   static int first = 1;
   if (first) {
     first = 0;
     srand (time(NULL));
   }
+}
+
+
+// returns a random double in [0,1]
+double frand()
+{
+  init_rand();
 
   return fabs(rand()) / (double)RAND_MAX;
+}
+
+
+// samples d integers from 0:n-1 uniformly without replacement
+void randperm(int *x, int n, int d)
+{
+  init_rand();
+
+  int i, j;
+
+  if (d > n) {
+    fprintf(stderr, "Error: d > n in randperm()\n");
+    return;
+  }
+  
+  for (i = 0; i < d; i++) {
+    while (1) {
+      x[i] = rand() % n;
+      for (j = 0; j < i; j++)
+	if (x[j] == x[i])
+	  break;
+      if (j == i)  // x[i] is unique
+	break;
+    }
+  }
 }
 
 

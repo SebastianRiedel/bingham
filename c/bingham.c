@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include "bingham.h"
 #include "bingham/util.h"
 #include "bingham/hypersphere.h"
@@ -344,7 +345,7 @@ static void bingham_MLE_NN(bingham_t *B, double **S)
   int d = B->d;
 
   if (d != 4) {
-    printf("Error: bingham_MLE_NN() is only implemented for d = 4!  Exiting...\n");
+    fprintf(stderr, "Error: bingham_MLE_NN() is only implemented for d = 4!  Exiting...\n");
     exit(1);
   }
 
@@ -439,6 +440,16 @@ void bingham_copy(bingham_t *dst, bingham_t *src)
   memcpy(dst->Z, src->Z, (d-1)*sizeof(double));
 
   dst->F = src->F;
+}
+
+
+/*
+ * Free the contents of a bingham
+ */
+void bingham_free(bingham_t *B)
+{
+  free_matrix2(B->V);
+  free(B->Z);
 }
 
 
@@ -601,7 +612,7 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     safe_malloc(pmf->volumes, n, double);
     tetramesh_centroids(pmf->points, pmf->volumes, pmf->tetramesh);
 
-    printf("Created points and volumes in %.0f ms\n", get_time_ms() - t0);  //dbug
+    fprintf(stderr, "Created points and volumes in %.0f ms\n", get_time_ms() - t0);  //dbug
 
     t0 = get_time_ms();  //dbug
 
@@ -615,11 +626,11 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     }
     mult(pmf->mass, pmf->mass, 1/tot_mass, n);
 
-    printf("Computed probabilities in %.0f ms\n", get_time_ms() - t0);  //dbug
+    fprintf(stderr, "Computed probabilities in %.0f ms\n", get_time_ms() - t0);  //dbug
 
   }
   else {
-    printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
+    fprintf(stderr, "Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
     return;
   }
 }
@@ -661,7 +672,7 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
       sample_simplex(X[i], S, pmf->d, pmf->d);
     }
     else {
-      printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", pmf->d);
+      fprintf(stderr, "Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", pmf->d);
       free(cdf);
       return;
     }
@@ -670,6 +681,159 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
   free(cdf);
 }
 
+
+/*
+ * Fits a Bingham distribution to the rows of X with MLESAC.
+ * Fills in B and outliers, and returns the number of outliers.
+ */
+int bingham_fit_mlesac(bingham_t *B, int *outliers, double **X, int n, int d)
+{
+  //fprintf(stderr, "bingham_fit_mlesac()\n");
+
+  int i, j, r[d], iter = 100;
+  double p0 = 1 / surface_area_sphere(d-1);
+  double logp0 = log(p0);
+  double pmax = 0;
+  int first = 1;
+
+  //fprintf(stderr, "p0 = %f, logp0 = %f\n", p0, logp0);
+
+  double **Xi = new_matrix2(d, d);
+
+  bingham_t Bi;
+
+  for (i = 0; i < iter; i++) {
+
+    // pick d points at random from X (no replacement)
+    randperm(r, n, d);
+    for (j = 0; j < d; j++)
+      memcpy(Xi[j], X[r[j]], d*sizeof(double));
+
+    //fprintf(stderr, "r = [%d %d %d %d]\n", r[0], r[1], r[2], r[3]);
+
+    // fit a Bingham to the d points
+    bingham_fit(&Bi, Xi, d, d);
+
+    // compute data log likelihood
+    double logp = 0;
+    for (j = 0; j < n; j++) {
+      double p = bingham_pdf(X[j], &Bi);
+      if (p > p0) {
+	logp += log(p);
+	//fprintf(stderr, "+");
+	//fflush(stderr);
+      }
+      else {
+	logp += logp0;
+	//fprintf(stderr, ".");
+	//fflush(stderr);
+      }
+    }
+    //fprintf(stderr, "\n");
+
+    //fprintf(stderr, "logp = %f\n", logp);
+
+    if (first || (logp > pmax)) {
+
+      //fprintf(stderr, " *** new best, logp = %f ***\n", logp);
+
+      pmax = logp;
+      if (first)
+	first = 0;
+      else
+	bingham_free(B);
+      memcpy(B, &Bi, sizeof(bingham_t));  // copy pointers from Bi to B
+    }
+    else
+      bingham_free(&Bi);
+  }
+  free_matrix2(Xi);
+
+  // find inliers/outliers
+  int L[n];
+  for (i = 0; i < n; i++) {
+    double p = bingham_pdf(X[i], B);
+    if (p > p0)
+      L[i] = 1;
+    else
+      L[i] = 0;
+  }
+  int num_inliers = count(L, n);
+  int num_outliers = n - num_inliers;
+  int inliers[num_inliers];
+  find(inliers, L, n);
+  not(L, L, n);
+  find(outliers, L, n);
+
+  //fprintf(stderr, "inliers = [ ");
+  //for (i = 0; i < num_inliers; i++)
+  //  fprintf(stderr, "%d ", inliers[i]);
+  //fprintf(stderr, "];\n");
+
+  //fprintf(stderr, "outliers = [ ");
+  //for (i = 0; i < num_outliers; i++)
+  //  fprintf(stderr, "%d ", outliers[i]);
+  //fprintf(stderr, "];\n");
+
+  // fit B to all the inliers
+  bingham_free(B);
+  Xi = new_matrix2(num_inliers, d);
+  for (j = 0; j < num_inliers; j++)
+    memcpy(Xi[j], X[inliers[j]], d*sizeof(double));
+  bingham_fit(B, Xi, num_inliers, d);
+  free_matrix2(Xi);
+
+  return num_outliers;
+}
+
+
+/*
+ * Fits a mixture of bingham distributions to the rows of X using a sample consensus algorithm.
+ * Fills in num_clusters and weights, and returns an array of bingham_t.
+ */
+void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d)
+{
+  const int min_points = 20;
+  const int iter = 100;
+  int outliers[n];
+  int num_outliers;
+  int i, j;
+
+  int capacity = 100;
+  safe_calloc(BM->B, capacity, bingham_t);
+  safe_calloc(BM->w, capacity, double);
+  BM->n = 0;
+
+  for (i = 0; i < iter; i++) {
+
+    num_outliers = bingham_fit_mlesac(&BM->B[i], outliers, X, n, d);
+    BM->w[i] = n - num_outliers;
+
+    //fprintf(stderr, "num_outliers = %d, w[%d] = %.0f\n", num_outliers, i, BM->w[i]);
+
+    if (BM->w[i] >= min_points)
+      BM->n++;
+    else
+      break;
+
+    if (num_outliers < min_points)
+      break;
+
+    n = num_outliers;
+    double **X2 = new_matrix2(n, d);
+    for (j = 0; j < n; j++)
+      memcpy(X2[j], X[outliers[j]], d*sizeof(double));
+    if (i > 0)
+      free_matrix2(X);
+    X = X2;
+  }
+  if (i > 0)
+    free(X);
+
+  safe_realloc(BM->B, BM->n, bingham_t);
+  safe_realloc(BM->w, BM->n, double);
+  normalize(BM->w, BM->w, BM->n);
+}
 
 
 

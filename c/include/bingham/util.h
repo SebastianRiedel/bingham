@@ -21,9 +21,11 @@ double fact(int x);                                     /* computes the factoria
 double lfact(int x);                                    /* computes the log factorial of x */
 double surface_area_sphere(int d);                      /* computes the surface area of a unit sphere with dimension d */
 double frand();                                         /* returns a random double in [0,1] */
+void randperm(int *x, int n, int d);                    /* samples d integers from 0:n-1 uniformly without replacement */
 double erfinv(double x);                                /* approximation to the inverse error function */
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 
+void not(int y[], int x[], int n);                                    /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
 void find(int *k, int x[], int n);                                    /* computes a dense array of the indices of x's non-zero elements */
 void findinv(int *k, int x[], int n);                                 /* computes a sparse array of the indices of x's non-zero elements */
@@ -37,6 +39,7 @@ double dot(double x[], double y[], int n);                            /* compute
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */
+void normalize(double y[], double x[], int n);                        /* sets y = x/norm(x) */
 void vmult(double z[], double x[], double y[], int n);                /* multiplies two vectors, z = x.*y */
 void avg(double z[], double x[], double y[], int n);                  /* averages two vectors, z = (x+y)/2 */
 void wavg(double z[], double x[], double y[], double w, int n);       /* averages two vectors, z = w*x+(1-w)*y */
