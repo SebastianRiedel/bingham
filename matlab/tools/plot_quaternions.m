@@ -1,14 +1,17 @@
-function plot_quaternions(Q, C)
+function plot_quaternions(Q, C, plot_sphere)
 % plot_quaternions(Q) -- plots quaternions as an axis/angle chart (Q is
 % n-by-4)
 
 %clf;
 
 subplot(2,1,1);
-%[SX,SY,SZ] = sphere(30);
-%surf(SX,SY,SZ, 'EdgeColor', 'none');
+
+if nargin >= 3 && plot_sphere
+    [SX,SY,SZ] = sphere(30);
+    surf(SX,SY,SZ, 'EdgeColor', 'none');
+    colormap(.5*gray+.5);
+end
 axis vis3d;
-%colormap(.5*gray+.5);
 hold on;
 
 subplot(2,1,2);

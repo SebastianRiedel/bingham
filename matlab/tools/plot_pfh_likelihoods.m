@@ -5,7 +5,7 @@ k = size(M,1);
 
 %cmap = gray;
 
-figure(1);
+figure(20);
 bar(F);
 p = zeros(1,k);
 for c=1:k
@@ -13,7 +13,7 @@ for c=1:k
 end
 %p = 65 - ceil(64*(p./max(p)));
 p = p./max(p);
-figure(2);
+figure(21);
 for c=1:k
    subplot(k,1,c);
    %bar(M(c,:), 'FaceColor', cmap(p(c),:));
