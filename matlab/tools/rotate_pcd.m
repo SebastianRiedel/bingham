@@ -24,4 +24,9 @@ if isfield(pcd, 'PCX')
     pcd2.PCZ = V(3,:)';
 end
 
-%pcd2.Q = get_pcd_quaternions
+if isfield(pcd, 'Q')
+    for i=1:size(pcd.Q,1)
+        pcd2.Q(i,:,1) = quaternion_mult(q, pcd.Q(i,:,1));
+        pcd2.Q(i,:,2) = quaternion_mult(q, pcd.Q(i,:,2));
+    end
+end
