@@ -88,9 +88,9 @@ if ~isempty(ch_nx) && ~isempty(ch_pcx)
    pcd.Q = get_pcd_quaternions(pcd.data, pcd.columns);
 end
 if ~isempty(ch_pfh) && ~isempty(ch_cluster)
-    pcd.M = zeros(k, size(pcd.F,2));
-    for i=1:k
-        pcd.M(i,:) = mean(pcd.F(L==i-1,:));
+    pcd.M = zeros(pcd.k, size(pcd.F,2));
+    for i=1:pcd.k
+        pcd.M(i,:) = mean(pcd.F(pcd.L==i-1,:));
     end
 end
 

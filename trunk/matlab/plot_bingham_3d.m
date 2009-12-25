@@ -1,6 +1,9 @@
-function plot_bingham_3d(V, Z, F, Q)
-% plot_bingham_3d(V, Z, F)
+function plot_bingham_3d(B, Q)
+% plot_bingham_3d(B, Q)
 
+V = B.V;
+Z = B.Z;
+F = B.F;
 
 clf;
 
@@ -28,12 +31,12 @@ axis vis3d;
 colormap(.5*gray+.5);
 
 
-if nargin >= 4
+if nargin >= 2
    n = size(Q,1);
    cmap = jet;
    P = zeros(1, n);
    for j=1:n
-      P(j) = bingham_pdf(Q(j,:), V, Z, F);
+      P(j) = bingham_pdf(Q(j,:), B);
    end
    P = P./max(P);
    C = cmap(round(1+63*P), :);

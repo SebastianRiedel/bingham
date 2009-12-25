@@ -13,5 +13,8 @@ B_rot = B;
 B_rot.V(:,1) = quaternion_mult(qv, B.V(:,1));
 B_rot.V(:,2) = quaternion_mult(qv, B.V(:,2));
 B_rot.V(:,3) = quaternion_mult(qv, B.V(:,3));
+%B_rot.V(:,1) = quaternion_mult(B.V(:,1), qv);
+%B_rot.V(:,2) = quaternion_mult(B.V(:,2), qv);
+%B_rot.V(:,3) = quaternion_mult(B.V(:,3), qv);
 
 %B_rot.V

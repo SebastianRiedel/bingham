@@ -1,5 +1,5 @@
-function plot_pcd_point(pcd, i, options)
-% plot_pcd_point(pcd, i, options)
+function plot_pcd_point(pcd, i, options, style)
+% plot_pcd_point(pcd, i, options, style)
 
 plot_normals = 0;
 plot_pcs = 0;
@@ -13,6 +13,10 @@ if nargin >= 3
    end
 end
 
+if nargin < 4
+    style = 'r.';
+end
+
 LINE_LENGTH_RATIO = 1;
 mean_std = mean([std(pcd.X) std(pcd.Y) std(pcd.Z)]);
 r = LINE_LENGTH_RATIO * mean_std;
@@ -21,7 +25,7 @@ x = pcd.X(i);
 y = pcd.Y(i);
 z = pcd.Z(i);
 
-plot3(x, y, z, 'r.');
+plot3(x, y, z, style, 'MarkerSize', 5, 'LineWidth', 5);
 hold on;
    
 if plot_normals
