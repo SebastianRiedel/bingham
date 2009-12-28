@@ -8,7 +8,7 @@ F = B.F;
 clf;
 
 subplot(2,1,1);
-[SX,SY,SZ] = sphere(30);
+[SX,SY,SZ] = sphere(50);
 n = size(SX,1);
 
 
@@ -28,6 +28,7 @@ C = C./max(max(C));
 
 surf(SX,SY,SZ,C, 'EdgeColor', 'none');
 axis vis3d;
+axis off;
 colormap(.5*gray+.5);
 
 

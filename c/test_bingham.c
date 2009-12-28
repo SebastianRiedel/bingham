@@ -401,7 +401,8 @@ void test_bingham_discretize(int argc, char *argv[])
 
   //printf("Calling tetramesh_save_PLY_colors()...\n");
 
-  tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
+  //tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
+  tetramesh_save_PLY(pmf.tetramesh, graph, "mesh.ply");
 
   // print out the points
   printf("pmf.points = [ ");

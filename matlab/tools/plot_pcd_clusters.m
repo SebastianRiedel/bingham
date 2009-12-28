@@ -6,8 +6,8 @@ function plot_pcd_clusters(data, columns, options)
 %    'q'  --  plot quaternions
 
 
-LINE_LENGTH_RATIO = .1;
-LINE_SKIP_RATE = 10;
+LINE_LENGTH_RATIO = .2; %.1;
+LINE_SKIP_RATE = 5; %10;
 
 plot_normals = 0;
 plot_pcs = 0;

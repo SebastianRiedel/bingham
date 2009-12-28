@@ -1,4 +1,4 @@
-function pose_voting(Q, B, C, pcd)
+function pose_voting(Q, B, C, q_obs, f_obs)
 % pose_voting(Q, B, C, pcd) -- computes a posterior distribution over
 % quaternions, Q, given bingham mixtures, B, cluster feature centers, C,
 % and point cloud, pcd.
