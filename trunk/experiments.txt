@@ -28,8 +28,12 @@ clear W B B_arr;
 B0; B_arr{1} = B; W{1} = B_weights; clear B; B1; B_arr{2} = B; W{2} = B_weights; clear B; B2; B_arr{3} = B; W{3} = B_weights; clear B; B3; B_arr{4} = B; W{4} = B_weights; clear B; B4; B_arr{5} = B; W{5} = B_weights; clear B; B5; B_arr{6} = B; W{6} = B_weights; clear B; B6; B_arr{7} = B; W{7} = B_weights; clear B; B7; B_arr{8} = B; W{8} = B_weights; clear B; B8; B_arr{9} = B; W{9} = B_weights; clear B; B9; B_arr{10} = B; W{10} = B_weights; 
 B = B_arr;
 
+% load pcd and compute quaternion clusters
+pcd_model = load_pcd('tools/000.580.67.pcd');
+for c=1:k, Qc{c} = [pcd_model.Q(find(pcd_model.L==c-1),:,1) ; pcd_model.Q(find(pcd_model.L==c-1),:,2)]; end
+
 % plot bingham mixtures
-for c=1:k, fprintf('cluster %d (n=%d)\n', c, length(B{c})); W{c}, for i=1:length(B{c}), figure(i); plot_bingham_3d(B{c}(i).V, B{c}(i).Z, B{c}(i).F, Qc{c}); end, input(':'); end
+for c=1:k, fprintf('cluster %d (n=%d)\n', c, length(B{c})); W{c}, for i=1:length(B{c}), figure(i); plot_bingham_3d(B{c}(i), Qc{c}); end, input(':'); end
 
 % plot local coordinates and pfh likelihoods for a point
 i=4; figure(5); plot_pcd(pcd); hold on; plot_pcd_point(pcd, i, 'np'); hold off; plot_pfh_likelihoods(pcd.M, pcd.F(i,:), .05);
@@ -42,6 +46,7 @@ n=20; [xxx I] = sort(-p.mass); cmap = jet; C = cmap(ceil(1+63*p.mass/max(p.mass)
 
 
 % plot clusters
+X = pcd_model.X; Y = pcd_model.Y; Z = pcd_model.Z; L = pcd_model.L;
 figure(10); for c=1:k, subplot(ceil(k/5), 5, c); plot3(X, Y, Z, '.'); hold on; plot3(X(L==c-1,:), Y(L==c-1,:), Z(L==c-1), 'r.'); hold off; axis vis3d; axis equal; axis off; title(sprintf('%d', c)); end
 
 pcd_model0 = pcd_model;
