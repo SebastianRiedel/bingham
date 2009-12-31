@@ -56,3 +56,8 @@ pcd_model2 = rotate_pcd(pcd_model, [sqrt(2)/2 0 sqrt(2)/2 0]);
 % pose posterior for a single point
 pcd = pcd1; for i=1200:50:length(pcd.X), fprintf('i=%d', i); figure(5); plot_pcd(pcd, '.', .2); hold on; plot_pcd_point(pcd, i, 'np'); hold off; plot_pfh_likelihoods(pcd_model.M, pcd.F(i,:), .05); p = pose_posterior(pmf.points, B, W, pcd_model.M, pcd.Q(i,:,1), pcd.F(i,:)); n=20; [xxx I] = sort(-p.mass); cmap = jet; C = cmap(ceil(1+63*p.mass/max(p.mass)), :); figure(6); plot_quaternions(p.points(I(1:n),:), C, 1); figure(7); bar(p.mass(I(1:n))); figure(8); for j=1:10, subplot(2,5,j); plot_pcd(rotate_pcd(pcd_model, p.points(I(j),:))); hold on; plot_pcd(pcd, 'r.'); hold off; axis off; end, input(':'); end
 
+
+% axis/angle visualization of pcs samples
+X = [bingham_sample_pcs(B{3}(1), 100*W{3}(1), p0(1)) ; bingham_sample_pcs(B{3}(2), 100*W{3}(2), p0(2)) ; bingham_sample_pcs(B{3}(3), 100*W{3}(3), p0(3)) ; bingham_sample_pcs(B{3}(4), 100*W{3}(4), p0(4))];
+A = X(:,2:4) .* repmat(2*acos(X(:,1)), [1 3]) ./ sqrt(1 - repmat(X(:,1).^2, [1 3]));
+p = []; for i=1:size(X,1), p(i) = bingham_mixture_pdf(X(i,:), B{3}, W{3}); end, p = p ./ max(p); C = []; for i=1:size(X,1), C(i,:) = cmap(round(1+63*p(i)), :); end, figure(13); clf; hold on; for i=1:size(A,1), plot3(A(i,1), A(i,2), A(i,3), '.', 'Color', C(i,:)); end; hold off; axis vis3d; axis equal;
