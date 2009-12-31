@@ -14,32 +14,6 @@
 
 
 
-/*
- * Binary search to find i s.t. A[i-1] <= x < A[i]
- */
-static int binary_search_cdf(double x, double *A, int n)
-{
-  int i0 = 0;
-  int i1 = n-1;
-  int i;
-
-  while (i0 <= i1) {
-    i = (i0 + i1) / 2;
-    if (x > A[i])
-      i0 = i + 1;
-    else if (i > 0 && x < A[i-1])
-      i1 = i-1;
-    else
-      break;
-  }
-
-  if (i0 <= i1)
-    return i;
-
-  return n-1;
-}
-
-
 
 //------------------- Bingham data log likelihood and partial derivatives -------------------//
 
@@ -654,7 +628,7 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
   // sample from the inverse CDF
   for (i = 0; i < n; i++) {
     double u = frand();
-    int cell = binary_search_cdf(u, cdf, pmf->n);
+    int cell = binary_search(u, cdf, pmf->n);
 
     if (pmf->d == 4) {
 
@@ -762,7 +736,7 @@ int bingham_fit_mlesac(bingham_t *B, int *outliers, double **X, int n, int d)
   int num_outliers = n - num_inliers;
   int inliers[num_inliers];
   find(inliers, L, n);
-  not(L, L, n);
+  vnot(L, L, n);
   find(outliers, L, n);
 
   //fprintf(stderr, "inliers = [ ");
@@ -793,7 +767,7 @@ int bingham_fit_mlesac(bingham_t *B, int *outliers, double **X, int n, int d)
  */
 void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d)
 {
-  const int min_points = 20;
+  const int min_points = 20;  // TODO: make this a parameter
   const int iter = 100;
   int outliers[n];
   int num_outliers;
@@ -848,7 +822,7 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
     return;
   }
 
-  int i;
+  int i, j;
   int d = B1->d;
 
   B->d = d;
@@ -882,23 +856,38 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
   eigen_symm(z, V, C, d);
   //matrix_copy(B->V, V, d-1, d);
   for (i = 0; i < d-1; i++)
-    memcpy(B->V[i], V[d-2-i], d*sizeof(double));
+    for (j = 0; j < d; j++)
+      B->V[i][j] = V[j][d-1-i];
 
   // set the smallest z[i] (in magnitude) to zero
   for (i = 0; i < d-1; i++)
     B->Z[i] = z[d-1-i] - z[0];
 
   // lookup F
+  if (d == 4)
+    B->F = bingham_F_lookup_3d(B->Z);
+  else if (d == 3)
+    B->F = bingham_F_2d(B->Z[0], B->Z[1]);
+  else if (d == 2)
+    B->F = bingham_F_1d(B->Z[0]);
+  else {
+    fprintf(stderr, "Error: bingham_mult() only supports 1D, 2D, and 3D binghams.\n");
+    B->F = 0;
+  }
 
+  /*
+  printf("z = [%f %f %f %f]\n", z[0], z[1], z[2], z[3]);
+  printf("V[0] = [%f %f %f %f]\n", V[0][0], V[0][1], V[0][2], V[0][3]);
+  printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
+  printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
+  printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
 
-
-
-  //printf("z = [%f %f %f %f]\n", z[0], z[1], z[2], z[3]);
-  //printf("V[0] = [%f %f %f %f]\n", V[0][0], V[0][1], V[0][2], V[0][3]);
-  //printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
-  //printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
-  //printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
-
+  printf("B->F = %f\n", B->F);
+  printf("B->Z = [%f %f %f]\n", B->Z[0], B->Z[1], B->Z[2]);
+  printf("B->V[0] = [%f %f %f %f]\n", B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
+  printf("B->V[1] = [%f %f %f %f]\n", B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
+  printf("B->V[2] = [%f %f %f %f]\n", B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
+  */
   
   free_matrix2(Vt);
   free_matrix2(Z);

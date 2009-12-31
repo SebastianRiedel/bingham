@@ -1,7 +1,7 @@
 
 
 NOW:
- - Add function "F = bingham_F_lookup_3d(Z)" to bingham_constants.c
+ - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
 
 
@@ -11,6 +11,7 @@ SOON:
 
 
 DONE:
+ + Add function "F = bingham_F_lookup_3d(Z)" to bingham_constants.c
  + Improve speed of bingham_discretize()
  + Test speed of bingham_discretize()
  + Test speed of bingham_sample()

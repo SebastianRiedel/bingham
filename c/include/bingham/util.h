@@ -25,7 +25,7 @@ void randperm(int *x, int n, int d);                    /* samples d integers fr
 double erfinv(double x);                                /* approximation to the inverse error function */
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 
-void not(int y[], int x[], int n);                                    /* logical not of a binary array */
+void vnot(int y[], int x[], int n);                                    /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
 void find(int *k, int x[], int n);                                    /* computes a dense array of the indices of x's non-zero elements */
 void findinv(int *k, int x[], int n);                                 /* computes a sparse array of the indices of x's non-zero elements */
@@ -45,6 +45,7 @@ void avg(double z[], double x[], double y[], int n);                  /* average
 void wavg(double z[], double x[], double y[], double w, int n);       /* averages two vectors, z = w*x+(1-w)*y */
 void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* averages three vectors, y = (x1+x2+x3)/3 */
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
+int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
 
 /* transpose a matrix */
 void transpose(double **Y, double **X, int n, int m);
