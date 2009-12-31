@@ -563,6 +563,27 @@ void test_bingham_mult(int argc, char *argv[])
 }
 
 
+void test_bingham_F_lookup_3d(int argc, char *argv[])
+{
+  if (argc < 4) {
+    printf("usage: %s <z1> <z2> <z3>\n", argv[0]);
+    exit(1);
+  }
+
+  double z1 = atof(argv[1]);
+  double z2 = atof(argv[2]);
+  double z3 = atof(argv[3]);
+
+  double Z[3] = {z1, z2, z3};
+
+  double F_interp = bingham_F_lookup_3d(Z);
+  double F_series = bingham_F_3d(z1, z2, z3);
+  double error = F_interp - F_series;
+
+  printf("\nF_interp = %f, F_series = %f, error = %f\n\n", F_interp, F_series, error);
+}
+
+
 void test_bingham_init()
 {
   double t0 = get_time_ms();
@@ -580,6 +601,7 @@ int main(int argc, char *argv[])
   //test_bingham_init();
 
   test_bingham_mult(argc, argv);
+  //test_bingham_F_lookup_3d(argc, argv);
 
   //test_fit_quaternions(argc, argv);
   //test_bingham_sample(argc, argv);

@@ -324,7 +324,7 @@ double surface_area_sphere(int d)
 
 
 // logical not of a binary array
-void not(int y[], int x[], int n)
+void vnot(int y[], int x[], int n)
 {
   int i;
   for (i = 0; i < n; i++)
@@ -533,6 +533,30 @@ void proj(double z[], double x[], double y[], int n)
   double d = norm(y, n);
   mult(u, y, 1/d, n);
   mult(z, u, dot(x,u,n), n);
+}
+
+
+// binary search to find i s.t. A[i-1] <= x < A[i]
+int binary_search(double x, double *A, int n)
+{
+  int i0 = 0;
+  int i1 = n-1;
+  int i;
+
+  while (i0 <= i1) {
+    i = (i0 + i1) / 2;
+    if (x > A[i])
+      i0 = i + 1;
+    else if (i > 0 && x < A[i-1])
+      i1 = i-1;
+    else
+      break;
+  }
+
+  if (i0 <= i1)
+    return i;
+
+  return n-1;
 }
 
 

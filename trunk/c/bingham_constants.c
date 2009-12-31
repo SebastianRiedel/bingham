@@ -93,6 +93,104 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY)
 }
 
 
+static double bingham_F_table_get(int i, int j, int k)
+{
+  if (i >= j) {
+    if (j >= k)
+      return bingham_F_table[i][j][k];
+    else if (i >= k)
+      return bingham_F_table[i][k][j];
+    else
+      return bingham_F_table[k][i][j];
+  }
+  else {
+    if (k >= j)
+      return bingham_F_table[k][j][i];
+    else if (k >= i)
+      return bingham_F_table[j][k][i];
+    else
+      return bingham_F_table[j][i][k];
+  }
+
+  return 0.0;
+}
+
+
+/*
+ * Look up normalization constant F given concentration params Z
+ * via trilinear interpolation.
+ */
+double bingham_F_lookup_3d(double *Z)
+{
+  double y0 = sqrt(-Z[0]);
+  double y1 = sqrt(-Z[1]);
+  double y2 = sqrt(-Z[2]);
+
+  int n = BINGHAM_TABLE_LENGTH;
+  double ymin = bingham_table_range[0];
+  double ymax = bingham_table_range[n-1];
+
+  // get the Z-table cell between (i0,i1), (j0,j1), and (k0,k1)
+
+  int i0, j0, k0, i1, j1, k1;
+
+  if (y0 <= ymin)
+    i1 = 1;
+  else if (y0 >= ymax)
+    i1 = n-1;
+  else
+    i1 = binary_search(y0, bingham_table_range, n);
+  i0 = i1-1;
+
+  if (y1 <= ymin)
+    j1 = 1;
+  else if (y1 >= ymax)
+    j1 = n-1;
+  else
+    j1 = binary_search(y1, bingham_table_range, n);
+  j0 = j1-1;
+
+  if (y2 <= ymin)
+    k1 = 1;
+  else if (y2 >= ymax)
+    k1 = n-1;
+  else
+    k1 = binary_search(y2, bingham_table_range, n);
+  k0 = k1-1;
+
+  // use trilinear interpolation between the 8 corners
+  y0 -= bingham_table_range[i0];
+  y1 -= bingham_table_range[j0];
+  y2 -= bingham_table_range[k0];
+  double d0 = bingham_table_range[i1] - bingham_table_range[i0];
+  double d1 = bingham_table_range[j1] - bingham_table_range[j0];
+  double d2 = bingham_table_range[k1] - bingham_table_range[k0];
+
+  double F000 = bingham_F_table_get(i0, j0, k0);
+  double F001 = bingham_F_table_get(i0, j0, k1);
+  double F010 = bingham_F_table_get(i0, j1, k0);
+  double F011 = bingham_F_table_get(i0, j1, k1);
+  double F100 = bingham_F_table_get(i1, j0, k0);
+  double F101 = bingham_F_table_get(i1, j0, k1);
+  double F110 = bingham_F_table_get(i1, j1, k0);
+  double F111 = bingham_F_table_get(i1, j1, k1);
+
+  // interpolate over k
+  double F00 = F000 + y2*(F001 - F000)/d2;
+  double F01 = F010 + y2*(F011 - F010)/d2;
+  double F10 = F100 + y2*(F101 - F100)/d2;
+  double F11 = F110 + y2*(F111 - F110)/d2;
+
+  // interpolate over j
+  double F0 = F00 + y1*(F01 - F00)/d1;
+  double F1 = F10 + y1*(F11 - F10)/d1;
+
+  // interpolate over i
+  double F = F0 + y0*(F1 - F0)/d0;
+
+  return F;
+}
+
 
 
 ///////////////////////////////////////////////////////////////////

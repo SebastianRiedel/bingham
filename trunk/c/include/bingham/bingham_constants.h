@@ -6,6 +6,7 @@
 
 void bingham_constants_init();
 void bingham_dY_params_3d(double *Z, double *F, double *dY);
+double bingham_F_lookup_3d(double *Z);
 
 
 //---------------- Bingham normalizing constants F(z) and partial derivatives ------------------//
