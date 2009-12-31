@@ -52,6 +52,12 @@ void transpose(double **Y, double **X, int n, int m);
 /* solve the equation Ax = b, where A is a square n-by-n matrix */
 void solve(double x[], double A[], double b[], int n);
 
+/* matrix copy, Y = X */
+void matrix_copy(double **Y, double **X, int n, int m);
+
+/* matrix addition, Z = X+Y */
+void matrix_add(double **Z, double **X, double **Y, int n, int m);
+
 /* matrix multiplication, Z = X*Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);
 
