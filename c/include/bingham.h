@@ -53,6 +53,7 @@ void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_sample(double **X, bingham_pmf_t *pmf, int n);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
 void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
+void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
 
 
 

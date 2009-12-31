@@ -836,6 +836,78 @@ void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d)
 }
 
 
+/*
+ * Multiplies two bingham distributions, B1 and B2.  Assumes B is already allocated.
+ *
+ * TODO: Make this faster.
+ */
+void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
+{
+  if (B1->d != B2->d) {
+    fprintf(stderr, "Error: B1->d != B2->d in bingham_mult()!\n");
+    return;
+  }
+
+  int i;
+  int d = B1->d;
+
+  B->d = d;
+
+  double **C1 = new_matrix2(d, d);
+  double **C2 = new_matrix2(d, d);
+  double **C = new_matrix2(d, d);
+
+  double **Z = new_matrix2(d-1, d-1);
+  double **Vt = new_matrix2(d, d-1);
+  double **ZV = new_matrix2(d-1, d);
+
+  // compute C1
+  for (i = 0; i < d-1; i++)
+    Z[i][i] = B1->Z[i];
+  transpose(Vt, B1->V, d-1, d);
+  matrix_mult(ZV, Z, B1->V, d-1, d-1, d);
+  matrix_mult(C1, Vt, ZV, d, d-1, d);
+
+  // compute C2
+  for (i = 0; i < d-1; i++)
+    Z[i][i] = B2->Z[i];
+  transpose(Vt, B2->V, d-1, d);
+  matrix_mult(ZV, Z, B2->V, d-1, d-1, d);
+  matrix_mult(C2, Vt, ZV, d, d-1, d);
+
+  // compute the principal components of C = C1 + C2
+  matrix_add(C, C1, C2, d, d);
+  double z[d];
+  double **V = C1;  // save an alloc
+  eigen_symm(z, V, C, d);
+  //matrix_copy(B->V, V, d-1, d);
+  for (i = 0; i < d-1; i++)
+    memcpy(B->V[i], V[d-2-i], d*sizeof(double));
+
+  // set the smallest z[i] (in magnitude) to zero
+  for (i = 0; i < d-1; i++)
+    B->Z[i] = z[d-1-i] - z[0];
+
+  // lookup F
+
+
+
+
+  //printf("z = [%f %f %f %f]\n", z[0], z[1], z[2], z[3]);
+  //printf("V[0] = [%f %f %f %f]\n", V[0][0], V[0][1], V[0][2], V[0][3]);
+  //printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
+  //printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
+  //printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
+
+  
+  free_matrix2(Vt);
+  free_matrix2(Z);
+  free_matrix2(ZV);
+  free_matrix2(C1);
+  free_matrix2(C2);
+  free_matrix2(C);
+}
+
 
 //------------ DEPRECATED ------------//
 

@@ -376,7 +376,7 @@ void test_bingham_discretize(int argc, char *argv[])
   bingham_discretize(&pmf, &B, ncells);
 
   // check if pmf sums to 1
-  double tot_mass = sum(pmf.mass, pmf.n);
+  //double tot_mass = sum(pmf.mass, pmf.n);
   //printf("tot_mass = %f\n", tot_mass);
 
   int i;
@@ -523,9 +523,45 @@ void test_bingham_sample(int argc, char *argv[])
   printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
 
   bingham_fit(&B, X, nsamples, 4);
-
-  
 }
+
+
+void test_bingham_mult(int argc, char *argv[])
+{
+  if (argc < 7) {
+    printf("usage: %s <z11> <z12> <z13> <z21> <z22> <z23> \n", argv[0]);
+    exit(1);
+  }
+
+  double z11 = atof(argv[1]);
+  double z12 = atof(argv[2]);
+  double z13 = atof(argv[3]);
+  double z21 = atof(argv[4]);
+  double z22 = atof(argv[5]);
+  double z23 = atof(argv[6]);
+ 
+  double Z1[3] = {z11, z12, z13};
+  double V1[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
+  bingham_t B1;
+  bingham_new(&B1, 4, Vp1, Z1);
+
+  double Z2[3] = {z21, z22, z23};
+  double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
+  //double V2[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
+  bingham_t B2;
+  bingham_new(&B2, 4, Vp2, Z2);
+
+  double Z[3];
+  double V[3][4];
+  double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
+  bingham_t B;
+  bingham_new(&B, 4, Vp, Z);
+
+  bingham_mult(&B, &B1, &B2);
+}
+
 
 void test_bingham_init()
 {
@@ -535,18 +571,19 @@ void test_bingham_init()
 
   double t1 = get_time_ms();
 
-  //printf("Initialized bingham library in %.0f ms\n", t1-t0);
+  printf("Initialized bingham library in %.0f ms\n", t1-t0);
 }
 
 
 int main(int argc, char *argv[])
 {
-  test_bingham_init();
+  //test_bingham_init();
+
+  test_bingham_mult(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-
   //test_bingham_sample(argc, argv);
-  test_bingham_discretize(argc, argv);
+  //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);

@@ -769,6 +769,20 @@ void transpose(double **Y, double **X, int n, int m)
 }
 
 
+// matrix copy, Y = X 
+void matrix_copy(double **Y, double **X, int n, int m)
+{
+  memcpy(Y[0], X[0], n*m*sizeof(double));
+}
+
+
+// matrix addition, Z = X+Y
+void matrix_add(double **Z, double **X, double **Y, int n, int m)
+{
+  add(Z[0], X[0], Y[0], n*m);
+}
+
+
 // matrix multiplication, Z = X*Y, where X is n-by-p and Y is p-by-m
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
 {
