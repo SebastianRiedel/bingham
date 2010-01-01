@@ -17,6 +17,8 @@
 
 double get_time_ms();  /* get the current system time in millis */
 
+char *sword(char *s, char *delim, int n);  /* returns a pointer to the nth word (starting from 0) in string s */
+
 double fact(int x);                                     /* computes the factorial of x */
 double lfact(int x);                                    /* computes the log factorial of x */
 double surface_area_sphere(int d);                      /* computes the surface area of a unit sphere with dimension d */

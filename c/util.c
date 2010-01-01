@@ -280,6 +280,24 @@ double get_time_ms()
 }
 
 
+// returns a pointer to the nth word (starting from 0) in string s
+char *sword(char *s, const char *delim, int n)
+{
+  if (s == NULL)
+    return NULL;
+
+  s += strspn(s, delim);  // skip over initial delimeters
+
+  int i;
+  for (i = 0; i < n; i++) {
+    s += strcspn(s, delim);  // skip over word
+    s += strspn(s, delim);  // skip over delimeters
+  }
+
+  return s;
+}
+
+
 // computes the log factorial of x
 double lfact(int x)
 {
