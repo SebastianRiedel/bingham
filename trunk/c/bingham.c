@@ -428,6 +428,17 @@ void bingham_free(bingham_t *B)
 
 
 /*
+ * Allocate the contents of a bingham
+ */
+void bingham_alloc(bingham_t *B, int d)
+{
+  B->d = d;
+  B->V = new_matrix2(d-1, d);
+  safe_malloc(B->Z, d-1, double);
+}
+
+
+/*
  * Create a new Bingham distribution.
  *
  * @param B Bingham distribution to create
@@ -881,13 +892,13 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
   printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
   printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
   printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
-
-  printf("B->F = %f\n", B->F);
-  printf("B->Z = [%f %f %f]\n", B->Z[0], B->Z[1], B->Z[2]);
-  printf("B->V[0] = [%f %f %f %f]\n", B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
-  printf("B->V[1] = [%f %f %f %f]\n", B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
-  printf("B->V[2] = [%f %f %f %f]\n", B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
   */
+
+  //printf("B->F = %f\n", B->F);
+  //printf("B->Z = [%f %f %f]\n", B->Z[0], B->Z[1], B->Z[2]);
+  //printf("B->V[0] = [%f %f %f %f]\n", B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
+  //printf("B->V[1] = [%f %f %f %f]\n", B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
+  //printf("B->V[2] = [%f %f %f %f]\n", B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
   
   free_matrix2(Vt);
   free_matrix2(Z);
@@ -896,6 +907,75 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
   free_matrix2(C2);
   free_matrix2(C);
 }
+
+
+
+/*
+ * Multiply two bingham mixtures, BM = BM1 * BM2.
+ */
+void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *BM2)
+{
+  int n1 = BM1->n;
+  int n2 = BM2->n;
+  int d = BM1->B[0].d;
+  int i, j;
+
+  BM->n = n1*n2;
+  safe_calloc(BM->w, BM->n, double);
+  safe_calloc(BM->B, BM->n, bingham_t);
+
+  // multiply bingham mixtures
+  int n = 0;
+  for (i = 0; i < n1; i++) {
+    for (j = 0; j < n2; j++) {
+      bingham_alloc(&BM->B[n], d);
+      bingham_mult(&BM->B[n], &BM1->B[i], &BM2->B[j]);
+      BM->w[n] = BM1->w[i] * BM2->w[j];
+      n++;
+    }
+  }
+
+  // sort mixture components
+  bingham_t b[n];
+  sortable_t wb[n];
+  for (i = 0; i < n; i++) {
+    wb[i].value = BM->w[i];
+    wb[i].data = (void *)(&b[i]);
+    memcpy(&b[i], &BM->B[i], sizeof(bingham_t));
+  }
+  sort_data(wb, n);
+  for (i = 0; i < n; i++) {
+    BM->w[i] = wb[i].value;
+    memcpy(&BM->B[i], wb[i].data, sizeof(bingham_t));
+  }
+}
+
+
+/*
+ * Remove mixture components with peak less than pthresh.
+ */
+void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh)
+{
+  int i, n = BM->n;
+  double peaks[n];
+
+  int cnt = 0;
+  for (i = 0; i < n; i++) {
+    peaks[i] = BM->w[i] / BM->B[i].F;
+    if (peaks[i] >= pthresh) {  // keep the bingham
+      if (cnt < i) {
+	memcpy(&BM->B[cnt], &BM->B[i], sizeof(bingham_t));
+	BM->w[cnt] = BM->w[i];
+      }
+      cnt++;
+    }
+    else {  // remove the bingham
+      bingham_free(&BM->B[i]);
+    }
+  }
+}
+
+
 
 
 //------------ DEPRECATED ------------//

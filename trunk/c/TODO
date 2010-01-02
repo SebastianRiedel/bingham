@@ -1,6 +1,7 @@
 
 
 NOW:
+ - Use bingham_F_lookup_3d() in bingham_new()
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
 
