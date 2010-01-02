@@ -1285,7 +1285,44 @@ int meshgraph_add_face(meshgraph_t *g, int i, int j, int k)
 }
 
 
+static int _sortable_cmp(const void *x1, const void *x2)
+{
+  double v1 = ((sortable_t *)x1)->value;
+  double v2 = ((sortable_t *)x2)->value;
 
+  if (v1 == v2)
+    return 0;
+
+  return (v1 < v2 ? -1 : 1);
+
+}
+
+// sort an array of weighted data using qsort
+void sort_data(sortable_t *x, size_t n)
+{
+  qsort(x, n, sizeof(sortable_t), _sortable_cmp);
+}
+
+
+/*
+static int _partition(double *x, int left, int right, int pivot)
+{
+
+}
+
+
+static void _qsort2(double *x, int *perm, int left, int right)
+{
+  if (right > left)
+}
+*/
+
+/* sort an array of doubles, x, and return the sorted indices, perm
+void qsort2(double *x, int *perm, int n)
+{
+  
+}
+*/
 
 int qselect(double *x, int n, int k)
 {

@@ -544,22 +544,35 @@ void test_bingham_mult(int argc, char *argv[])
   double V1[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
   double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
   bingham_t B1;
-  bingham_new(&B1, 4, Vp1, Z1);
+  B1.d = 4;
+  B1.Z = Z1;
+  B1.V = Vp1;
+  //bingham_new(&B1, 4, Vp1, Z1);
 
   double Z2[3] = {z21, z22, z23};
   double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
   //double V2[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
   double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
   bingham_t B2;
-  bingham_new(&B2, 4, Vp2, Z2);
+  B2.d = 4;
+  B2.Z = Z2;
+  B2.V = Vp2;
+  //bingham_new(&B2, 4, Vp2, Z2);
 
   double Z[3];
   double V[3][4];
   double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
   bingham_t B;
-  bingham_new(&B, 4, Vp, Z);
+  B.Z = Z;
+  B.V = Vp;
+  //bingham_new(&B, 4, Vp, Z);
 
-  bingham_mult(&B, &B1, &B2);
+  double t0 = get_time_ms();
+  int i, n=10000;
+  for (i = 0; i < n; i++)
+    bingham_mult(&B, &B1, &B2);
+  double t1 = get_time_ms();
+  printf("Performed %d same Bingham multiplications in %.0f ms\n", n, t1-t0);
 }
 
 
@@ -576,11 +589,37 @@ void test_bingham_F_lookup_3d(int argc, char *argv[])
 
   double Z[3] = {z1, z2, z3};
 
-  double F_interp = bingham_F_lookup_3d(Z);
-  double F_series = bingham_F_3d(z1, z2, z3);
-  double error = F_interp - F_series;
+  double t0 = get_time_ms();
+  int i, n=1000000;
+  for (i = 0; i < n; i++)
+    bingham_F_lookup_3d(Z);
+  double t1 = get_time_ms();
+  printf("Performed %d same F-lookups in %.0f ms\n", n, t1-t0);
 
-  printf("\nF_interp = %f, F_series = %f, error = %f\n\n", F_interp, F_series, error);
+  t0 = get_time_ms();
+  int j, k, m=200;
+  n=0;
+  for (i = 1; i <= m; i++) {
+    for (j = 1; j <= i; j++) {
+      for (k = 1; k <= j; k++) {
+	Z[0] = -i;
+	Z[1] = -j;
+	Z[2] = -k;
+	bingham_F_lookup_3d(Z);
+	n++;
+      }
+    }
+  }
+  t1 = get_time_ms();
+  printf("Performed %d unique F-lookups in %.0f ms\n", n, t1-t0);
+
+
+
+  //double F_interp = bingham_F_lookup_3d(Z);
+  //double F_series = bingham_F_3d(z1, z2, z3);
+  //double error = F_interp - F_series;
+
+  //printf("\nF_interp = %f, F_series = %f, error = %f\n\n", F_interp, F_series, error);
 }
 
 

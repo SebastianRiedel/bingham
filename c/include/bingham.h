@@ -44,6 +44,7 @@ void bingham_new_S1(bingham_t *B, double *v1, double z1);
 void bingham_new_S2(bingham_t *B, double *v1, double *v2, double z1, double z2);
 void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1, double z2, double z3);
 void bingham_copy(bingham_t *dst, bingham_t *src);
+void bingham_alloc(bingham_t *B, int d);
 void bingham_free(bingham_t *B);
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
@@ -54,6 +55,8 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
 void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
 void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
+void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *BM2);
+void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh);
 
 
 

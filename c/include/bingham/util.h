@@ -15,9 +15,18 @@
 #define safe_realloc(x, n, type) do{ x = (type*)realloc(x,(n)*sizeof(type)); test_alloc(x); } while(0)
 
 
+typedef struct {
+  double value;
+  void *data;
+} sortable_t;
+
+void sort_data(sortable_t *x, size_t n);  /* sort an array of weighted data using qsort */
+
 double get_time_ms();  /* get the current system time in millis */
 
-char *sword(char *s, char *delim, int n);  /* returns a pointer to the nth word (starting from 0) in string s */
+char *sword(char *s, const char *delim, int n);  /* returns a pointer to the nth word (starting from 0) in string s */
+
+
 
 double fact(int x);                                     /* computes the factorial of x */
 double lfact(int x);                                    /* computes the log factorial of x */
