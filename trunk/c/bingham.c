@@ -513,7 +513,7 @@ double bingham_pdf(double x[], bingham_t *B)
     double dvx0 = V[0][0]*x[0] + V[0][1]*x[1] + V[0][2]*x[2] + V[0][3]*x[3];
     double dvx1 = V[1][0]*x[0] + V[1][1]*x[1] + V[1][2]*x[2] + V[1][3]*x[3];
     double dvx2 = V[2][0]*x[0] + V[2][1]*x[1] + V[2][2]*x[2] + V[2][3]*x[3];
-    return exp(Z[0]*dvx0 + Z[1]*dvx1 + Z[2]*dvx2) / B->F;
+    return exp(Z[0]*dvx0*dvx0 + Z[1]*dvx1*dvx1 + Z[2]*dvx2*dvx2) / B->F;
   }
 
   int i, d = B->d;
@@ -719,6 +719,8 @@ void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh)
       // calculate num samples in each pc direction (rounded to the nearest odd number)
       pcs_grid_size[i] = 2*ceil(m*Y[i]/2.0) - 1;
       cmax[i] = sqrt(log(F*p0)/Z[i]);
+      if (cmax[i] > 1)
+	cmax[i] = 1;
       step[i] = 2*cmax[i]/(pcs_grid_size[i]-1) - eps;
       grid_size *= pcs_grid_size[i];
     }
@@ -824,12 +826,26 @@ void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh)
       break;
   }
 
-  // TODO: sort samples by pdf, and return the top n
-  memcpy(X[0], X2[0], n*d*sizeof(double));
+  // sort samples by pdf, and return the top n
+  double *pdf;
+  int *indices;
+  safe_malloc(pdf, grid_size, double);
+  safe_malloc(indices, grid_size, int);
+  for (i = 0; i < grid_size; i++) {
+    pdf[i] = -bingham_pdf(X2[i], B);
+    //fprintf(stderr, "X2[%d] = (%f, %f, %f, %f), pdf[%d] = %f\n",
+    //	    i, X2[i][0], X2[i][1], X2[i][2], X2[i][3], i, pdf[i]);
+  }
+  sort_indices(pdf, indices, grid_size);
+  for (i = 0; i < n; i++)
+    memcpy(X[i], X2[indices[i]], d*sizeof(double));
 
+  // free temporary variables
   free_matrix2(X2);
   for (i = 0; i < d-1; i++)
     free(pcs_grid_coords[i]);
+  free(pdf);
+  free(indices);
 }
 
 
