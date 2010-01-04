@@ -504,7 +504,26 @@ void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1,
  */
 double bingham_pdf(double x[], bingham_t *B)
 {
-  return exp(bingham_L(B, &x, 1));
+  //return exp(bingham_L(B, &x, 1));
+
+  double **V = B->V;
+  double *Z = B->Z;
+
+  if (B->d == 4) {
+    double dvx0 = V[0][0]*x[0] + V[0][1]*x[1] + V[0][2]*x[2] + V[0][3]*x[3];
+    double dvx1 = V[1][0]*x[0] + V[1][1]*x[1] + V[1][2]*x[2] + V[1][3]*x[3];
+    double dvx2 = V[2][0]*x[0] + V[2][1]*x[1] + V[2][2]*x[2] + V[2][3]*x[3];
+    return exp(Z[0]*dvx0 + Z[1]*dvx1 + Z[2]*dvx2) / B->F;
+  }
+
+  int i, d = B->d;
+  double dvx, logf = 0;
+  for (i = 0; i < d-1; i++) {
+    dvx = dot(V[i], x, d);
+    logf += Z[i]*dvx*dvx;
+  }
+
+  return exp(logf) / B->F;
 }
 
 
@@ -597,6 +616,9 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     safe_malloc(pmf->volumes, n, double);
     tetramesh_centroids(pmf->points, pmf->volumes, pmf->tetramesh);
 
+    for (i = 0; i < n; i++)
+      mult(pmf->points[i], pmf->points[i], 1/norm(pmf->points[i], d), d);
+
     fprintf(stderr, "Created points and volumes in %.0f ms\n", get_time_ms() - t0);  //dbug
 
     t0 = get_time_ms();  //dbug
@@ -605,8 +627,7 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     safe_malloc(pmf->mass, n, double);
     double tot_mass = 0;
     for (i = 0; i < n; i++) {
-      mult(pmf->points[i], pmf->points[i], 1/norm(pmf->points[i], d), d);
-      pmf->mass[i] = pmf->volumes[i] * exp(bingham_L(B, &pmf->points[i], 1));
+      pmf->mass[i] = pmf->volumes[i] * bingham_pdf(pmf->points[i], B);
       tot_mass += pmf->mass[i];
     }
     mult(pmf->mass, pmf->mass, 1/tot_mass, n);
@@ -664,6 +685,151 @@ void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
   }
 
   free(cdf);
+}
+
+
+/*
+ * Samples discretely from the ridges of a Bingham
+ */
+void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh)
+{
+  const double eps = 1e-16;
+
+  double *Z = B->Z;
+  double **V = B->V;
+  double F = B->F;
+  int d = B->d;
+  double p0 = pthresh;
+  int i, j, k;
+
+  double Y[d-1], sumlogy = 0;
+  for (i = 0; i < d-1; i++) {
+    Y[i] = 1/sqrt(-Z[i]);
+    sumlogy += log(Y[i]);
+  }
+  double m = exp((log(n) - sumlogy)/(d-1));
+  int grid_size;
+  int pcs_grid_size[d-1];
+  double cmax[d-1];
+  double step[d-1];
+  // generate a grid with at least n cells
+  while (1) {
+    grid_size = 1;
+    for (i = 0; i < d-1; i++) {
+      // calculate num samples in each pc direction (rounded to the nearest odd number)
+      pcs_grid_size[i] = 2*ceil(m*Y[i]/2.0) - 1;
+      cmax[i] = sqrt(log(F*p0)/Z[i]);
+      step[i] = 2*cmax[i]/(pcs_grid_size[i]-1) - eps;
+      grid_size *= pcs_grid_size[i];
+    }
+    if (grid_size >= n)
+      break;
+    m *= 1.1;
+  }
+
+  double **X2 = new_matrix2(grid_size, d);
+  double *pcs_grid_coords[d-1];
+  for (i = 0; i < d-1; i++) {
+    safe_malloc(pcs_grid_coords[i], pcs_grid_size[i], double);
+    if (pcs_grid_size[i] == 1)
+      pcs_grid_coords[i][0] = 0;
+    else {
+      double c = 0;
+      int j0 = pcs_grid_size[i]/2;
+      for (j = 0; j < (pcs_grid_size[i]+1)/2; j++) {
+	pcs_grid_coords[i][j0+j] = c;
+	pcs_grid_coords[i][j0-j] = -c;
+	c += step[i];
+      }
+    }
+  }
+
+  // search for axis to cut the hypersphere in half
+  double Vcut_raw[(d-1)*(d-1)];
+  double *Vcut[d-1];
+  for (i = 0; i < d-1; i++)
+    Vcut[i] = Vcut_raw + (d-1)*i;
+  int cut_axis = 0;
+  double max_det = 0;
+  for (i = 0; i < d; i++) {  // try cutting each axis, from i=0:d-1
+    // set Vcut = V(uncut_axes,:)
+    for (j = 0; j < d-1; j++) {
+      for (k = 0; k < d-1; k++) {
+	if (k < i)
+	  Vcut[j][k] = V[j][k];
+	else
+	  Vcut[j][k] = V[j][k+1];
+      }
+    }
+    double det_Vcut = abs(det(Vcut, d-1));
+    if (det_Vcut > max_det) {
+      max_det = det_Vcut;
+      cut_axis = i;
+    }
+  }
+  // set Vcut = V(uncut_axes,:)
+  for (j = 0; j < d-1; j++) {
+    for (k = 0; k < d-1; k++) {
+      if (k < cut_axis)
+	Vcut[j][k] = V[j][k];
+      else
+	Vcut[j][k] = V[j][k+1];
+    }
+  }
+
+  double c0[d-1];
+  for (i = 0; i < d-1; i++)
+    c0[i] = V[i][cut_axis];
+
+  double W_raw[(d-1)*(d-1)];
+  double *W[d-1];
+  for (i = 0; i < d-1; i++)
+    W[i] = W_raw + (d-1)*i;
+  inv(W, Vcut, d-1);
+
+  double x[d-1];
+  double c[d-1];
+  double dc[d-1];
+  int cnt = 0;
+  int idx[d-1];
+  for (i = 0; i < d-1; i++)
+    idx[i] = 0;
+
+  while (1) {
+    // sample uncut coords x = W*(c-c0) and normalize
+    for (i = 0; i < d-1; i++)
+      c[i] = pcs_grid_coords[i][idx[i]];
+    sub(dc, c, c0, d-1);  // dc = c-c0
+    for (i = 0; i < d-1; i++)
+      x[i] = dot(W[i], dc, d-1);  // x = W*dc
+    for (i = 0; i < d-1; i++) {
+      if (i < cut_axis)
+	X2[cnt][i] = x[i];
+      else
+	X2[cnt][i+1] = x[i];
+    }
+    X2[cnt][cut_axis] = 1;
+    normalize(X2[cnt], X2[cnt], d);
+    cnt++;
+
+    // increment the grid indices
+    for (i = d-2; i >= 0; i--) {
+      if (idx[i] < pcs_grid_size[i] - 1) {
+	idx[i]++;
+	break;
+      }
+      idx[i] = 0;
+    }
+    if (i < 0)
+      break;
+  }
+
+  // TODO: sort samples by pdf, and return the top n
+  memcpy(X[0], X2[0], n*d*sizeof(double));
+
+  free_matrix2(X2);
+  for (i = 0; i < d-1; i++)
+    free(pcs_grid_coords[i]);
 }
 
 
@@ -886,20 +1052,6 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
     B->F = 0;
   }
 
-  /*
-  printf("z = [%f %f %f %f]\n", z[0], z[1], z[2], z[3]);
-  printf("V[0] = [%f %f %f %f]\n", V[0][0], V[0][1], V[0][2], V[0][3]);
-  printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
-  printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
-  printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
-  */
-
-  //printf("B->F = %f\n", B->F);
-  //printf("B->Z = [%f %f %f]\n", B->Z[0], B->Z[1], B->Z[2]);
-  //printf("B->V[0] = [%f %f %f %f]\n", B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
-  //printf("B->V[1] = [%f %f %f %f]\n", B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
-  //printf("B->V[2] = [%f %f %f %f]\n", B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
-  
   free_matrix2(Vt);
   free_matrix2(Z);
   free_matrix2(ZV);
@@ -939,13 +1091,13 @@ void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *
   bingham_t b[n];
   sortable_t wb[n];
   for (i = 0; i < n; i++) {
-    wb[i].value = BM->w[i];
+    wb[i].value = -BM->w[i];  // descending order
     wb[i].data = (void *)(&b[i]);
     memcpy(&b[i], &BM->B[i], sizeof(bingham_t));
   }
   sort_data(wb, n);
   for (i = 0; i < n; i++) {
-    BM->w[i] = wb[i].value;
+    BM->w[i] = -wb[i].value;  // descending order
     memcpy(&BM->B[i], wb[i].data, sizeof(bingham_t));
   }
 }
@@ -973,6 +1125,8 @@ void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh)
       bingham_free(&BM->B[i]);
     }
   }
+  mult(BM->w, BM->w, 1/sum(BM->w, cnt), cnt);
+  BM->n = cnt;
 }
 
 

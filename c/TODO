@@ -7,7 +7,7 @@ NOW:
 
 
 SOON:
- - Test speed of bingham_pdf()
+ - Speed optimizations
  - Test for memory leaks (continuous operation)
 
 

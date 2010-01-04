@@ -522,7 +522,7 @@ void test_bingham_sample(int argc, char *argv[])
   bingham_sample(X, &pmf, nsamples);
   printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
 
-  bingham_fit(&B, X, nsamples, 4);
+  //bingham_fit(&B, X, nsamples, 4);
 }
 
 
@@ -573,6 +573,152 @@ void test_bingham_mult(int argc, char *argv[])
     bingham_mult(&B, &B1, &B2);
   double t1 = get_time_ms();
   printf("Performed %d same Bingham multiplications in %.0f ms\n", n, t1-t0);
+
+  //printf("B.F = %f\n", B.F);
+  //printf("B.Z = [%f %f %f]\n", B.Z[0], B.Z[1], B.Z[2]);
+  //printf("B.V[0] = [%f %f %f %f]\n", B.V[0][0], B.V[0][1], B.V[0][2], B.V[0][3]);
+  //printf("B.V[1] = [%f %f %f %f]\n", B.V[1][0], B.V[1][1], B.V[1][2], B.V[1][3]);
+  //printf("B.V[2] = [%f %f %f %f]\n", B.V[2][0], B.V[2][1], B.V[2][2], B.V[2][3]);
+}
+
+
+void test_bingham_mixture_mult(int argc, char *argv[])
+{
+  bingham_t B0[2];
+  double w0[2] = {.8, .2};
+  double Z00[3] = {-100, -1, -1};
+  double V00[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp00[3] = {&V00[0][0], &V00[1][0], &V00[2][0]};
+  B0[0].d = 4;
+  B0[0].Z = Z00;
+  B0[0].V = Vp00;
+  double Z01[3] = {-100, -1, -1};
+  double V01[3][4] = {{0,0,0,1}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp01[3] = {&V01[0][0], &V01[1][0], &V01[2][0]};
+  B0[1].d = 4;
+  B0[1].Z = Z01;
+  B0[1].V = Vp01;
+
+  bingham_t B1[2];
+  double w1[2] = {.5, .5};
+  double Z10[3] = {-100, -1, -1};
+  double V10[3][4] = {{0,1,0,0}, {1,0,0,0}, {0,0,1,0}};
+  double *Vp10[3] = {&V10[0][0], &V10[1][0], &V10[2][0]};
+  B1[0].d = 4;
+  B1[0].Z = Z10;
+  B1[0].V = Vp10;
+  double Z11[3] = {-1, -1, -1};
+  double V11[3][4] = {{0,1,0,0}, {0,0,0,1}, {0,0,1,0}};
+  double *Vp11[3] = {&V11[0][0], &V11[1][0], &V11[2][0]};
+  B1[1].d = 4;
+  B1[1].Z = Z11;
+  B1[1].V = Vp11;
+
+  bingham_mix_t BM0, BM1, BM;
+  BM0.n = 2;
+  BM0.w = w0;
+  BM0.B = B0;
+  BM1.n = 2;
+  BM1.w = w1;
+  BM1.B = B1;
+
+  double t0 = get_time_ms();
+  int i, n=10000;
+  for (i = 0; i < n; i++)
+    bingham_mixture_mult(&BM, &BM0, &BM1);
+  double t1 = get_time_ms();
+  printf("Performed %d same Bingham mixture multiplications in %.0f ms\n", n, t1-t0);
+
+  printf("BM.n = %d\n", BM.n);
+  printf("BM.w = [ ");
+  for (i = 0; i < BM.n; i++)
+    printf("%f ", BM.w[i]);
+  printf("]\n");
+  for (i = 0; i < BM.n; i++) {
+    bingham_t *B = &BM.B[i];
+    printf("B[%d]->F = %f\n", i, B->F);
+    printf("B[%d]->Z = [%f %f %f]\n", i, B->Z[0], B->Z[1], B->Z[2]);
+    printf("B[%d]->V[0] = [%f %f %f %f]\n", i, B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
+    printf("B[%d]->V[1] = [%f %f %f %f]\n", i, B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
+    printf("B[%d]->V[2] = [%f %f %f %f]\n", i, B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
+  }
+
+  printf("\n\n");
+}
+
+
+void test_bingham_mixture_thresh_peaks(int argc, char *argv[])
+{
+  bingham_t B0[2];
+  double w0[2] = {.8, .2};
+  double Z00[3] = {-100, -1, -1};
+  double V00[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp00[3] = {&V00[0][0], &V00[1][0], &V00[2][0]};
+  B0[0].d = 4;
+  B0[0].Z = Z00;
+  B0[0].V = Vp00;
+  double Z01[3] = {-100, -1, -1};
+  double V01[3][4] = {{0,0,0,1}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp01[3] = {&V01[0][0], &V01[1][0], &V01[2][0]};
+  B0[1].d = 4;
+  B0[1].Z = Z01;
+  B0[1].V = Vp01;
+
+  bingham_t B1[2];
+  double w1[2] = {.5, .5};
+  double Z10[3] = {-100, -1, -1};
+  double V10[3][4] = {{0,1,0,0}, {1,0,0,0}, {0,0,1,0}};
+  double *Vp10[3] = {&V10[0][0], &V10[1][0], &V10[2][0]};
+  B1[0].d = 4;
+  B1[0].Z = Z10;
+  B1[0].V = Vp10;
+  double Z11[3] = {-1, -1, -1};
+  double V11[3][4] = {{0,1,0,0}, {0,0,0,1}, {0,0,1,0}};
+  double *Vp11[3] = {&V11[0][0], &V11[1][0], &V11[2][0]};
+  B1[1].d = 4;
+  B1[1].Z = Z11;
+  B1[1].V = Vp11;
+
+  bingham_mix_t BM0, BM1, BM;
+  BM0.n = 2;
+  BM0.w = w0;
+  BM0.B = B0;
+  BM1.n = 2;
+  BM1.w = w1;
+  BM1.B = B1;
+
+  bingham_mixture_mult(&BM, &BM0, &BM1);
+
+  int i;
+  double peak, max_peak = 0;
+  for (i = 0; i < BM.n; i++) {
+    peak = BM.w[i] / BM.B[i].F;
+    if (peak > max_peak)
+      max_peak = peak;
+  }
+
+  printf("max_peak = %f\n", max_peak);
+
+  double t0 = get_time_ms();
+  int n=1;
+  for (i = 0; i < n; i++)
+    bingham_mixture_thresh_peaks(&BM, max_peak/10.0);
+  double t1 = get_time_ms();
+  printf("Performed %d same Bingham mixture thresh peaks in %.0f ms\n", n, t1-t0);
+
+  printf("BM.n = %d\n", BM.n);
+  printf("BM.w = [ ");
+  for (i = 0; i < BM.n; i++)
+    printf("%f ", BM.w[i]);
+  printf("]\n");
+  for (i = 0; i < BM.n; i++) {
+    bingham_t *B = &BM.B[i];
+    printf("B[%d]->F = %f\n", i, B->F);
+    printf("B[%d]->Z = [%f %f %f]\n", i, B->Z[0], B->Z[1], B->Z[2]);
+    printf("B[%d]->V[0] = [%f %f %f %f]\n", i, B->V[0][0], B->V[0][1], B->V[0][2], B->V[0][3]);
+    printf("B[%d]->V[1] = [%f %f %f %f]\n", i, B->V[1][0], B->V[1][1], B->V[1][2], B->V[1][3]);
+    printf("B[%d]->V[2] = [%f %f %f %f]\n", i, B->V[2][0], B->V[2][1], B->V[2][2], B->V[2][3]);
+  }
 }
 
 
@@ -639,11 +785,13 @@ int main(int argc, char *argv[])
 {
   //test_bingham_init();
 
-  test_bingham_mult(argc, argv);
+  //test_bingham_mixture_mult(argc, argv);
+  //test_bingham_mixture_thresh_peaks(argc, argv);
+  //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-  //test_bingham_sample(argc, argv);
+  test_bingham_sample(argc, argv);
   //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);

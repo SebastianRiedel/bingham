@@ -858,6 +858,35 @@ void solve(double x[], double A[], double b[], int n)
 }
 
 
+// compute the determinant of the n-by-n matrix X
+double det(double **X, int n)
+{
+  int s;
+  gsl_matrix_view X_gsl = gsl_matrix_view_array(X[0], n, n);
+  gsl_permutation *p = gsl_permutation_alloc(n);
+     
+  gsl_linalg_LU_decomp(&X_gsl.matrix, p, &s);
+  double det_X = gsl_linalg_LU_det(&X_gsl.matrix, s);
+  gsl_permutation_free(p);
+
+  return det_X;
+}
+
+
+// compute the inverse (Y) of the n-by-n matrix X
+void inv(double **Y, double **X, int n)
+{
+  int s;
+  gsl_matrix_view X_gsl = gsl_matrix_view_array(X[0], n, n);
+  gsl_matrix_view Y_gsl = gsl_matrix_view_array(Y[0], n, n);
+  gsl_permutation *p = gsl_permutation_alloc(n);
+     
+  gsl_linalg_LU_decomp(&X_gsl.matrix, p, &s);
+  gsl_linalg_LU_invert(&X_gsl.matrix, p, &Y_gsl.matrix);
+  gsl_permutation_free(p);
+}
+
+
 // compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
 void eigen_symm(double z[], double **V, double **X, int n)
 {
@@ -1304,25 +1333,30 @@ void sort_data(sortable_t *x, size_t n)
 }
 
 
-/*
-static int _partition(double *x, int left, int right, int pivot)
+// sort the indices of x (leaving x unchanged)
+void sort_indices(double *x, int *idx, int n)
 {
+  int i;
+  sortable_t *s;
+  int *xi;
+  safe_malloc(s, n, sortable_t);
+  safe_malloc(xi, n, int);
 
+  for (i = 0; i < n; i++) {
+    xi[i] = i;
+    s[i].value = x[i];
+    s[i].data = (void *)(&xi[i]);
+  }
+
+  sort_data(s, n);
+
+  for (i = 0; i < n; i++)
+    idx[i] = *(int *)(s[i].data);
+
+  free(s);
+  free(xi);
 }
 
-
-static void _qsort2(double *x, int *perm, int left, int right)
-{
-  if (right > left)
-}
-*/
-
-/* sort an array of doubles, x, and return the sorted indices, perm
-void qsort2(double *x, int *perm, int n)
-{
-  
-}
-*/
 
 int qselect(double *x, int n, int k)
 {

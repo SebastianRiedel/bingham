@@ -6,7 +6,7 @@ INSTALL_DIR=/usr
 
 CC=gcc
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -pg
+CFLAGS=-Wall -I$(IDIR) -O3 #-pg
 
 #CYGWIN=1
 
