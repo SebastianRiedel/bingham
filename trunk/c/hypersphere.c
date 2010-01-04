@@ -102,19 +102,15 @@ tetramesh_t *tessellate_S3(int n)
 {
   int i;
   for (i = 0; i < MAX_LEVELS; i++) {
-    if (tessellations[i] == NULL)
-      break;
+    if (tessellations[i] == NULL) {
+      octetramesh_t *mesh = build_octetra(i);
+      tessellations[i] = octetramesh_to_tetramesh(mesh);
+    }
     if (tessellations[i]->nt >= n)
       return tessellations[i];
   }
 
-  if (i < MAX_LEVELS) {
-    octetramesh_t *mesh = build_octetra(i);
-    tessellations[i] = octetramesh_to_tetramesh(mesh);
-    return tessellations[i];
-  }
-
-  return NULL;
+  return tessellations[MAX_LEVELS-1];
 }
 
 

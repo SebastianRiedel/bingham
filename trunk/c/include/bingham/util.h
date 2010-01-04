@@ -21,6 +21,7 @@ typedef struct {
 } sortable_t;
 
 void sort_data(sortable_t *x, size_t n);  /* sort an array of weighted data using qsort */
+void sort_indices(double *x, int *idx, int n);  /* sort the indices of x (leaving x unchanged) */
 
 double get_time_ms();  /* get the current system time in millis */
 
@@ -63,6 +64,12 @@ void transpose(double **Y, double **X, int n, int m);
 
 /* solve the equation Ax = b, where A is a square n-by-n matrix */
 void solve(double x[], double A[], double b[], int n);
+
+/* compute the determinant of the n-by-n matrix X */
+double det(double **X, int n);
+
+/* compute the inverse (Y) of the n-by-n matrix X*/
+void inv(double **Y, double **X, int n);
 
 /* matrix copy, Y = X */
 void matrix_copy(double **Y, double **X, int n, int m);
