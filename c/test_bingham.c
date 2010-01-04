@@ -700,7 +700,7 @@ void test_bingham_mixture_thresh_peaks(int argc, char *argv[])
   printf("max_peak = %f\n", max_peak);
 
   double t0 = get_time_ms();
-  int n=1;
+  int n=1000000;
   for (i = 0; i < n; i++)
     bingham_mixture_thresh_peaks(&BM, max_peak/10.0);
   double t1 = get_time_ms();
@@ -769,6 +769,41 @@ void test_bingham_F_lookup_3d(int argc, char *argv[])
 }
 
 
+void test_bingham_sample_ridge(int argc, char *argv[])
+{
+  if (argc < 6) {
+    printf("usage: %s <z1> <z2> <z3> <num_samples> <pthresh>\n", argv[0]);
+    exit(1);
+  }
+
+  double z1 = atof(argv[1]);
+  double z2 = atof(argv[2]);
+  double z3 = atof(argv[3]);
+  int nsamples = atoi(argv[4]);
+  double pthresh = atof(argv[5]);
+
+  double Z[3] = {z1, z2, z3};
+  double V[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
+
+  bingham_t B;
+  bingham_new(&B, 4, Vp, Z);
+  //printf("B.F = %f\n", B.F);
+
+  double t0 = get_time_ms();
+  double **X = new_matrix2(nsamples, 4);
+  bingham_sample_ridge(X, &B, nsamples, pthresh);
+  printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
+
+  //printf("X = [ ...\n");
+  //int i;
+  //for (i = 0; i < nsamples; i++) {
+  //  printf("%f, %f, %f, %f ; ...\n", X[i][0], X[i][1], X[i][2], X[i][3]);
+  //}
+  //printf("];\n\n");
+}
+
+
 void test_bingham_init()
 {
   double t0 = get_time_ms();
@@ -790,8 +825,10 @@ int main(int argc, char *argv[])
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
+  //test_bingham_sample(argc, argv);
+  test_bingham_sample_ridge(argc, argv);
+
   //test_fit_quaternions(argc, argv);
-  test_bingham_sample(argc, argv);
   //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);

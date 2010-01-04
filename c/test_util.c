@@ -143,11 +143,27 @@ void test_safe_alloc()
 }
 
 
+void test_sort_indices()
+{
+  double x[10] = {0, 90, 70, 40, 20, 10, 30, 80, 50, 60};
+  int idx[10];
+
+  sort_indices(x, idx, 10);
+
+  printf("x[idx] = [ ");
+  int i;
+  for (i = 0; i < 10; i++)
+    printf("%f ", x[idx[i]]);
+  printf("]\n");
+}
+
+
 int main(int argc, char *argv[])
 {
   //test_kdtree(argc, argv);
   //test_normrand(argc, argv);
-  test_safe_alloc();
+  //test_safe_alloc();
+  test_sort_indices();
 
   return 0;
 }
