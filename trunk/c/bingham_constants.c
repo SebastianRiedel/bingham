@@ -116,6 +116,87 @@ static double bingham_F_table_get(int i, int j, int k)
 }
 
 
+static double bingham_dF1_table_get(int i, int j, int k)
+{
+  if (i >= j) {
+    if (j >= k)
+      return bingham_dF1_table[i][j][k];
+    else if (i >= k)
+      return bingham_dF1_table[i][k][j];
+    else
+      return bingham_dF1_table[k][i][j];
+  }
+  else {
+    if (k >= j)
+      return bingham_dF1_table[k][j][i];
+    else if (k >= i)
+      return bingham_dF1_table[j][k][i];
+    else
+      return bingham_dF1_table[j][i][k];
+  }
+
+  return 0.0;
+}
+
+
+static double bingham_dF2_table_get(int i, int j, int k)
+{
+  if (i >= j) {
+    if (j >= k)
+      return bingham_dF2_table[i][j][k];
+    else if (i >= k)
+      return bingham_dF2_table[i][k][j];
+    else
+      return bingham_dF2_table[k][i][j];
+  }
+  else {
+    if (k >= j)
+      return bingham_dF2_table[k][j][i];
+    else if (k >= i)
+      return bingham_dF2_table[j][k][i];
+    else
+      return bingham_dF2_table[j][i][k];
+  }
+
+  return 0.0;
+}
+
+
+static double bingham_dF3_table_get(int i, int j, int k)
+{
+  if (i >= j) {
+    if (j >= k)
+      return bingham_dF3_table[i][j][k];
+    else if (i >= k)
+      return bingham_dF3_table[i][k][j];
+    else
+      return bingham_dF3_table[k][i][j];
+  }
+  else {
+    if (k >= j)
+      return bingham_dF3_table[k][j][i];
+    else if (k >= i)
+      return bingham_dF3_table[j][k][i];
+    else
+      return bingham_dF3_table[j][i][k];
+  }
+
+  return 0.0;
+}
+
+
+static double bingham_dF_table_get(int a, int i, int j, int k)
+{
+  switch (a) {
+  case 0:
+    return bingham_dF1_table_get(i, j, k);
+  case 1:
+    return bingham_dF2_table_get(i, j, k);
+  }
+  return bingham_dF3_table_get(i, j, k);
+}
+
+
 /*
  * Look up normalization constant F given concentration params Z
  * via trilinear interpolation.
@@ -139,7 +220,7 @@ double bingham_F_lookup_3d(double *Z)
   else if (y0 >= ymax)
     i1 = n-1;
   else
-    i1 = binary_search(y0, bingham_table_range, n);
+    i1 = binary_search(y0, (double *)bingham_table_range, n);
   i0 = i1-1;
 
   if (y1 <= ymin)
@@ -147,7 +228,7 @@ double bingham_F_lookup_3d(double *Z)
   else if (y1 >= ymax)
     j1 = n-1;
   else
-    j1 = binary_search(y1, bingham_table_range, n);
+    j1 = binary_search(y1, (double *)bingham_table_range, n);
   j0 = j1-1;
 
   if (y2 <= ymin)
@@ -155,7 +236,7 @@ double bingham_F_lookup_3d(double *Z)
   else if (y2 >= ymax)
     k1 = n-1;
   else
-    k1 = binary_search(y2, bingham_table_range, n);
+    k1 = binary_search(y2, (double *)bingham_table_range, n);
   k0 = k1-1;
 
   // use trilinear interpolation between the 8 corners
@@ -189,6 +270,83 @@ double bingham_F_lookup_3d(double *Z)
   double F = F0 + y0*(F1 - F0)/d0;
 
   return F;
+}
+
+
+/*
+ * Look up partial derivatives of the normalization constant F
+ * given concentration params Z via trilinear interpolation.
+ */
+void bingham_dF_lookup_3d(double *dF, double *Z)
+{
+  double y0 = sqrt(-Z[0]);
+  double y1 = sqrt(-Z[1]);
+  double y2 = sqrt(-Z[2]);
+
+  int n = BINGHAM_TABLE_LENGTH;
+  double ymin = bingham_table_range[0];
+  double ymax = bingham_table_range[n-1];
+
+  // get the Z-table cell between (i0,i1), (j0,j1), and (k0,k1)
+
+  int i0, j0, k0, i1, j1, k1;
+
+  if (y0 <= ymin)
+    i1 = 1;
+  else if (y0 >= ymax)
+    i1 = n-1;
+  else
+    i1 = binary_search(y0, (double *)bingham_table_range, n);
+  i0 = i1-1;
+
+  if (y1 <= ymin)
+    j1 = 1;
+  else if (y1 >= ymax)
+    j1 = n-1;
+  else
+    j1 = binary_search(y1, (double *)bingham_table_range, n);
+  j0 = j1-1;
+
+  if (y2 <= ymin)
+    k1 = 1;
+  else if (y2 >= ymax)
+    k1 = n-1;
+  else
+    k1 = binary_search(y2, (double *)bingham_table_range, n);
+  k0 = k1-1;
+
+  // use trilinear interpolation between the 8 corners
+  y0 -= bingham_table_range[i0];
+  y1 -= bingham_table_range[j0];
+  y2 -= bingham_table_range[k0];
+  double d0 = bingham_table_range[i1] - bingham_table_range[i0];
+  double d1 = bingham_table_range[j1] - bingham_table_range[j0];
+  double d2 = bingham_table_range[k1] - bingham_table_range[k0];
+
+  int a;
+  for (a = 0; a < 3; a++) {
+    double dF000 = bingham_dF_table_get(a, i0, j0, k0);
+    double dF001 = bingham_dF_table_get(a, i0, j0, k1);
+    double dF010 = bingham_dF_table_get(a, i0, j1, k0);
+    double dF011 = bingham_dF_table_get(a, i0, j1, k1);
+    double dF100 = bingham_dF_table_get(a, i1, j0, k0);
+    double dF101 = bingham_dF_table_get(a, i1, j0, k1);
+    double dF110 = bingham_dF_table_get(a, i1, j1, k0);
+    double dF111 = bingham_dF_table_get(a, i1, j1, k1);
+
+    // interpolate over k
+    double dF00 = dF000 + y2*(dF001 - dF000)/d2;
+    double dF01 = dF010 + y2*(dF011 - dF010)/d2;
+    double dF10 = dF100 + y2*(dF101 - dF100)/d2;
+    double dF11 = dF110 + y2*(dF111 - dF110)/d2;
+
+    // interpolate over j
+    double dF0 = dF00 + y1*(dF01 - dF00)/d1;
+    double dF1 = dF10 + y1*(dF11 - dF10)/d1;
+
+    // interpolate over i
+    dF[a] = dF0 + y0*(dF1 - dF0)/d0;
+  }
 }
 
 

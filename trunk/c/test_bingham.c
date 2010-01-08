@@ -804,6 +804,36 @@ void test_bingham_sample_ridge(int argc, char *argv[])
 }
 
 
+void test_bingham_stats(int argc, char *argv[])
+{
+  if (argc < 4) {
+    printf("usage: %s <z1> <z2> <z3>\n", argv[0]);
+    exit(1);
+  }
+
+  double z1 = atof(argv[1]);
+  double z2 = atof(argv[2]);
+  double z3 = atof(argv[3]);
+
+  double Z[3] = {z1, z2, z3};
+  double V[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
+
+  bingham_t B;
+  bingham_new(&B, 4, Vp, Z);
+
+  int n = 1000000;
+  double t0 = get_time_ms();
+  bingham_stats_t stats;
+  bingham_stats(&stats, &B);
+  printf("Computed stats %d times in %.0f ms\n", n, get_time_ms() - t0);
+
+  printf("stats.mode = [ %f %f %f %f ]\n", stats.mode[0], stats.mode[1], stats.mode[2], stats.mode[3]);
+  printf("stats.dF = [ %f %f %f ]\n", stats.dF[0], stats.dF[1], stats.dF[2]);
+  printf("stats.entropy = %f\n", stats.entropy);
+}
+
+
 void test_bingham_init()
 {
   double t0 = get_time_ms();
@@ -820,13 +850,15 @@ int main(int argc, char *argv[])
 {
   //test_bingham_init();
 
+  test_bingham_stats(argc, argv);
+
   //test_bingham_mixture_mult(argc, argv);
   //test_bingham_mixture_thresh_peaks(argc, argv);
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
   //test_bingham_sample(argc, argv);
-  test_bingham_sample_ridge(argc, argv);
+  //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
   //test_bingham_discretize(argc, argv);
