@@ -36,6 +36,7 @@ double frand();                                         /* returns a random doub
 void randperm(int *x, int n, int d);                    /* samples d integers from 0:n-1 uniformly without replacement */
 double erfinv(double x);                                /* approximation to the inverse error function */
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
+double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 
 void vnot(int y[], int x[], int n);                                    /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */

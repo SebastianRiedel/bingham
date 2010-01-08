@@ -702,6 +702,15 @@ double normrand(double mu, double sigma)
 }
 
 
+// compute the pdf of a normal random variable
+double normpdf(double x, double mu, double sigma)
+{
+  double dx = x - mu;
+
+  return exp(-dx*dx / (2*sigma*sigma)) / (sqrt(2*M_PI) * sigma);
+}
+
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {
