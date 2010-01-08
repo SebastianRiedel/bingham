@@ -33,6 +33,12 @@ typedef struct {
 } bingham_pmf_t;
 
 typedef struct {
+  double *mode;      /* v0 */
+  double *dF;        /* dF/dZ */
+  double entropy;    /* entropy */
+} bingham_stats_t;
+
+typedef struct {
   bingham_t *B;         /* array of binghams */
   double *w;            /* weights */
   int n;                /* number of binghams */
@@ -50,6 +56,7 @@ void bingham_free(bingham_t *B);
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
 double bingham_L(bingham_t *B, double **X, int n);
+void bingham_stats(bingham_stats_t *stats, bingham_t *B);
 void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);

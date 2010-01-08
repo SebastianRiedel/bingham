@@ -539,6 +539,112 @@ double bingham_pdf(double x[], bingham_t *B)
 }
 
 
+void bingham_mode(double *mode, bingham_t *B)
+{
+  int i, j, k, d = B->d;
+  double **V = B->V;
+
+  // search for axis to cut the hypersphere in half
+  double Vcut_raw[(d-1)*(d-1)];
+  double *Vcut[d-1];
+  for (i = 0; i < d-1; i++)
+    Vcut[i] = Vcut_raw + (d-1)*i;
+  int cut_axis = 0;
+  double max_det = 0;
+  for (i = 0; i < d; i++) {  // try cutting each axis, from i=0:d-1
+    // set Vcut = V(uncut_axes,:)
+    for (j = 0; j < d-1; j++) {
+      for (k = 0; k < d-1; k++) {
+	if (k < i)
+	  Vcut[j][k] = V[j][k];
+	else
+	  Vcut[j][k] = V[j][k+1];
+      }
+    }
+    double det_Vcut = abs(det(Vcut, d-1));
+    if (det_Vcut > max_det) {
+      max_det = det_Vcut;
+      cut_axis = i;
+    }
+  }
+  // set Vcut = V(uncut_axes,:)
+  for (j = 0; j < d-1; j++) {
+    for (k = 0; k < d-1; k++) {
+      if (k < cut_axis)
+	Vcut[j][k] = V[j][k];
+      else
+	Vcut[j][k] = V[j][k+1];
+    }
+  }
+
+  double b[d-1];
+  for (i = 0; i < d-1; i++)
+    b[i] = -V[i][cut_axis];
+
+  // now solve Vcut * x = b
+  double x[d-1];
+
+  /*
+  printf("Vcut = [%f %f %f ; %f %f %f ; %f %f %f]\n",
+	 Vcut[0][0], Vcut[0][1], Vcut[0][2],
+	 Vcut[1][0], Vcut[1][1], Vcut[1][2],
+	 Vcut[2][0], Vcut[2][1], Vcut[2][2]);
+
+  printf("b = [%f %f %f]\n", b[0], b[1], b[2]);
+  */
+
+  solve(x, Vcut[0], b, d-1);
+
+  //printf("x = [%f %f %f]\n", x[0], x[1], x[2]);
+
+  for (i = 0; i < d-1; i++) {
+    if (i < cut_axis)
+      mode[i] = x[i];
+    else
+      mode[i+1] = x[i];
+  }
+  mode[cut_axis] = 1;
+
+  normalize(mode, mode, d);
+
+}
+
+
+/*
+ * Computes some statistics of a bingham.
+ * Note: allocates space in stats.
+ */
+void bingham_stats(bingham_stats_t *stats, bingham_t *B)
+{
+  int i, d = B->d;
+  double F = B->F;
+
+  safe_calloc(stats->mode, d, double);
+  safe_calloc(stats->dF, d-1, double);
+
+  // compute the mode
+  bingham_mode(stats->mode, B);
+
+  // look up dF
+  if (d == 4)
+    bingham_dF_lookup_3d(stats->dF, B->Z);
+  else if (d == 3) {
+    stats->dF[0] = bingham_dF1_2d(B->Z[0], B->Z[1]);
+    stats->dF[1] = bingham_dF2_2d(B->Z[0], B->Z[1]);
+  }
+  else if (d == 2)
+    stats->dF[0] = bingham_dF_1d(B->Z[0]);
+  else {
+    fprintf(stderr, "Error: bingham_stats() only supports 1D, 2D, and 3D binghams.\n");
+  }
+
+  // compute the entropy
+  stats->entropy = log(F);
+  for (i = 0; i < d-1; i++)
+    stats->entropy -= B->Z[i] * stats->dF[i] / F;
+}
+
+
 /*
  * Fit a bingham to a set of samples.
  */
@@ -800,7 +906,7 @@ void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh)
   for (i = 0; i < d-1; i++)
     W[i] = W_raw + (d-1)*i;
   inv(W, Vcut, d-1);
-
+ 
   double x[d-1];
   double c[d-1];
   double dc[d-1];
