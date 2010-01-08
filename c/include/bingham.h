@@ -40,6 +40,7 @@ typedef struct {
 
 void bingham_init();
 void bingham_new(bingham_t *B, int d, double **V, double *Z);
+void bingham_new_uniform(bingham_t *B, int d);
 void bingham_new_S1(bingham_t *B, double *v1, double z1);
 void bingham_new_S2(bingham_t *B, double *v1, double *v2, double z1, double z2);
 void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1, double z2, double z3);
@@ -57,7 +58,15 @@ void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh);
 void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
 void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
 void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *BM2);
+void bingham_mixture_copy(bingham_mix_t *dst, bingham_mix_t *src);
+void bingham_mixture_free(bingham_mix_t *BM);
+void bingham_mixture_sample_ridge(double **X, bingham_mix_t *BM, int n, double pthresh);
+double bingham_mixture_pdf(double x[], bingham_mix_t *BM);
+void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src);
+double bingham_mixture_peak(bingham_mix_t *BM);
 void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh);
+void bingham_mixture_thresh_weights(bingham_mix_t *BM, double wthresh);
+
 
 
 

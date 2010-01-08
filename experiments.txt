@@ -31,6 +31,7 @@ B = B_arr;
 % load pcd and compute quaternion clusters
 pcd_model = load_pcd('tools/000.580.67.pcd');
 for c=1:k, Qc{c} = [pcd_model.Q(find(pcd_model.L==c-1),:,1) ; pcd_model.Q(find(pcd_model.L==c-1),:,2)]; end
+figure(15); for i=1:length(Qc), plot_quaternions(Qc{i}); axis off; i, input(':'); end
 
 % plot bingham mixtures
 for c=1:k, fprintf('cluster %d (n=%d)\n', c, length(B{c})); W{c}, for i=1:length(B{c}), figure(i); plot_bingham_3d(B{c}(i), Qc{c}); end, input(':'); end
