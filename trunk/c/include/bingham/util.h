@@ -59,6 +59,7 @@ void wavg(double z[], double x[], double y[], double w, int n);       /* average
 void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* averages three vectors, y = (x1+x2+x3)/3 */
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
 int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
+void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
 
 /* transpose a matrix */
 void transpose(double **Y, double **X, int n, int m);

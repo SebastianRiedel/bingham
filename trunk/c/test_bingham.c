@@ -822,15 +822,76 @@ void test_bingham_stats(int argc, char *argv[])
   bingham_t B;
   bingham_new(&B, 4, Vp, Z);
 
-  int n = 1000000;
+  int i, n = 1; //1000000;
   double t0 = get_time_ms();
   bingham_stats_t stats;
-  bingham_stats(&stats, &B);
+  for (i = 0; i < n; i++)
+    bingham_stats(&stats, &B);
   printf("Computed stats %d times in %.0f ms\n", n, get_time_ms() - t0);
 
   printf("stats.mode = [ %f %f %f %f ]\n", stats.mode[0], stats.mode[1], stats.mode[2], stats.mode[3]);
   printf("stats.dF = [ %f %f %f ]\n", stats.dF[0], stats.dF[1], stats.dF[2]);
   printf("stats.entropy = %f\n", stats.entropy);
+}
+
+
+void test_bingham_KL_divergence(int argc, char *argv[])
+{
+  if (argc < 8) {
+    printf("usage: %s <z11> <z12> <z13> <z21> <z22> <z23> <theta>\n", argv[0]);
+    exit(1);
+  }
+
+  double z11 = atof(argv[1]);
+  double z12 = atof(argv[2]);
+  double z13 = atof(argv[3]);
+  double z21 = atof(argv[4]);
+  double z22 = atof(argv[5]);
+  double z23 = atof(argv[6]);
+  double theta = atof(argv[7]);
+ 
+  double Z1[3] = {z11, z12, z13};
+  double V1[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
+  bingham_t B1;
+  B1.d = 4;
+  B1.Z = Z1;
+  B1.V = Vp1;
+  B1.F = bingham_F_lookup_3d(Z1);
+  //bingham_new(&B1, 4, Vp1, Z1);
+
+  double Z2[3] = {z21, z22, z23};
+  //double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
+  double V2[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
+  bingham_t B2;
+  B2.d = 4;
+  B2.Z = Z2;
+  B2.V = Vp2;
+  B2.F = bingham_F_lookup_3d(Z2);
+  //bingham_new(&B2, 4, Vp2, Z2);
+
+  // rotate B2 by theta about (1,0,0,0)
+  double q[4] = {cos(theta/2.0), sin(theta/2.0), 0, 0};
+  quaternion_mult(B2.V[0], q, B2.V[0]);
+  quaternion_mult(B2.V[1], q, B2.V[1]);
+  quaternion_mult(B2.V[2], q, B2.V[2]);
+
+  bingham_stats_t s1, s2;
+  bingham_stats(&s1, &B1);
+  bingham_stats(&s2, &B2);
+
+  int i, n = 1000;
+  double t0 = get_time_ms();
+  double d_KL;
+  for (i = 0; i < n; i++)
+    d_KL = bingham_KL_divergence(&s1, &s2);
+  printf("Computed KL divergence %d times in %.0f ms\n", n, get_time_ms() - t0);
+  printf("d_KL = %f\n", d_KL);
+
+  //printf("stats.mode = [ %f %f %f %f ]\n", stats.mode[0], stats.mode[1], stats.mode[2], stats.mode[3]);
+  //printf("stats.dF = [ %f %f %f ]\n", stats.dF[0], stats.dF[1], stats.dF[2]);
+  //printf("stats.entropy = %f\n", stats.entropy);
 }
 
 
@@ -850,7 +911,8 @@ int main(int argc, char *argv[])
 {
   //test_bingham_init();
 
-  test_bingham_stats(argc, argv);
+  //test_bingham_stats(argc, argv);
+  test_bingham_KL_divergence(argc, argv);
 
   //test_bingham_mixture_mult(argc, argv);
   //test_bingham_mixture_thresh_peaks(argc, argv);

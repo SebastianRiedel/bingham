@@ -539,6 +539,9 @@ double bingham_pdf(double x[], bingham_t *B)
 }
 
 
+/*
+ * Computes the mode of a bingham distribution.
+ */
 void bingham_mode(double *mode, bingham_t *B)
 {
   int i, j, k, d = B->d;
@@ -619,6 +622,8 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
   int i, d = B->d;
   double F = B->F;
 
+  stats->B = B;
+
   safe_calloc(stats->mode, d, double);
   safe_calloc(stats->dF, d-1, double);
 
@@ -642,6 +647,73 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
   stats->entropy = log(F);
   for (i = 0; i < d-1; i++)
     stats->entropy -= B->Z[i] * stats->dF[i] / F;
+}
+
+
+/*
+ * Computes the cross entropy H(B1,B2) between two binghams.
+ */
+double bingham_cross_entropy(bingham_stats_t *s1, bingham_stats_t *s2)
+{
+  int i, j;
+  int d = s1->B->d;
+  double F1 = s1->B->F;
+  double **V1 = s1->B->V;
+  double *dF1 = s1->dF;
+  double F2 = s2->B->F;
+  double *Z2 = s2->B->Z;
+  double **V2 = s2->B->V;
+
+  // compute the full, transposed V1
+  double **V1_ft = new_matrix2(d, d);
+  for (i = 0; i < d; i++)
+    V1_ft[i][0] = s1->mode[i];
+  for (i = 0; i < d; i++)
+    for (j = 1; j < d; j++)
+      V1_ft[i][j] = V1[j-1][i];
+
+  // rotate B2 into B1's coordinate frame
+  double **V1_ft_inv = new_matrix2(d, d);
+  inv(V1_ft_inv, V1_ft, d);
+  double **A = new_matrix2(d-1, d);
+  for (i = 0; i < d-1; i++) {
+    for (j = 0; j < d; j++) {
+      A[i][j] = dot(V1_ft_inv[j], V2[i], d);
+      A[i][j] *= A[i][j];
+    }
+  }
+
+  /*
+  printf("A = [%f %f %f %f ; %f %f %f %f ; %f %f %f %f]\n",
+	 A[0][0], A[0][1], A[0][2], A[0][3],
+	 A[1][0], A[1][1], A[1][2], A[1][3],
+	 A[2][0], A[2][1], A[2][2], A[2][3]);
+  */
+
+  // compute H(B1,B2)
+  double H = log(F2);
+  for (i = 0; i < d-1; i++) {
+    double H_i = A[i][0];
+    for (j = 1; j < d; j++)
+      H_i += (A[i][j] - A[i][0]) * (dF1[j-1]/F1);
+    H_i *= Z2[i];
+    H -= H_i;
+  }
+
+  free_matrix2(V1_ft);
+  free_matrix2(V1_ft_inv);
+  free_matrix2(A);
+
+  return H;
+}
+
+
+/*
+ * Computes the KL divergence D_KL(B1||B2) between two binghams.
+ */
+double bingham_KL_divergence(bingham_stats_t *s1, bingham_stats_t *s2)
+{
+  return bingham_cross_entropy(s1, s2) - s1->entropy;
 }
 
 

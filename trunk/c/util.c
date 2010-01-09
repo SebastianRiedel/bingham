@@ -578,6 +578,25 @@ int binary_search(double x, double *A, int n)
 }
 
 
+// quaternion multiplication:  z = x*y
+void quaternion_mult(double z[4], double x[4], double y[4])
+{
+  double a = x[0];
+  double b = x[1];
+  double c = x[2];
+  double d = x[3];
+  double y0 = y[0];
+  double y1 = y[1];
+  double y2 = y[2];
+  double y3 = y[3];
+
+  z[0] = a*y0 - b*y1 - c*y2 - d*y3;
+  z[1] = b*y0 + a*y1 - d*y2 + c*y3;
+  z[2] = c*y0 + d*y1 + a*y2 - b*y3;
+  z[3] = d*y0 - c*y1 + b*y2 + a*y3;
+}
+
+
 // add an element to the front of a list
 ilist_t *ilist_add(ilist_t *x, int a)
 {
