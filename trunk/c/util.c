@@ -889,6 +889,23 @@ void solve(double x[], double A[], double b[], int n)
 // compute the determinant of the n-by-n matrix X
 double det(double **X, int n)
 {
+  if (n == 1)
+    return X[0][0];
+  else if (n == 2)
+    return X[0][0]*X[1][1] - X[0][1]*X[1][0];
+  else if (n == 3) {
+    double a = X[0][0];
+    double b = X[0][1];
+    double c = X[0][2];
+    double d = X[1][0];
+    double e = X[1][1];
+    double f = X[1][2];
+    double g = X[2][0];
+    double h = X[2][1];
+    double i = X[2][2];
+    return a*e*i - a*f*h + b*f*g - b*d*i + c*d*h - c*e*g;
+  }
+
   int s;
   gsl_matrix_view X_gsl = gsl_matrix_view_array(X[0], n, n);
   gsl_permutation *p = gsl_permutation_alloc(n);

@@ -93,7 +93,7 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY)
 }
 
 
-static double bingham_F_table_get(int i, int j, int k)
+double bingham_F_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
@@ -116,7 +116,7 @@ static double bingham_F_table_get(int i, int j, int k)
 }
 
 
-static double bingham_dF1_table_get(int i, int j, int k)
+double bingham_dF1_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
@@ -139,7 +139,7 @@ static double bingham_dF1_table_get(int i, int j, int k)
 }
 
 
-static double bingham_dF2_table_get(int i, int j, int k)
+double bingham_dF2_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
@@ -162,7 +162,7 @@ static double bingham_dF2_table_get(int i, int j, int k)
 }
 
 
-static double bingham_dF3_table_get(int i, int j, int k)
+double bingham_dF3_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
@@ -185,7 +185,7 @@ static double bingham_dF3_table_get(int i, int j, int k)
 }
 
 
-static double bingham_dF_table_get(int a, int i, int j, int k)
+double bingham_dF_table_get(int a, int i, int j, int k)
 {
   switch (a) {
   case 0:

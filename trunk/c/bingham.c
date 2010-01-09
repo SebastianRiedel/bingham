@@ -564,7 +564,9 @@ void bingham_mode(double *mode, bingham_t *B)
 	  Vcut[j][k] = V[j][k+1];
       }
     }
-    double det_Vcut = abs(det(Vcut, d-1));
+
+    double det_Vcut = fabs(det(Vcut, d-1));
+
     if (det_Vcut > max_det) {
       max_det = det_Vcut;
       cut_axis = i;
@@ -587,18 +589,18 @@ void bingham_mode(double *mode, bingham_t *B)
   // now solve Vcut * x = b
   double x[d-1];
 
-  /*
-  printf("Vcut = [%f %f %f ; %f %f %f ; %f %f %f]\n",
+  /*dbug
+  printf("cut_axis = %d\n", cut_axis);
+  printf("Vcut = [\n%f %f %f ; \n%f %f %f ; \n%f %f %f]\n",
 	 Vcut[0][0], Vcut[0][1], Vcut[0][2],
 	 Vcut[1][0], Vcut[1][1], Vcut[1][2],
 	 Vcut[2][0], Vcut[2][1], Vcut[2][2]);
-
   printf("b = [%f %f %f]\n", b[0], b[1], b[2]);
   */
 
   solve(x, Vcut[0], b, d-1);
 
-  //printf("x = [%f %f %f]\n", x[0], x[1], x[2]);
+  //printf("x = [%f %f %f]\n\n", x[0], x[1], x[2]);
 
   for (i = 0; i < d-1; i++) {
     if (i < cut_axis)
@@ -609,7 +611,6 @@ void bingham_mode(double *mode, bingham_t *B)
   mode[cut_axis] = 1;
 
   normalize(mode, mode, d);
-
 }
 
 
@@ -619,7 +620,7 @@ void bingham_mode(double *mode, bingham_t *B)
  */
 void bingham_stats(bingham_stats_t *stats, bingham_t *B)
 {
-  int i, d = B->d;
+  int i, j, d = B->d;
   double F = B->F;
 
   stats->B = B;
@@ -642,6 +643,31 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
   else {
     fprintf(stderr, "Error: bingham_stats() only supports 1D, 2D, and 3D binghams.\n");
   }
+
+  // compute the scatter matrix
+  double **Si = new_matrix2(d, d);
+  double **S = new_matrix2(d, d);
+  double **v;
+  double *vt[d];
+  double sigma;
+  v = &stats->mode;
+  for (j = 0; j < d; j++)
+    vt[j] = &v[0][j];
+  matrix_mult(Si, vt, v, d, 1, d);
+  sigma = 1 - sum(stats->dF, d-1)/F;
+  mult(Si[0], Si[0], sigma, d*d);
+  matrix_add(S, S, Si, d, d);
+  for (i = 0; i < d-1; i++) {
+    v = &B->V[i];
+    for (j = 0; j < d; j++)
+      vt[j] = &v[0][j];
+    matrix_mult(Si, vt, v, d, 1, d);
+    sigma = stats->dF[i]/F;
+    mult(Si[0], Si[0], sigma, d*d);
+    matrix_add(S, S, Si, d, d);
+  }
+  free_matrix2(Si);
+  stats->scatter = S;
 
   // compute the entropy
   stats->entropy = log(F);
@@ -718,6 +744,25 @@ double bingham_KL_divergence(bingham_stats_t *s1, bingham_stats_t *s2)
 
 
 /*
+ * Merge two binghams: B = a*B1 + (1-a)*B2.
+ */
+void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, double alpha)
+{
+  int d = s1->B->d;
+
+  double **S = new_matrix2(d, d);
+  matrix_copy(S, s2->scatter, d, d);
+  mult(S[0], S[0], (1-alpha)/alpha, d*d);
+  matrix_add(S, S, s1->scatter, d, d);
+  mult(S[0], S[0], alpha, d*d);
+
+  bingham_fit_scatter(B, S, d);
+
+  free_matrix2(S);
+}
+
+
+/*
  * Fit a bingham to a set of samples.
  */
 void bingham_fit(bingham_t *B, double **X, int n, int d)
@@ -739,6 +784,16 @@ void bingham_fit(bingham_t *B, double **X, int n, int d)
  */
 void bingham_fit_scatter(bingham_t *B, double **S, int d)
 {
+  /*dbug
+  int i, j;
+  for (i = 0; i < d; i++) {
+    printf("S[%d] = [ ", i);
+    for (j = 0; j < d; j++)
+      printf("%f ", S[i][j]);
+    printf("]\n");
+  }
+  */
+
   // use PCA to get B->V
   double *eigenvals;
   safe_malloc(eigenvals, d, double);
