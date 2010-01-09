@@ -9,6 +9,12 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY);
 double bingham_F_lookup_3d(double *Z);
 void bingham_dF_lookup_3d(double *dF, double *Z);
 
+double bingham_F_table_get(int i, int j, int k);
+double bingham_dF1_table_get(int i, int j, int k);
+double bingham_dF2_table_get(int i, int j, int k);
+double bingham_dF3_table_get(int i, int j, int k);
+double bingham_dF_table_get(int a, int i, int j, int k);
+
 
 //---------------- Bingham normalizing constants F(z) and partial derivatives ------------------//
 

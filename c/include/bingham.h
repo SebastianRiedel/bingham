@@ -36,6 +36,7 @@ typedef struct {
   bingham_t *B;
   double *mode;      /* v0 */
   double *dF;        /* dF/dZ */
+  double **scatter;  /* scatter matrix */
   double entropy;    /* entropy */
 } bingham_stats_t;
 
@@ -61,6 +62,7 @@ void bingham_mode(double *mode, bingham_t *B);
 void bingham_stats(bingham_stats_t *stats, bingham_t *B);
 double bingham_cross_entropy(bingham_stats_t *s1, bingham_stats_t *s2);
 double bingham_KL_divergence(bingham_stats_t *s1, bingham_stats_t *s2);
+void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, double alpha);
 void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
