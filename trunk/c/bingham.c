@@ -677,6 +677,17 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
 
 
 /*
+ * Frees a bingham_stats_t (but not the underlying bingham_t).
+ */
+void bingham_stats_free(bingham_stats_t *stats)
+{
+  free(stats->mode);
+  free(stats->dF);
+  free_matrix2(stats->scatter);
+}
+
+
+/*
  * Computes the cross entropy H(B1,B2) between two binghams.
  */
 double bingham_cross_entropy(bingham_stats_t *s1, bingham_stats_t *s2)
@@ -1578,6 +1589,130 @@ void bingham_mixture_thresh_weights(bingham_mix_t *BM, double wthresh)
   }
   mult(BM->w, BM->w, 1/sum(BM->w, cnt), cnt);
   BM->n = cnt;
+}
+
+
+
+/*
+ * Load a Bingham Mixtures (BMX) file.
+ */
+bingham_mix_t *load_bmx(char *f_bmx, int *k)
+{
+  FILE *f = fopen(f_bmx, "r");
+
+  if (f == NULL) {
+    fprintf(stderr, "Invalid filename: %s", f_bmx);
+    return NULL;
+  }
+
+  // get the number of binghams mixtures in the bmx file
+  *k = 0;
+  char sbuf[1024], *s = sbuf;
+  int c;
+  while (!feof(f)) {
+    fgets(s, 1024, f);
+    if (s[0] == 'B' && sscanf(s, "B %d", &c) && c+1 > *k)
+      *k = c+1;
+  }
+  rewind(f);
+
+  bingham_mix_t *BM = (bingham_mix_t *)calloc(*k, sizeof(bingham_mix_t));
+
+  // get the number of binghams in each mixture
+  int i;
+  while (!feof(f)) {
+    fgets(s, 1024, f);
+    if (s[0] == 'B' && sscanf(s, "B %d %d", &c, &i) == 2 && i+1 > BM[c].n)
+      BM[c].n = i+1;
+  }
+  rewind(f);
+
+  // allocate space for the binghams
+  for (c = 0; c < *k; c++) {
+    BM[c].w = (double *)calloc(BM[c].n, sizeof(double));
+    BM[c].B = (bingham_t *)calloc(BM[c].n, sizeof(bingham_t));
+  }
+
+  // read in the binghams and corresponding weights
+  int d, j, j2;
+  double w;
+  int line = 0;
+  while (!feof(f)) {
+    line++;
+    s = sbuf;
+    fgets(s, 1024, f);
+    if (s[0] == 'B' && sscanf(s, "B %d %d %lf %d", &c, &i, &w, &d) == 4) {
+      BM[c].w[i] = w;
+      BM[c].B[i].d = d;
+      BM[c].B[i].Z = (double *)calloc(d-1, sizeof(double));
+      BM[c].B[i].V = new_matrix2(d-1, d);
+      s = sword(s, " \t", 5);
+      if (sscanf(s, "%lf", &BM[c].B[i].F) < 1)  // read F
+	break;
+      s = sword(s, " \t", 1);
+      for (j = 0; j < d-1; j++) {  // read Z
+	if (sscanf(s, "%lf", &BM[c].B[i].Z[j]) < 1)
+	  break;
+	s = sword(s, " \t", 1);
+      }
+      if (j < d-1)  // error
+	break;
+      for (j = 0; j < d-1; j++) {  // read V
+	for (j2 = 0; j2 < d; j2++) {
+	  if (sscanf(s, "%lf", &BM[c].B[i].V[j][j2]) < 1)
+	    break;
+	  s = sword(s, " \t", 1);
+	}
+	if (j2 < d)  // error
+	  break;
+      }
+      if (j < d-1)  // error
+	break;
+    }
+  }
+  if (!feof(f)) {  // error
+    fprintf(stderr, "Error reading file %s at line %d.\n", f_bmx, line);
+    return NULL;
+  }
+  fclose(f);
+
+  return BM;
+}
+
+
+/*
+ * Write bingham mixtures in the following format:
+ *
+ * B <c> <i> <w> <d> <F> <Z> <V>
+ */
+void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
+{
+  fprintf(stderr, "saving BMM to %s\n", fout);
+
+  FILE *f = fopen(fout, "w");
+  int c, i, j, k;
+
+  for (c = 0; c < num_clusters; c++) {
+    for (i = 0; i < BM[c].n; i++) {
+
+      double w = BM[c].w[i];
+      int d = BM[c].B[i].d;
+      double F = BM[c].B[i].F;
+      double *Z = BM[c].B[i].Z;
+      double **V = BM[c].B[i].V;
+
+      fprintf(f, "B %d %d %f ", c, i, w);
+      fprintf(f, "%d %f ", d, F);
+      for (j = 0; j < d-1; j++)
+	fprintf(f, "%f ", Z[j]);
+      for (j = 0; j < d-1; j++)
+	for (k = 0; k < d; k++)
+	  fprintf(f, "%f ", V[j][k]);
+      fprintf(f, "\n");
+    }
+  }
+
+  fclose(f);
 }
 
 
