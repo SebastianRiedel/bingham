@@ -7,7 +7,7 @@ F = B.F;
 
 clf;
 
-subplot(2,1,1);
+%subplot(2,1,1);
 [SX,SY,SZ] = sphere(50);
 n = size(SX,1);
 
@@ -25,11 +25,17 @@ for i=1:n
 end
 
 C = C./max(max(C));
+%C = .5*C + .5
 
-surf(SX,SY,SZ,C, 'EdgeColor', 'none');
+surf(SX,SY,SZ,C, 'EdgeColor', 'none', 'FaceAlpha', .7);
 axis vis3d;
 axis off;
-colormap(.5*gray+.5);
+%colormap(.5*gray+.5);
+cmap = pink;
+cmap(1:2:end,:) = cmap(end/2+1:end,:);
+cmap(2:2:end,:) = cmap(1:2:end,:);
+cmap = .75*cmap + .15*autumn + .1*gray;
+colormap(cmap);
 
 
 if nargin >= 2
@@ -40,6 +46,6 @@ if nargin >= 2
       P(j) = bingham_pdf(Q(j,:), B);
    end
    P = P./max(P);
-   C = cmap(round(1+63*P), :);
-   plot_quaternions(Q, C);
+   C = repmat(cmap(1,:), [n 1]); %cmap(round(1+63*P), :);
+   plot_quaternions(Q, C, 0, 0);
 end

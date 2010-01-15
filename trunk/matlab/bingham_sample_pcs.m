@@ -17,6 +17,9 @@ m = exp((log(n) - sum(log(Y)))/d);
 pcs_grid_size = ceil(m*Y);  % num. samples in each pc direction
 pcs_grid_size = 2*ceil(pcs_grid_size/2)-1;  % round to the nearest odd number
 cmax = sqrt(log(F*p0)./Z);
+cmax = min(cmax, 1);
+%theta_min = acos(cmax)
+%theta_step = 2*(pi/2 - theta_min) ./ (pcs_grid_size-1) - eps
 step = 2*cmax ./ (pcs_grid_size-1) - eps;
 
 grid_size = round(exp(sum(log(pcs_grid_size))));
@@ -26,6 +29,8 @@ for i=1:d
    if pcs_grid_size(i) == 1
       c = 0;
    else
+      %theta1 = (pi/2):-theta_step(i):theta_min(i)
+      %c1 = cos(theta1)  %dbug
       c1 = 0:step(i):cmax(i);
       c = [-c1(end:-1:2) c1];
    end
