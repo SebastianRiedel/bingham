@@ -1,22 +1,32 @@
-function plot_quaternions(Q, C, plot_sphere)
+function plot_quaternions(Q, C, plot_sphere, plot_hopf)
 % plot_quaternions(Q) -- plots quaternions as an axis/angle chart (Q is
 % n-by-4)
 
 %clf;
 
-subplot(2,1,1);
+if nargin < 3
+   plot_sphere = 0;
+end
 
-if nargin >= 3 && plot_sphere
+if nargin < 4
+   plot_hopf = 1;
+end
+
+if plot_sphere
+    subplot(2,1,1);
     [SX,SY,SZ] = sphere(30);
-    surf(SX,SY,SZ, 'EdgeColor', 'none');
+    surf(SX,SY,SZ, 'EdgeColor', 'none', 'FaceAlpha', .3);
     colormap(.5*gray+.5);
 end
 axis vis3d;
+axis equal;
 hold on;
 
-subplot(2,1,2);
-axis([0 2*pi 0 1]);
-hold on;
+if plot_sphere
+   subplot(2,1,2);
+   axis([0 2*pi 0 1]);
+   hold on;
+end
 
 for i=1:size(Q,1)
 
@@ -36,18 +46,25 @@ for i=1:size(Q,1)
       c = C(i,:);
    end
    
-   % plot axis
-   subplot(2,1,1);
-   plot3(v(1), v(2), v(3), '.', 'Color', c);
-   
-   % plot angle
-   subplot(2,1,2);
-   plot(a, 0, 'o', 'Color', c);
+   if plot_sphere
+      % plot axis
+      subplot(2,1,1);
+      plot3(v(1), v(2), v(3), '.', 'Color', c);
+      % plot angle
+      subplot(2,1,2);
+      plot(a, 0, 'o', 'Color', c);
+   elseif plot_hopf
+      plot3(a*v(1), a*v(2), a*v(3), '.', 'Color', c, 'MarkerSize', 15);
+   else
+      plot3(v(1), v(2), v(3), '.', 'Color', c, 'MarkerSize', 15);
+   end   
 end
 
-subplot(2,1,1);
-hold off;
-subplot(2,1,2);
+if plot_sphere
+   subplot(2,1,1);
+   hold off;
+   subplot(2,1,2);
+end
 hold off;
 
 
