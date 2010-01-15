@@ -48,7 +48,7 @@ n=20; [xxx I] = sort(-p.mass); cmap = jet; C = cmap(ceil(1+63*p.mass/max(p.mass)
 
 % plot clusters
 X = pcd_model.X; Y = pcd_model.Y; Z = pcd_model.Z; L = pcd_model.L;
-figure(10); for c=1:k, subplot(ceil(k/5), 5, c); plot3(X, Y, Z, '.'); hold on; plot3(X(L==c-1,:), Y(L==c-1,:), Z(L==c-1), 'r.'); hold off; axis vis3d; axis equal; axis off; title(sprintf('%d', c)); end
+figure(10); for c=1:pcd_model.k, subplot(ceil(pcd_model.k/5), 5, c); plot3(X, Y, Z, '.'); hold on; plot3(X(L==c-1,:), Y(L==c-1,:), Z(L==c-1), 'r.'); hold off; axis vis3d; axis equal; axis off; title(sprintf('%d', c)); end
 
 pcd_model0 = pcd_model;
 pcd_model1 = rotate_pcd(pcd_model, [sqrt(2)/2 sqrt(2)/2 0 0]);
