@@ -16,11 +16,11 @@ figure(9); plot(mean(C_mean,4), 'LineWidth', 2); legend('k=1', 'k=2', 'k=3', 'k=
 % get CV error for the IKEA-Synthetic
 objs = ikea_objects_synth();
 clear E_med E_mean C_mean;
-for i=1:length(objs)
+for i=4 %1:length(objs)
    [E_med_i E_mean_i C_mean_i] = get_tofoo_error(sprintf('../../IKEA-Synthetic/%s', objs{i}), 50);
-   E_med(:,:,:,i) = E_med_i;
-   E_mean(:,:,:,i) = real(E_mean_i);  %dbug
-   C_mean(:,:,:,i) = C_mean_i;
+   E_med(:,:,:,1) = E_med_i;
+   E_mean(:,:,:,1) = real(E_mean_i);  %dbug
+   C_mean(:,:,:,1) = C_mean_i;
 end
 
 E_med = reshape(E_med, [size(E_med,1) size(E_med,3) size(E_med,4)]);
@@ -30,4 +30,15 @@ C_mean = reshape(C_mean, [size(C_mean,1) size(C_mean,3) size(C_mean,4)]);
 figure(1); plot(mean(E_med,3), 'LineWidth', 2); legend('k=1', 'k=2', 'k=3', 'k=4', 'k=5');
 figure(2); plot(mean(E_mean,3), 'LineWidth', 2); legend('k=1', 'k=2', 'k=3', 'k=4', 'k=5');
 figure(3); plot(mean(C_mean,3), 'LineWidth', 2); legend('k=1', 'k=2', 'k=3', 'k=4', 'k=5');
+
+for i=4:size(E_med,3)
+   pcd_model = load_pcd(sprintf('%s/%s/cv1.pcd', fdir, objs{i}));
+   figure(4);
+   plot_pcd(pcd_model);
+   figure(5);
+   plot(mean(E_med(:,:,i),2));
+   title(sprintf('obj %d', i));
+   input(':');
+end
+
 
