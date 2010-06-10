@@ -471,7 +471,7 @@ void bingham_new_uniform(bingham_t *B, int d)
   bingham_alloc(B, d);
   memset(B->V[0], 0, d*(d-1)*sizeof(double));
   memset(B->Z, 0, (d-1)*sizeof(double));
-  B->F = 1/surface_area_sphere(d);
+  B->F = surface_area_sphere(d);
 }
 
 
@@ -1635,7 +1635,7 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
 
   // read in the binghams and corresponding weights
   int d, j, j2;
-  double w;
+  double w, xxx;
   int line = 0;
   while (!feof(f)) {
     line++;
@@ -1650,6 +1650,15 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
       if (sscanf(s, "%lf", &BM[c].B[i].F) < 1)  // read F
 	break;
       s = sword(s, " \t", 1);
+
+      for (j = 0; j < d-1; j++) {  // read dF -- dbug: add dF to bingham_t
+	if (sscanf(s, "%lf", &xxx) < 1)
+	  break;
+	s = sword(s, " \t", 1);
+      }
+      if (j < d-1)  // error
+	break;
+
       for (j = 0; j < d-1; j++) {  // read Z
 	if (sscanf(s, "%lf", &BM[c].B[i].Z[j]) < 1)
 	  break;
@@ -1683,7 +1692,7 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
 /*
  * Write bingham mixtures in the following format:
  *
- * B <c> <i> <w> <d> <F> <Z> <V>
+ * B <c> <i> <w> <d> <F> <dF> <Z> <V>
  */
 void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
 {
@@ -1691,6 +1700,7 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
 
   FILE *f = fopen(fout, "w");
   int c, i, j, k;
+  bingham_stats_t stats;
 
   for (c = 0; c < num_clusters; c++) {
     for (i = 0; i < BM[c].n; i++) {
@@ -1701,19 +1711,28 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
       double *Z = BM[c].B[i].Z;
       double **V = BM[c].B[i].V;
 
+      bingham_stats(&stats, &BM[c].B[i]);
+      double *dF = stats.dF;
+
       fprintf(f, "B %d %d %f ", c, i, w);
       fprintf(f, "%d %f ", d, F);
+      for (j = 0; j < d-1; j++)
+	fprintf(f, "%f ", dF[j]);
       for (j = 0; j < d-1; j++)
 	fprintf(f, "%f ", Z[j]);
       for (j = 0; j < d-1; j++)
 	for (k = 0; k < d; k++)
 	  fprintf(f, "%f ", V[j][k]);
       fprintf(f, "\n");
+
+      bingham_stats_free(&stats);
     }
   }
 
   fclose(f);
 }
+
+
 
 
 

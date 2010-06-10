@@ -3,6 +3,12 @@
 #define BINGHAM_UTIL_H
 
 
+#ifdef HAVE_WINDOWS
+#include <gsl/gsl_sf.h>
+#define lgamma(x) gsl_sf_lngamma(x)
+#endif
+
+
 #define MAXFACT 10000
 
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
@@ -96,6 +102,9 @@ double **new_matrix2(int n, int m);                     /* create a new n-by-m 2
 int **new_matrix2i(int n, int m);                       /* create a new n-by-m 2d matrix of ints */
 void free_matrix2(double **X);                          /* free a 2d matrix of doubles */
 void free_matrix2i(int **X);                            /* free a 2d matrix of ints */
+
+void save_matrix(char *fout, double **X, int n, int m);   /* save a matrix to a file */
+double **load_matrix(char *fin, int *n, int *m);          /* load a matrix from a file */
 
 
 typedef struct ilist {

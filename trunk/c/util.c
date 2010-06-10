@@ -771,6 +771,81 @@ void free_matrix2i(int **X)
   free(X);
 }
 
+/*
+ * Write a matrix in the following format.
+ *
+ * <nrows> <ncols>
+ * <row 1>
+ * <row 2>
+ * ...
+ */
+void save_matrix(char *fout, double **X, int n, int m)
+{
+  //fprintf(stderr, "saving matrix to %s\n", fout);
+
+  FILE *f = fopen(fout, "w");
+  int i, j;
+
+  fprintf(f, "%d %d\n", n, m);
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++)
+      fprintf(f, "%f ", X[i][j]);
+    fprintf(f, "\n");
+  }
+
+  fclose(f);
+}
+
+/*
+ * Load a matrix in the following format.
+ *
+ * <nrows> <ncols>
+ * <row 1>
+ * <row 2>
+ * ...
+ */
+double **load_matrix(char *fin, int *n, int *m)
+{
+  FILE *f = fopen(fin, "r");
+
+  if (f == NULL) {
+    fprintf(stderr, "Invalid filename: %s", fin);
+    return NULL;
+  }
+
+  char sbuf[1024], *s = sbuf;
+  fgets(s, 1024, f);
+  if (sscanf(s, "%d %d", n, m) < 2) {
+    fprintf(stderr, "Corrupt matrix header in file %s\n", fin);
+    fclose(f);
+    return NULL;
+  }
+
+  double **X = new_matrix2(*n, *m);
+
+  int i, j;
+  for (i = 0; i < *n; i++) {
+    if (fgets(s, 1024, f) == NULL)
+      break;
+    for (j = 0; j < *m; j++) {
+      if (sscanf(s, "%lf", &X[i][j]) < 1)
+	break;
+      s = sword(s, " \t", 1);
+    }
+    if (j < *m)
+      break;
+  }
+  if (i < *n) {
+    fprintf(stderr, "Corrupt matrix file '%s' at line %d\n", fin, i+2);
+    fclose(f);
+    free_matrix2(X);
+    return NULL;
+  }
+
+  return X;
+}
+
+
 
 // calculate the area of a triangle
 double triangle_area(double x[], double y[], double z[], int n)

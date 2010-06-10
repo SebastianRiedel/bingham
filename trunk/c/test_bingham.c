@@ -991,7 +991,7 @@ int main(int argc, char *argv[])
   //test_bingham_init();
 
   //test_bingham_stats(argc, argv);
-  test_bingham_KL_divergence(argc, argv);
+  //test_bingham_KL_divergence(argc, argv);
 
   //test_bingham_mixture_mult(argc, argv);
   //test_bingham_mixture_thresh_peaks(argc, argv);
@@ -1002,7 +1002,7 @@ int main(int argc, char *argv[])
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-  //test_bingham_discretize(argc, argv);
+  test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);

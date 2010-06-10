@@ -5,13 +5,18 @@ LDIR =lib
 INSTALL_DIR=/usr
 
 CC=gcc
+#MEX=mex
+MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
 CFLAGS=-Wall -I$(IDIR) -O3 #-pg
 
-#CYGWIN=1
+CYGWIN=1
+#WINDOWS=1
 
-ifdef CYGWIN
-CFLAGS += -mno-cygwin -mwindows -I/usr/include
+
+ifdef WINDOWS
+CFLAGS += -static -mno-cygwin -I"C:\Program Files\GnuWin32\include" -DHAVE_WINDOWS #-mwindows -I/usr/include
+#CFLAGS = -I$(IDIR) -I"C:\Program*\GnuWin32\include" -DHAVE_WINDOWS
 endif
 
 LFLAGS=-lm -lgsl -lgslcblas #-lduma
@@ -21,10 +26,13 @@ _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h 
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 ifdef CYGWIN
-LIBS = $(LDIR)/bingham.dll
-TARGETS = $(LIBS)
+LIBS += libbingham.so.1.0.1 #$(LDIR)/bingham.dll
 else
 LIBS = libbingham.a
+endif
+ifdef WINDOWS
+TARGETS = $(LIBS)
+else
 TARGETS = $(LIBS) test_bingham test_util fit_bingham cluster_bingham
 endif
 
@@ -32,11 +40,19 @@ endif
 
 all: $(TARGETS)
 
+#ifdef WINDOWS
+#$(ODIR)/%.o: %.c $(DEPS)
+#	$(MEX) -c $< $(CFLAGS)
+#else
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
+#endif
 
 libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(LINK) $@ $^
+
+libbingham.so.1.0.1: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+	$(CC) -shared -Wl,-soname,libbingham.so.1 -o $@ $^ $(LFLAGS)
 
 $(LDIR)/bingham.dll: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(CC) -shared -o $@ $^ $(LFLAGS)
