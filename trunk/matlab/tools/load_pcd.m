@@ -10,7 +10,7 @@ columns = {};
 while 1
    s = fgets(f);
    [t s] = strtok(s);
-   if strcmp(t, 'COLUMNS')
+   if strcmp(t, 'COLUMNS') || strcmp(t, 'FIELDS')
       i = 0;
       s = strtrim(s);
       while ~isempty(s)

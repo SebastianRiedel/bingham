@@ -17,7 +17,7 @@ if nargin < 4
     style = 'r.';
 end
 
-LINE_LENGTH_RATIO = .3;
+LINE_LENGTH_RATIO = 1; %.3;
 mean_std = mean([std(pcd.X) std(pcd.Y) std(pcd.Z)]);
 r = LINE_LENGTH_RATIO * mean_std;
 
