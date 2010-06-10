@@ -7,12 +7,14 @@ J = [];
 K = [];
 for i=1:length(files)
    a = sscanf(files(i).name, 'cv%d_post%d_bag%d.m');
+   files(i).name
+   %a = sscanf(files(i).name, 'cv%d_post%d_nxyz_fpfh_bag%d.m');
    K = [K a(1)];
    I = [I a(2)];
    J = [J a(3)];
 end
 K = intersect(K, 1:max(K));
-I = intersect(I, 1:max(I));
+%I = intersect(I, 1:max(I));
 J = intersect(J, 1:max(J));
 
 if nargin > 2
@@ -38,6 +40,7 @@ for k=1:length(K)
    for i=1:length(I)
       for j = 1:length(J)
          run(sprintf('%s/cv%d_post%d_bag%d.m', fdir, K(k), I(i), J(j)));
+         %run(sprintf('%s/cv%d_post%d_nxyz_fpfh_bag%d.m', fdir, K(k), I(i), J(j)));
          theta = acos(abs(X(:,1).^2 - X(:,2).^2 - X(:,3).^2 + X(:,4).^2))';
          theta = (180/pi)*theta;
          if length(theta) > 100

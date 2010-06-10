@@ -1,10 +1,15 @@
-function [E_med E_mean C_mean] = get_tofoo_error(fdir, bag_sizes)
+function [E_med E_mean C_mean] = get_tofoo_error(fdir, bag_sizes, cvsets)
 % [E_med E_mean C_mean] = get_tofoo_error(fdir)
 
 
+if nargin < 3
+    cvsets = 1:5;
+end
+
 % get CV error for an object
 E = {};
-for k=1:5
+for k=cvsets
+   k
    files = dir(sprintf('%s/cv%d*.m', fdir, k));
    if nargin > 1
       E{k} = tofoo_error_rotsym(fdir, files, bag_sizes);
@@ -13,8 +18,11 @@ for k=1:5
    end
 end
 
+'break'
+
 % plot error graphs
-for i=1:5
+for i=cvsets
+    i
    E_med(:,:,i) = median(E{i}(1:20,:,:),3);
    E_mean(:,:,i) = mean(E{i}(1:20,:,:),3);
    C = E{i}<20;

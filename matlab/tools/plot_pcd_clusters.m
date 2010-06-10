@@ -1,10 +1,15 @@
-function plot_pcd_clusters(data, columns, options)
+function plot_pcd_clusters(data, columns, options, B, W)
 % plot_pcd_clusters(data, columns, options) -- where options is a string
 % contains any combination of the following characters:
 %    'n'  --  plot normals
 %    'p'  --  plot principal curvatures
 %    'q'  --  plot quaternions
 
+
+figure(1);
+clf;
+figure(2);
+clf;
 
 LINE_LENGTH_RATIO = .2; %.1;
 LINE_SKIP_RATE = 5; %10;
@@ -25,6 +30,11 @@ if nargin >= 3
       plot_pcs = 1;
       plot_normals = 1;
    end
+end
+
+plot_bmx = 0;
+if nargin >= 4
+    plot_bmx = 1;
 end
 
 
@@ -176,51 +186,52 @@ for i=0:max(L)
       Qi = [Q(Li,:,1) ; Q(Li,:,2)];
       %[B_V B_Z B_F] = bingham_fit(Qi')
 
-      [V1 Z1 F1 V2 Z2 F2] = bingham_fit_bimodal(Qi')
+      %[V1 Z1 F1 V2 Z2 F2] = bingham_fit_bimodal(Qi')
 %      Z1
 %      Z2
 
       figure(3);
-      plot_bingham_3d(V1, Z1, F1);
-      plot_quaternions(Qi);
-      
-      figure(4);
-      plot_bingham_3d(V2, Z2, F2);
-      plot_quaternions(Qi);
-      
-      figure(5);
       clf;
-      subplot(2,1,1);
-      [SX,SY,SZ] = sphere(30);
-      surf(SX,SY,SZ, 'EdgeColor', 'none');
-      axis vis3d;
-      colormap(.5*gray+.5);
-      cmap = jet;
-      P1 = zeros(1, 2*length(Li));
-      P2 = zeros(1, 2*length(Li));
-      for j=1:2*length(Li)
-         P1(j) = bingham_pdf(Qi(j,:), V1, Z1, F1);
-         P2(j) = bingham_pdf(Qi(j,:), V2, Z2, F2);
-      end
-      P1 = P1./max(P1);
-      P2 = P2./max(P2);
-      C1 = cmap(round(1+63*P1), :);
-      C2 = cmap(round(1+63*P2), :);
-      plot_quaternions(Qi, C1);
+      %plot_bingham_3d(V1, Z1, F1);
+      plot_quaternions(Qi);
+      
+      %figure(4);
+      %plot_bingham_3d(V2, Z2, F2);
+      %plot_quaternions(Qi);
+      
+      %figure(5);
+      %clf;
+      %subplot(2,1,1);
+      %[SX,SY,SZ] = sphere(30);
+      %surf(SX,SY,SZ, 'EdgeColor', 'none');
+      %axis vis3d;
+      %colormap(.5*gray+.5);
+      %cmap = jet;
+      %P1 = zeros(1, 2*length(Li));
+      %P2 = zeros(1, 2*length(Li));
+      %for j=1:2*length(Li)
+      %   P1(j) = bingham_pdf(Qi(j,:), V1, Z1, F1);
+      %   P2(j) = bingham_pdf(Qi(j,:), V2, Z2, F2);
+      %end
+      %P1 = P1./max(P1);
+      %P2 = P2./max(P2);
+      %C1 = cmap(round(1+63*P1), :);
+      %C2 = cmap(round(1+63*P2), :);
+      %plot_quaternions(Qi, C1);
 
-      figure(6);
-      clf;
-      subplot(2,1,1);
-      surf(SX,SY,SZ, 'EdgeColor', 'none');
-      axis vis3d;
-      colormap(.5*gray+.5);
-      plot_quaternions(Qi, C2);
+      %figure(6);
+      %clf;
+      %subplot(2,1,1);
+      %surf(SX,SY,SZ, 'EdgeColor', 'none');
+      %axis vis3d;
+      %colormap(.5*gray+.5);
+      %plot_quaternions(Qi, C2);
       
-      figure(7);
-      plot_bingham_3d_projections(V1, Z1, F1);
+      %figure(7);
+      %plot_bingham_3d_projections(V1, Z1, F1);
       
-      figure(8);
-      plot_bingham_3d_projections(V2, Z2, F2);
+      %figure(8);
+      %plot_bingham_3d_projections(V2, Z2, F2);
       
       %figure(5);
       %A = 2*acos(Q(Li,:,1));
@@ -232,9 +243,9 @@ for i=0:max(L)
    figure(1);
    hold off;
    axis vis3d;
+   axis equal;
    
    figure(2);
-   
    % plot pfh
    subplot(k,1,i+1);
    bar(mean(F(Li,:)), 'r');
@@ -242,10 +253,28 @@ for i=0:max(L)
       subplot(k,1,i);
       bar(mean(F(find(L==i-1),:)), 'b');
    end
+
+   if plot_bmx
+       figure(9);
+       clf;
+       for j=1:length(B{i+1})
+           subplot(1,length(B{i+1}),j);
+           plot_quaternions(bingham_sample(B{i+1}(j),200));
+           title(sprintf('entropy = %f', bingham_entropy(B{i+1}(j))));
+       end
+       figure(10);
+       clf;
+       plot_quaternions(bingham_mixture_sample(B{i+1},W{i+1},500));
+       title(sprintf('avg. entropy = %f', bingham_mixture_entropy(B{i+1}, W{i+1})));
+   end
+
    
    fprintf('cluster %d', i);
    input(':');
 end
+figure(2);
 subplot(k,1,k);
 bar(mean(F(find(L==k-1),:)), 'b');
+
+
 

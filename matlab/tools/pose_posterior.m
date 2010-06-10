@@ -38,6 +38,9 @@ for i=1:size(Q,1)   % cells
         end
         mass = mass + p_pfh * p_bingham;
         
+        if i==1
+            fprintf('c=%d: p_pfh = %f\n', c, p_pfh);
+        end
         %fprintf('i=%d, c=%d: p_pfh = %f, p_bingham = %f\n', i, c, p_pfh, p_bingham);
     end
 

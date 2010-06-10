@@ -10,6 +10,8 @@ b2 = y(2);
 c2 = y(3);
 d2 = y(4);
 
+z = x;  % just to match the dimensions
+
 z(1) = a1*a2 - b1*b2 - c1*c2 - d1*d2;
 z(2) = a1*b2 + b1*a2 + c1*d2 - d1*c2;
 z(3) = a1*c2 - b1*d2 + c1*a2 + d1*b2;
