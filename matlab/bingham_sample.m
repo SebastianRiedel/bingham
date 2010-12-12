@@ -1,7 +1,7 @@
 function X = bingham_sample(B,n)
 % X = bingham_sample(B,n) - sample n points from a Bingham using Monte Carlo simulation
 
-burn_in = 0;
+burn_in = 10;
 sample_rate = 1; %10;
 %sigma = .1;
 
@@ -30,6 +30,6 @@ for i=1:n*sample_rate+burn_in
     X(i,:) = x;
 end
 
-accept_rate = num_accepts / (n*sample_rate + burn_in)
+%accept_rate = num_accepts / (n*sample_rate + burn_in)
 
 X = X(burn_in+1:sample_rate:end,:);
