@@ -27,8 +27,8 @@ if nargin >= 3
    end
    if strfind(options, 'q')
       plot_quat = 1;
-      plot_pcs = 1;
-      plot_normals = 1;
+      %plot_pcs = 1;
+      %plot_normals = 1;
    end
 end
 

@@ -1,16 +1,19 @@
-function FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment)
+function FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment, I)
 %FCP = compute_feature_class_probs(tofoo, pcd)
-
-if nargin < 3
-    hard_assignment = 1;
-end
 
 k = length(tofoo.W);
 n = size(pcd.X,1);
 
+if nargin < 3
+    hard_assignment = 1;
+end
+if nargin < 4
+    I = 1:n;
+end
+
 FCP = zeros(n,k);  % feature class probabilities
 
-for i=1:n
+for i=I
     % compute feature class probabilities
     DF = tofoo.M - repmat(pcd.F(i,:), [k,1]);
     df = sum(DF.*DF,2);

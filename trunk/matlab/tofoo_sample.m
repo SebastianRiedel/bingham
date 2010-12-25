@@ -9,11 +9,13 @@ function [Q Q2] = tofoo_sample(tofoo, pcd, n)
 %is a nonlinear function of local orientation distributions, but we can
 %compute the PDF in closed form for a given orientation.
 
-
-npoints = size(pcd.X,1);
-FCP = compute_feature_class_probs(tofoo, pcd, 1);
+hard_assignment = 1;
 burn_in = 10;
 sample_rate = 1; %10;
+always_accept = 1;
+
+npoints = size(pcd.X,1);
+FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment);
 
 r = [];
 num_accepts = 0;
@@ -38,23 +40,27 @@ for i=1:n*sample_rate+burn_in
     %r2_err = acos(abs(r2(1)^2 - r2(2)^2 - r2(3)^2 + r2(4)^2))'
 
     % sample a random acceptance threshold
-    if num_accepts==0
-        t2min = 0;
-    else
-        t2min = rand()*t*p2/p;
+    if ~always_accept
+        if num_accepts==0
+            t2min = 0;
+        else
+            t2min = rand()*t*p2/p;
+        end
+
+        % compute target density for the given orientation 
+        t2 = tofoo_cloud_pdf(r2, tofoo, pcd, FCP, t2min);
     end
-    
-    % compute target density for the given orientation 
-    t2 = tofoo_cloud_pdf(r2, tofoo, pcd, FCP, t2min);
 
     % a = p*t2/(p2*t) >= rand()
     % t2 >= rand()*t*p2/p
     
-    if num_accepts==0 || t2 > t2min
+    if always_accept || num_accepts==0 || t2 > t2min
         num_accepts = num_accepts + 1;
         r = r2;
         p = p2;
-        t = t2;
+        if ~always_accept
+            t = t2;
+        end
     end
     Q(i,:) = r;
     Q2(i,:) = r2;
