@@ -8,7 +8,7 @@ if nargin < 5 || isempty(pmin)
     pmin = 0;
 end
 if nargin < 6 || isempty(num_samples)
-    num_samples = 5;
+    num_samples = 10;
 end
 if nargin < 7 || isempty(lambda)
     lambda = 4; %.07; %.3;
@@ -27,13 +27,13 @@ if nargin < 4 || isempty(FCP)
 end
 
 % compute max BMM densities (for pruning)
-bmm_mode_densities = zeros(1,length(tofoo.BMM));
-for i=1:length(tofoo.BMM)
-    for j=1:length(tofoo.BMM(i).B)
-        bmm_mode_densities(i) = max(bmm_mode_densities(i), 1/tofoo.BMM(i).B(j).F);
-    end
-end
-bmm_mode_log_densities = log(bmm_mode_densities);  %dbug
+%bmm_mode_densities = zeros(1,length(tofoo.BMM));
+%for i=1:length(tofoo.BMM)
+%    for j=1:length(tofoo.BMM(i).B)
+%        bmm_mode_densities(i) = max(bmm_mode_densities(i), 1/tofoo.BMM(i).B(j).F);
+%    end
+%end
+%bmm_mode_log_densities = log(bmm_mode_densities);  %dbug
 
 
 % prob(q) = lambda*e^(lambda*(x1/b1 + x2/b2 + ... + xk/bk))
@@ -44,9 +44,11 @@ PB = repmat(num_samples, [1,k]);
 FCW = sum(FCP(I,:));  % feature class weights for cloud subset
 FCW(FCW==0) = inf;
 
+q_inv = [q(1) -q(2:4)];
+
 % compute quaternion probabilities
 for i=I
-    q2 = quaternion_mult(q, pcd.Q(i,:));
+    q2 = quaternion_mult(pcd.Q(i,:), q_inv);
 
     if hard_assignment
         j = find(FCP(i,:));
@@ -54,13 +56,8 @@ for i=I
         PX(j) = PX(j) + log(p);
         %PB(j) = PB(j) + 1;
     else
-        for j=1:k
-            if FCP(i,j) > 0
-                p = bingham_mixture_pdf(q2, tofoo.BMM(j).B, tofoo.BMM(j).W);
-                PX(j) = PX(j) + log(p)*FCP(i,j);
-                %PB(j) = PB(j) + FCP(i,j);
-            end
-        end
+        fprintf('soft assignment not supported\n');
+        return
     end
     
     % pruning
