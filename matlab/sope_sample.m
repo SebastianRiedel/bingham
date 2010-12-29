@@ -1,26 +1,19 @@
-function [Q Q2] = tofoo_sample(tofoo, pcd, n)
-%Q = tofoo_sample(tofoo, pcd, n) -- monte carlo (metropolis hasting) sampling
-%algorithm for object orientation given a tofoo model.  The proposal
-%distribution is a mixture of orientation posteriors from single
-%observations, and the target distribution is a function (geometric mean?)
-%of the local orientation distributions over the full observed point cloud.
-%
-%The difficulty with sampling from the target distribution directly is that it
-%is a nonlinear function of local orientation distributions, but we can
-%compute the PDF in closed form for a given orientation.
+function XQ = sope_sample(tofoo, pcd, n)
+%XQ = sope_sample(tofoo, pcd, n) -- monte carlo (metropolis hasting) sampling
+%algorithm for object pose given a tofoo model.
 
 hard_assignment = 1;
 burn_in = 10;
 sample_rate = 1; %10;
-always_accept = 1;
+always_accept = 0;
 
 npoints = size(pcd.X,1);
 FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment);
 
 r = [];
+x = [];
 num_accepts = 0;
-Q = zeros(n,4);
-Q2 = zeros(n,4);
+XQ = zeros(n,7);
 for i=1:n*sample_rate+burn_in
     % sample a point feature
     j = ceil(rand()*npoints);
@@ -39,6 +32,16 @@ for i=1:n*sample_rate+burn_in
     p2 = bingham_mixture_pdf(r2, BMM.B, BMM.W);
     %r2_err = acos(abs(r2(1)^2 - r2(2)^2 - r2(3)^2 + r2(4)^2))'
 
+    % sample from the proposal distribution of position given orientation
+    xj = [pcd.X(j) pcd.Y(j) pcd.Z(j)];
+    c = find(FCP(j,:));
+    q2 = quaternion_mult(q, qinv(r2));
+    [x_mean x_cov] = qksample_tofoo(q2,c,tofoo);
+    x0 = mvnrnd(x_mean, x_cov);
+    R = quaternionToRotationMatrix(r2);
+    x2 = (xj' - R*x0')';
+    p2 = p2*mvnpdf(x0, x_mean, x_cov);
+    
     % sample a random acceptance threshold
     if ~always_accept
         if num_accepts==0
@@ -48,7 +51,7 @@ for i=1:n*sample_rate+burn_in
         end
 
         % compute target density for the given orientation 
-        t2 = tofoo_cloud_pdf(r2, tofoo, pcd, FCP, t2min);
+        t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP);
     end
 
     % a = p*t2/(p2*t) >= rand()
@@ -56,14 +59,14 @@ for i=1:n*sample_rate+burn_in
     
     if always_accept || num_accepts==0 || t2 > t2min
         num_accepts = num_accepts + 1;
+        x = x2;
         r = r2;
         p = p2;
         if ~always_accept
             t = t2;
         end
     end
-    Q(i,:) = r;
-    Q2(i,:) = r2;
+    XQ(i,:) = [x r];
     
     fprintf('.');
 end
@@ -71,8 +74,7 @@ fprintf('\n');
 
 accept_rate = num_accepts / (n*sample_rate + burn_in)
 
-Q = Q(burn_in+1:sample_rate:end,:);
-Q2 = Q2(burn_in+1:sample_rate:end,:);
+XQ = XQ(burn_in+1:sample_rate:end,:);
 
 
 

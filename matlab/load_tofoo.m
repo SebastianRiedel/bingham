@@ -8,6 +8,8 @@ function tofoo = load_tofoo(name)
 [B,W] = load_bmx(sprintf('%s.bmx', name));
 pcd = load_pcd(sprintf('%s.pcd', name));
 
+tofoo.pcd = pcd;  % TODO -- compute QK lookup table
+
 tofoo.BMM = [];
 for i=1:length(B)
     tofoo.BMM(i).B = B{i};
