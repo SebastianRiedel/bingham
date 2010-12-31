@@ -100,7 +100,8 @@ ANNpointArray
       continue;
     }
 
-    // Ignore SIZE, TYPE, WIDTH and HEIGHT for now
+    // Ignore COUNT, SIZE, TYPE, WIDTH and HEIGHT for now
+    if (lineType.substr (0, 5) == "COUNT") { readComments (line, header); continue; }
     if (lineType.substr (0, 4) == "SIZE") { readComments (line, header); continue; }
     if (lineType.substr (0, 4) == "TYPE") { readComments (line, header); continue; }
     if (lineType.substr (0, 5) == "WIDTH") { readComments (line, header); continue; }
