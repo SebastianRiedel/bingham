@@ -540,6 +540,19 @@ double bingham_pdf(double x[], bingham_t *B)
 
 
 /*
+ * Test whether a Bingham is uniform.
+ */
+int bingham_is_uniform(bingham_t *B)
+{
+  int i;
+  for (i = 0; i < B->d-1; i++)
+    if (B->Z[i] != 0.0)
+      return 0;
+  return 1;
+}
+
+
+/*
  * Computes the mode of a bingham distribution.
  */
 void bingham_mode(double *mode, bingham_t *B)
@@ -609,7 +622,7 @@ void bingham_mode(double *mode, bingham_t *B)
       mode[i+1] = x[i];
   }
   mode[cut_axis] = 1;
-
+  
   normalize(mode, mode, d);
 }
 
@@ -623,15 +636,11 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
   int i, j, d = B->d;
   double F = B->F;
 
+  memset(stats, 0, sizeof(bingham_stats_t));
   stats->B = B;
 
-  safe_calloc(stats->mode, d, double);
-  safe_calloc(stats->dF, d-1, double);
-
-  // compute the mode
-  bingham_mode(stats->mode, B);
-
   // look up dF
+  safe_calloc(stats->dF, d-1, double);
   if (d == 4)
     bingham_dF_lookup_3d(stats->dF, B->Z);
   else if (d == 3) {
@@ -644,35 +653,42 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
     fprintf(stderr, "Error: bingham_stats() only supports 1D, 2D, and 3D binghams.\n");
   }
 
-  // compute the scatter matrix
-  double **Si = new_matrix2(d, d);
-  double **S = new_matrix2(d, d);
-  double **v;
-  double *vt[d];
-  double sigma;
-  v = &stats->mode;
-  for (j = 0; j < d; j++)
-    vt[j] = &v[0][j];
-  matrix_mult(Si, vt, v, d, 1, d);
-  sigma = 1 - sum(stats->dF, d-1)/F;
-  mult(Si[0], Si[0], sigma, d*d);
-  matrix_add(S, S, Si, d, d);
-  for (i = 0; i < d-1; i++) {
-    v = &B->V[i];
-    for (j = 0; j < d; j++)
-      vt[j] = &v[0][j];
-    matrix_mult(Si, vt, v, d, 1, d);
-    sigma = stats->dF[i]/F;
-    mult(Si[0], Si[0], sigma, d*d);
-    matrix_add(S, S, Si, d, d);
-  }
-  free_matrix2(Si);
-  stats->scatter = S;
-
   // compute the entropy
   stats->entropy = log(F);
   for (i = 0; i < d-1; i++)
     stats->entropy -= B->Z[i] * stats->dF[i] / F;
+
+  if (!bingham_is_uniform(B)) {
+
+    // compute the mode
+    safe_calloc(stats->mode, d, double);
+    bingham_mode(stats->mode, B);
+
+    // compute the scatter matrix
+    double **Si = new_matrix2(d, d);
+    double **S = new_matrix2(d, d);
+    double **v;
+    double *vt[d];
+    double sigma;
+    v = &stats->mode;
+    for (j = 0; j < d; j++)
+      vt[j] = &v[0][j];
+    matrix_mult(Si, vt, v, d, 1, d);
+    sigma = 1 - sum(stats->dF, d-1)/F;
+    mult(Si[0], Si[0], sigma, d*d);
+    matrix_add(S, S, Si, d, d);
+    for (i = 0; i < d-1; i++) {
+      v = &B->V[i];
+      for (j = 0; j < d; j++)
+	vt[j] = &v[0][j];
+      matrix_mult(Si, vt, v, d, 1, d);
+      sigma = stats->dF[i]/F;
+      mult(Si[0], Si[0], sigma, d*d);
+      matrix_add(S, S, Si, d, d);
+    }
+    free_matrix2(Si);
+    stats->scatter = S;
+  }
 }
 
 
@@ -681,9 +697,12 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
  */
 void bingham_stats_free(bingham_stats_t *stats)
 {
-  free(stats->mode);
-  free(stats->dF);
-  free_matrix2(stats->scatter);
+  if (stats->mode)
+    free(stats->mode);
+  if (stats->dF)
+    free(stats->dF);
+  if (stats->scatter)
+    free_matrix2(stats->scatter);
 }
 
 

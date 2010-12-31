@@ -9,14 +9,14 @@ LINK=ar rcs
 #CFLAGS=-Wall -I$(IDIR) -O3 #-pg
 CFLAGS = -Ieigen -I/home/jglov/bingham/c/include
 
-CYGWIN=1
+#CYGWIN=1
 
 #ifdef CYGWIN
 #CFLAGS += -mno-cygwin -mwindows -I/usr/include
 #endif
 
 #LFLAGS=-lm -lgsl -lgslcblas #-lduma
-LFLAGS=-L/home/jglov/bingham/c -lbingham -lgsl
+LFLAGS=-L/home/jglov/bingham/c -lbingham -lgsl -lgslcblas
 
 #ifdef CYGWIN
 #LFLAGS=-static -L/home/jglov/bingham -lbingham
@@ -40,7 +40,7 @@ DEPS += eigen/Eigen/Core
 #TARGETS = $(LIBS) test_bingham test_util fit_bingham cluster_bingham
 #endif
 
-TARGETS = merge_pcd pfh_cluster bingham_fit_clusters tofoo
+TARGETS = merge_pcd downsample_pcd pfh_cluster bingham_fit_clusters tofoo
 
 
 
@@ -50,6 +50,9 @@ $(ODIR)/%.o: %.cpp $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 merge_pcd: merge_pcd.o pointcloud.o CommonIORoutines.o StringTokenizer.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+downsample_pcd: downsample_pcd.o pointcloud.o CommonIORoutines.o StringTokenizer.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 pfh_cluster: pfh_cluster.o pointcloud.o CommonIORoutines.o StringTokenizer.o

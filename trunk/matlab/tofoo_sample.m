@@ -12,7 +12,7 @@ function [Q Q2] = tofoo_sample(tofoo, pcd, n)
 hard_assignment = 1;
 burn_in = 10;
 sample_rate = 1; %10;
-always_accept = 1;
+always_accept = 0;
 
 npoints = size(pcd.X,1);
 FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment);

@@ -34,10 +34,10 @@ typedef struct {
 
 typedef struct {
   bingham_t *B;
-  double *mode;      /* v0 */
   double *dF;        /* dF/dZ */
-  double **scatter;  /* scatter matrix */
   double entropy;    /* entropy */
+  double *mode;      /* v0 -- only defined if B is not uniform */
+  double **scatter;  /* scatter matrix -- only defined if B is not uniform */
 } bingham_stats_t;
 
 typedef struct {
@@ -58,6 +58,7 @@ void bingham_free(bingham_t *B);
 double bingham_F(bingham_t *B);
 double bingham_pdf(double x[], bingham_t *B);
 double bingham_L(bingham_t *B, double **X, int n);
+int bingham_is_uniform(bingham_t *B);
 void bingham_mode(double *mode, bingham_t *B);
 void bingham_stats(bingham_stats_t *stats, bingham_t *B);
 void bingham_stats_free(bingham_stats_t *stats);
