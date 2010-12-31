@@ -48,7 +48,11 @@ q_inv = [q(1) -q(2:4)];
 
 % compute quaternion probabilities
 for i=I
-    q2 = quaternion_mult(pcd.Q(i,:), q_inv);
+    if rand() < .5
+        q2 = quaternion_mult(pcd.Q(i,:,1), q_inv);
+    else
+        q2 = quaternion_mult(pcd.Q(i,:,2), q_inv);
+    end
 
     if hard_assignment
         j = find(FCP(i,:));

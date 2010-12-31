@@ -7,7 +7,7 @@ if nargin < 6 || isempty(num_samples)
     num_samples = 10;
 end
 if nargin < 7 || isempty(lambda)
-    lambda = 4; %.07; %.3;
+    lambda = 4; %4; %.07; %.3;
 end
 
 k = length(tofoo.W);

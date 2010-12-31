@@ -41,12 +41,16 @@
 
 
 // point cloud mapping
-#include <point_cloud_mapping/cloud_io.h>
-#include <point_cloud_mapping/geometry/point.h>
+//#include <point_cloud_mapping/cloud_io.h>
+//#include <point_cloud_mapping/geometry/point.h>
 
+#include "pointcloud.h"
+
+#define ROS_INFO printf
+#define ROS_ERROR printf
 
 using namespace std;
-using namespace sensor_msgs;
+//using namespace sensor_msgs;
 
 
 void downsample(PointCloud &dst, PointCloud &src, double sample_ratio)
@@ -58,7 +62,7 @@ void downsample(PointCloud &dst, PointCloud &src, double sample_ratio)
 
   int step = src.get_points_size() / num_points;
 
-  dst.header = src.header;
+  //dst.header = src.header;
   dst.points.resize(num_points);
   dst.channels.resize(src.channels.size());
 
