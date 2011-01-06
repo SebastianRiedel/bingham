@@ -6,10 +6,7 @@ function X = bingham_mixture_sample(B,W,n)
 if n==1
     
     % sample a mixture component
-    r = rand();
-    C = cumsum(W);
-    i = find(([0 C(1:end-1)]<r).*(C>=r));
-    
+    i = pmf_sample(W);
     X = bingham_sample(B(i), 1);
     
 elseif n<100
