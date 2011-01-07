@@ -30,3 +30,5 @@ if isfield(pcd, 'Q')
         pcd2.Q(i,:,2) = quaternion_mult(q, pcd.Q(i,:,2));
     end
 end
+
+pcd2.data = populate_pcd_data(pcd2);
