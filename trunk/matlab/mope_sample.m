@@ -1,26 +1,25 @@
-function S = mope_sample(models, pcd, n, k)
-%S = mope_sample(models, pcd, n, k) -- sample 'n' scene hypotheses, 'S',
+function [H,W] = mope_sample(models, pcd, occ_grid, n, k, FCP)
+%[H,W] = mope_sample(models, pcd, occ_grid, n, k) -- sample 'n' scene hypotheses, 'H',
 %with 'k' objects per sample, given models 'models' and a point cloud, 'pcd'
+%with occupancy grid, 'occ_grid'
 
-for m=1:length(models)
-    fprintf('.');
-    FCP{m} = compute_feature_class_probs(models(m).tofoo, pcd, 1);
+if nargin < 5 || isempty(FCP)
+    for m=1:length(models)
+        fprintf('.');
+        FCP{m} = compute_feature_class_probs(models(m).tofoo, pcd, 1);
+    end
+    fprintf('\n');
 end
-fprintf('\n');
 
-H = {};  %object hypotheses
-nh = 100; %10000;
+nh = n; %10000;  %dbug
+H = cell(1,nh);   % object hypotheses
+W = zeros(1,nh);  % hypothesis weights
 npoints = size(pcd.X,1);
 
-burn_in = 10;
-sample_rate = 1;
-always_accept = 0;
-num_accepts = 0;
-h = [];
-for i=0:nh*sample_rate+burn_in-1
+for i=1:nh
     
     % 1. sample pcd point
-    j = ceil(rand()*npoints);
+    j = 3242; %ceil(rand()*npoints);  %dbug
     f = pcd.F(j,:);
     if rand() < .5
         q = pcd.Q(j,1:4);
@@ -36,9 +35,9 @@ for i=0:nh*sample_rate+burn_in-1
         pfh_probs(m) = tofoo_feature_pdf(f, models(m).tofoo);
     end
     pfh_probs = pfh_probs/sum(pfh_probs);
-    m = pmf_sample(pfh_probs);
+    m = 1; %pmf_sample(pfh_probs);  %dbug
     tofoo = models(m).tofoo;
-    h2.id = m;
+    H{i}.id = m;
     
     % 4. sample object pose given point and id
     % compute the model orientation posterior given the feature
@@ -55,38 +54,40 @@ for i=0:nh*sample_rate+burn_in-1
     R = quaternionToRotationMatrix(r2);
     x2 = (xj' - R*x0')';
     p2 = p2*mvnpdf(x0, x_mean, x_cov);
+
+    H{i}.x = x2;
+    H{i}.q = r2;
     
-    % 5. accept/reject object hypothesis using mope_hypothesis_pdf()
-    h2.x = x2;
-    h2.q = r2;
-    % sample a random acceptance threshold
-    if ~always_accept
-        if num_accepts==0
-            t2min = 0;
+    % 5. weight object hypothesis using occupancy grid
+    occ_logp = 0;
+    model_pcd = models(H{i}.id).pcd;
+    for gi=1:500
+        gj = ceil(rand()*size(model_pcd.X, 1));
+        p = [pcd.X(gj) pcd.Y(gj) pcd.Z(gj)];          % observed point
+        c = ceil((p - occ_grid.min)/occ_grid.res);    % point cell
+        if (c >= [1,1,1]) .* (c <= size(occ_grid.occ))
+            logp = log(occ_grid.occ(c(1), c(2), c(3)));
         else
-            t2min = rand()*t*p2/p;
+            logp = log(.5);
         end
-        % compute target density for the given orientation 
-        t2 = mope_hypothesis_pdf(h2, models(h2.id), pcd, 10, FCP{h2.id});
+        occ_logp = occ_logp + logp;
     end
-    if always_accept || num_accepts==0 || t2 > t2min
-        num_accepts = num_accepts + 1;
-        h = h2;
-        p = p2;
-        if ~always_accept
-            t = t2;
-        end
-    end
+    t2 = exp(occ_logp);
+    W(i) = t2/p2;
     
-    if i-burn_in >= 0 && mod(i-burn_in, sample_rate) == 0
-        hi = (i-burn_in)/sample_rate + 1;
-        H{hi} = h;
-        %H2{hi} = h2;
-    end
+    %t2 = mope_hypothesis_pdf(h2, models(h2.id), pcd, 10, FCP{h2.id});
     
     fprintf('.');
 end
 fprintf('\n');
 
-S = H; %dbug
+
+[W I] = sort(W,'descend');
+H2 = cell(1,nh);
+for i=1:nh
+    H2{i} = H{I(i)};
+end
+H = H2;
+W = W/sum(W);
+
 
