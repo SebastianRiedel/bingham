@@ -150,7 +150,7 @@ for i=1:nh
     I = randperm(size(pcd_obj.X,1));
     I = [j0 I(1:nsamples-1)];
 
-    t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], nsamples, .5, I);
+    t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], nsamples, 1, I);
     %t3 = sope_cloud_pdf(H{i}.x - [.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj_centered, [], 10, 1, I)
     %t2 = sope_cloud_pdf([.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], 10, 1, I)
     %t3 = sope_cloud_pdf([0,0,0], H{i}.q, models(H{i}.id).tofoo, shift_pcd(pcd_obj, -[.8,.1,.8]), [], 10, 1, I);

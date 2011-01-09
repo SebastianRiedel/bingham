@@ -8,6 +8,7 @@ VP = repmat(vp, [size(pcd.X,1),1]);
 
 flip = sum((VP - [pcd.X, pcd.Y, pcd.Z]).*[pcd.NX, pcd.NY, pcd.NZ], 2) < 0;
 C = ~flip - flip;
+%C = -C;  %dbug
 
 pcd2 = pcd;
 pcd2.NX = C.*pcd.NX;

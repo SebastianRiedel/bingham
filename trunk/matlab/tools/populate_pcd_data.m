@@ -2,6 +2,7 @@ function data = populate_pcd_data(pcd)
 % data = populate_pcd_data(pcd) -- populate the data of a pcd
 
 columns = pcd.columns;
+data = pcd.data;
 
 ch_cluster = find(strcmp(columns, 'cluster'));
 ch_x = find(strcmp(columns, 'x'));
@@ -11,6 +12,7 @@ ch_pfh = find(strncmp(columns, 'f', 1));
 ch_nx = find(strcmp(columns, 'nx'));
 ch_ny = find(strcmp(columns, 'ny'));
 ch_nz = find(strcmp(columns, 'nz'));
+ch_curv = find(strcmp(columns, 'curvature'));
 ch_pcx = find(strcmp(columns, 'pcx'));
 ch_pcy = find(strcmp(columns, 'pcy'));
 ch_pcz = find(strcmp(columns, 'pcz'));
@@ -38,6 +40,9 @@ if ~isempty(ch_ny)
 end
 if ~isempty(ch_nz)
    data(:, ch_nz) = pcd.NZ;
+end
+if ~isempty(ch_curv)
+    data(:, ch_curv) = pcd.C;
 end
 if ~isempty(ch_pcx)
    data(:, ch_pcx) = pcd.PCX;

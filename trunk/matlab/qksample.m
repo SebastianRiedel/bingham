@@ -27,13 +27,16 @@ for i=1:size(q,1)
     dq = acos(abs(sum(repmat(qi, [N 1]).*Q, 2)));
     
     w = exp(-(dq/r).^2);        % weights
+    wi = find(w>=max(w)/50);
+    w = w(wi);                  % truncate small weights
+    X = X(wi,:);
     wtot = sum(w) + w0;
     wx = repmat(w, [1 nx]).*X;
     x(i,:) = (x0*w0 + sum(wx)) / wtot;
-    dx = X - repmat(x(i,:), [N 1]);
+    dx = X - repmat(x(i,:), [length(w) 1]);
     dwx = repmat(w, [1 nx]).*dx;
     S = 0;
-    for j=1:N
+    for j=1:size(dwx,1)
         S = S + dwx(j,:)'*dwx(j,:);
     end
     s(:,:,i) = (s0*w0 + S) / wtot;

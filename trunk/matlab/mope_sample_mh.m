@@ -1,5 +1,5 @@
-function [H,W] = mope_sample(models, pcd, occ_grid, n, k, FCP, obj_id, fclass)
-%[H,W] = mope_sample(models, pcd, occ_grid, n, k) -- sample 'n' scene hypotheses, 'H',
+function [H,W] = mope_sample_mh(models, pcd, occ_grid, n, k, FCP, obj_id, fclass)
+%[H,W] = mope_sample_mh(models, pcd, occ_grid, n, k) -- sample 'n' scene hypotheses, 'H',
 %with 'k' objects per sample, given models 'models' and a point cloud, 'pcd'
 %with occupancy grid, 'occ_grid'
 
@@ -54,9 +54,11 @@ if isempty(pcd_good_points)
 end
 
 nh = n; %10000;  %dbug
-H = cell(1,nh);   % object hypotheses
-W = zeros(1,nh);  % hypothesis weights
+H = {}; %cell(1,nh);   % object hypotheses
+W = []; %zeros(1,nh);  % hypothesis weights
 npoints = size(pcd.X,1);
+
+burn_in = 10;
 
 for i=1:nh
     
@@ -104,7 +106,7 @@ for i=1:nh
 %     pfh_probs = pfh_probs/sum(pfh_probs);
      m = obj_id; %pmf_sample(pfh_probs);  %dbug
      tofoo = models(m).tofoo;
-     H{i}.id = m;
+     h.id = m;
     
     % 4. sample object pose given point and id
     % compute the model orientation posterior given the feature
@@ -122,17 +124,17 @@ for i=1:nh
     x2 = (xj' - R*x0')';
     p2 = p2*mvnpdf(x0, x_mean, x_cov);
 
-    H{i}.x = x2;
-    H{i}.q = r2;
+    h.x = x2;
+    h.q = r2;
     
     % 5. weight object hypothesis using occupancy grid
 %     occ_logp = 0;
-%     model_pcd = models(H{i}.id).pcd;
+%     model_pcd = models(h.id).pcd;
 %     model_samples = 50;
 %     for gi=1:model_samples  %size(model_pcd.X, 1)
 %         gj = ceil(rand()*size(model_pcd.X, 1));
 %         x0 = [model_pcd.X(gj) model_pcd.Y(gj) model_pcd.Z(gj)];
-%         p = H{i}.x + x0*R';
+%         p = h.x + x0*R';
 %         c = ceil((p - occ_grid.min)/occ_grid.res);    % point cell
 %         if (c >= [1,1,1]) .* (c <= size(occ_grid.occ))
 %             logp = log(occ_grid.occ(c(1), c(2), c(3)));
@@ -142,23 +144,42 @@ for i=1:nh
 %         occ_logp = occ_logp + logp;
 %     end
 %     t2 = 4*exp(4*occ_logp/size(model_pcd.X, 1));
-    %t2 = exp(-acos(H{i}.q(1)))
-    %q = H{i}.q;
+    %t2 = exp(-acos(h.q(1)))
+    %q = h.q;
     %t2 = exp(-acos(q(1)^2 - q(2)^2 - q(3)^2 + q(4)^2));
 
     nsamples = 3;
     I = randperm(size(pcd_obj.X,1));
     I = [j0 I(1:nsamples-1)];
 
-    t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], nsamples, .5, I);
-    %t3 = sope_cloud_pdf(H{i}.x - [.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj_centered, [], 10, 1, I)
-    %t2 = sope_cloud_pdf([.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], 10, 1, I)
-    %t3 = sope_cloud_pdf([0,0,0], H{i}.q, models(H{i}.id).tofoo, shift_pcd(pcd_obj, -[.8,.1,.8]), [], 10, 1, I);
+    t2 = p2*sope_cloud_pdf(h.x, h.q, models(h.id).tofoo, pcd_obj, [], nsamples, 1, I);
+    %t3 = sope_cloud_pdf(h.x - [.8,.1,.8], h.q, models(h.id).tofoo, pcd_obj_centered, [], 10, 1, I)
+    %t2 = sope_cloud_pdf([.8,.1,.8], h.q, models(h.id).tofoo, pcd_obj, [], 10, 1, I)
+    %t3 = sope_cloud_pdf([0,0,0], h.q, models(h.id).tofoo, shift_pcd(pcd_obj, -[.8,.1,.8]), [], 10, 1, I);
     %t2=t3;
-    %H{i}.x = [.8,.1,.8];
-    
-    W(i) = t2; %/p2;
+    %h.x = [.8,.1,.8];
 
+    %W(i) = t2; %/p2;
+
+    
+    % sample a random acceptance threshold
+    if length(H)==0
+        t2min = 0;
+    else
+        t2min = rand()*t*p2/p;
+    end
+    if length(H)==0 || t2 > t2min
+        x = x2;
+        r = r2;
+        p = p2;
+        t = t2;
+        H{end+1} = h;
+        W(end+1) = 1;
+    else
+        W(end) = W(end)+1;
+    end
+    
+    
     
     %t2 = mope_hypothesis_pdf(h2, models(h2.id), pcd, 10, FCP{h2.id});
     
@@ -168,6 +189,7 @@ fprintf('\n');
 
 
 [W I] = sort(W,'descend');
+nh = length(H);
 H2 = cell(1,nh);
 for i=1:nh
     H2{i} = H{I(i)};
