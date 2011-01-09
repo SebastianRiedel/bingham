@@ -1,4 +1,4 @@
-function p = sope_cloud_pdf(x, q, tofoo, pcd, FCP, num_samples, lambda)
+function p = sope_cloud_pdf(x, q, tofoo, pcd, FCP, num_samples, lambda, I)
 %p = sope_cloud_pdf(q, tofoo, pcd, FCP, num_samples, lambda) -- computes the
 %pdf of a point cloud given a sope model (tofoo) and a model pose, (x,q).
 
@@ -15,8 +15,10 @@ n = size(pcd.X, 1);
 hard_assignment = 1;
 
 %TODO: sample evenly from each feature class?
-I = randperm(n);
-I = I(1:num_samples);
+if nargin < 8
+    I = randperm(n);
+    I = I(1:num_samples);
+end
 
 if nargin < 5 || isempty(FCP)
     FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment, I);
@@ -31,15 +33,17 @@ q_inv = [q(1) -q(2:4)];
 
 % compute quaternion probabilities
 for i=I
+    % q2: rotation from model -> feature
     if rand() < .5
         q2 = quaternion_mult(pcd.Q(i,:,1), q_inv);
     else
         q2 = quaternion_mult(pcd.Q(i,:,2), q_inv);
     end
 
+    % x2: translation from model -> feature
     xi = [pcd.X(i); pcd.Y(i); pcd.Z(i)] - x';
     R_inv = quaternionToRotationMatrix(q_inv);
-    x2 = (R_inv*xi)';
+    x2 = (R_inv*xi)';  %-(R_inv*xi)';
     
     if hard_assignment
         j = find(FCP(i,:));

@@ -12,6 +12,7 @@ ch_pfh = find(strncmp(columns, 'f', 1));
 ch_nx = find(strcmp(columns, 'nx'));
 ch_ny = find(strcmp(columns, 'ny'));
 ch_nz = find(strcmp(columns, 'nz'));
+ch_curv = find(strcmp(columns, 'curvature'));
 ch_pcx = find(strcmp(columns, 'pcx'));
 ch_pcy = find(strcmp(columns, 'pcy'));
 ch_pcz = find(strcmp(columns, 'pcz'));
@@ -40,6 +41,9 @@ if ~isempty(ch_ny)
 end
 if ~isempty(ch_nz)
    pcd.NZ = data(:, ch_nz);
+end
+if ~isempty(ch_curv)
+    pcd.C = data(:, ch_curv);
 end
 if ~isempty(ch_pcx)
    pcd.PCX = data(:, ch_pcx);
