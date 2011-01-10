@@ -1,5 +1,5 @@
-function [H,W] = mope_sample(models, pcd, occ_grid, n, k, FCP, obj_id, fclass)
-%[H,W] = mope_sample(models, pcd, occ_grid, n, k) -- sample 'n' scene hypotheses, 'H',
+function [H,W] = mope_sample_old(models, pcd, occ_grid, n, k, FCP, obj_id, fclass)
+%[H,W] = mope_sample_old(models, pcd, occ_grid, n, k) -- sample 'n' scene hypotheses, 'H',
 %with 'k' objects per sample, given models 'models' and a point cloud, 'pcd'
 %with occupancy grid, 'occ_grid'
 
@@ -23,11 +23,11 @@ plot_pcd(pcd);
 hold on;
 plot_pcd(populate_pcd_fields(pcd.columns, pcd.data(FCP_ind,:)), 'c.');
 hold off;
-if input(':')==0
-    H = {};
-    W = [];
-    return
-end
+%if input(':')==0
+%    H = {};
+%    W = [];
+%    return
+%end
 
 
 if obj_id==1
@@ -147,10 +147,15 @@ for i=1:nh
     %t2 = exp(-acos(q(1)^2 - q(2)^2 - q(3)^2 + q(4)^2));
 
     nsamples = 3;
-    I = randperm(size(pcd_obj.X,1));
-    I = [j0 I(1:nsamples-1)];
+    sigma = .03;
+    I = pcd_random_walk(pcd, j, nsamples, sigma);
+    t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd, [], nsamples, .5, I);
 
-    t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], nsamples, 1, I);
+    %I = randperm(size(pcd_obj.X,1));
+    %I = [j0 I(1:nsamples-1)];
+    %t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], nsamples, .5, I);
+    
+    
     %t3 = sope_cloud_pdf(H{i}.x - [.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj_centered, [], 10, 1, I)
     %t2 = sope_cloud_pdf([.8,.1,.8], H{i}.q, models(H{i}.id).tofoo, pcd_obj, [], 10, 1, I)
     %t3 = sope_cloud_pdf([0,0,0], H{i}.q, models(H{i}.id).tofoo, shift_pcd(pcd_obj, -[.8,.1,.8]), [], 10, 1, I);
