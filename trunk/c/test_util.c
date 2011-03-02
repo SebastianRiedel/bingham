@@ -158,12 +158,97 @@ void test_sort_indices()
 }
 
 
+void test_mvnrand_pcs(int argc, char *argv[])
+{
+  if (argc < 7) {
+    printf("usage: %s <n> <m1> <m2> <z1> <z2> <v11>\n", argv[0]);
+    return;
+  }
+
+  int d = 2;
+  int i, n = atoi(argv[1]);
+  double m1 = atof(argv[2]);
+  double m2 = atof(argv[3]);
+  double z1 = atof(argv[4]);
+  double z2 = atof(argv[5]);
+  double v11 = atof(argv[6]);
+
+  double mu[2] = {m1, m2};
+  double z[2] = {z1, z2};
+  double **V = new_matrix2(d, d);
+  V[0][0] = v11;
+  V[0][1] = sqrt(1 - v11*v11);
+  V[1][0] = V[0][1];
+  V[1][1] = -V[0][0];
+
+  //printf("X = [ ");
+  double **X = new_matrix2(n, d);
+  for (i = 0; i < n; i++) {
+    mvnrand_pcs(X[i], mu, z, V, d);
+    //printf("%f %f, ", X[i][0], X[i][1]);
+  }
+  //printf("]\n");
+
+  double sample_mu[2] = {0,0};
+  for (i = 0; i < n; i++) {
+    sample_mu[0] += X[i][0];
+    sample_mu[1] += X[i][1];
+  }
+  sample_mu[0] /= (double)n;
+  sample_mu[1] /= (double)n;
+
+  // set X = (X - sample_mu)
+  for (i = 0; i < n; i++)
+    sub(X[i], X[i], sample_mu, d);
+
+  double **Xt = new_matrix2(d, n);
+  transpose(Xt, X, n, d);
+  double **S = new_matrix2(d, d);
+  matrix_mult(S, Xt, X, d, n, d);
+  mult(S[0], S[0], 1/(double)n, d*d);
+
+  eigen_symm(z, V, S, d);
+
+  printf("sample mu = (%f, %f), z = (%f, %f), V = [%f %f; %f %f]\n", sample_mu[0], sample_mu[1], z[0], z[1], V[0][0], V[0][1], V[1][0], V[1][1]);
+}
+
+
+void test_mvnpdf_pcs(int argc, char *argv[])
+{
+  if (argc < 8) {
+    printf("usage: %s <x1> <x2> <m1> <m2> <z1> <z2> <v11>\n", argv[0]);
+    return;
+  }
+
+  int d = 2;
+  double x[2];
+  double mu[2];
+  double z[2];
+  double **V = new_matrix2(2,2);
+
+  x[0] = atof(argv[1]);
+  x[1] = atof(argv[2]);
+  mu[0] = atof(argv[3]);
+  mu[1] = atof(argv[4]);
+  z[0] = atof(argv[5]);
+  z[1] = atof(argv[6]);
+  V[0][0] = atof(argv[7]);
+  V[0][1] = sqrt(1 - V[0][0]*V[0][0]);
+  V[1][0] = V[0][1];
+  V[1][1] = -V[0][0];
+
+  printf("pdf = %f\n", mvnpdf_pcs(x, mu, z, V, d));
+}
+
+
 int main(int argc, char *argv[])
 {
   //test_kdtree(argc, argv);
   //test_normrand(argc, argv);
   //test_safe_alloc();
-  test_sort_indices();
+  //test_sort_indices();
+  //test_mvnrand_pcs(argc, argv);
+  test_mvnpdf_pcs(argc, argv);
 
   return 0;
 }

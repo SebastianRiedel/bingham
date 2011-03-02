@@ -509,7 +509,7 @@ void test_bingham_pdf(int argc, char *argv[])
 }
 
 
-void test_bingham_sample(int argc, char *argv[])
+void test_bingham_sample_pmf(int argc, char *argv[])
 {
   if (argc < 6) {
     printf("usage: %s <z1> <z2> <z3> <num_cells> <num_samples>\n", argv[0]);
@@ -536,7 +536,7 @@ void test_bingham_sample(int argc, char *argv[])
 
   t0 = get_time_ms();
   double **X = new_matrix2(nsamples, 4);
-  bingham_sample(X, &pmf, nsamples);
+  bingham_sample_pmf(X, &pmf, nsamples);
   printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
 
   bingham_fit(&B, X, nsamples, 4);
@@ -998,7 +998,7 @@ int main(int argc, char *argv[])
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
-  //test_bingham_sample(argc, argv);
+  //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);

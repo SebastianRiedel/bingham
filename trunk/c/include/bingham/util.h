@@ -44,11 +44,15 @@ double erfinv(double x);                                /* approximation to the 
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 
+void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d);   /* sample from a multivariate normal in principal components form */
+double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* compute a multivariate normal pdf in principal components form */
+
 void vnot(int y[], int x[], int n);                                    /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
 void find(int *k, int x[], int n);                                    /* computes a dense array of the indices of x's non-zero elements */
 void findinv(int *k, int x[], int n);                                 /* computes a sparse array of the indices of x's non-zero elements */
 double sum(double x[], int n);                                        /* computes the sum of x's elements */
+double prod(double x[], int n);                                       /* computes the product of x's elements */
 double max(double x[], int n);                                        /* computes the max of x */
 double min(double x[], int n) ;                                       /* computes the min of x */
 double norm(double x[], int n);                                       /* computes the norm of x */
