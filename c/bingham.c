@@ -918,9 +918,35 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
 
 
 /*
+ * Metroplis-Hastings sampler for the Bingham distribution.
+ *
+void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
+{
+  int burn_in = 5;
+  int sample_rate = 1;
+
+  int i, j, d = B->d;
+  double F = B->F;
+  double x[d];
+
+  memcpy(x, stats->mode, d*sizeof(double));  // x = stats->mode
+
+  
+
+S = bingham_scatter(B);
+d = length(x);
+z = zeros(1,d);
+t = bingham_pdf(x,B);  % target
+p = mvnpdf(x,z,S);    % proposal
+
+}
+*/
+
+
+/*
  * Simulate samples from a discrete Bingham distribution.
  */
-void bingham_sample(double **X, bingham_pmf_t *pmf, int n)
+void bingham_sample_pmf(double **X, bingham_pmf_t *pmf, int n)
 {
   int i;
 

@@ -1,6 +1,27 @@
 
 
+---
+OLF
+---
+
 NOW:
+ - Make OLF (Oriented Local Feature) library
+ - load_pcd()
+ - load_olf()
+ - sope_sample()
+ - sope_cloud_pdf()
+ - qksample()
+
+
+
+
+-------
+BINGHAM
+-------
+
+NOW:
+ - bingham_sample()
+ - bingham_mixture_sample()
  - Use bingham_F_lookup_3d() in bingham_new()
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2

@@ -1,4 +1,5 @@
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -396,6 +397,17 @@ double sum(double x[], int n)
 }
 
 
+// computes the product of x's elements
+double prod(double x[], int n)
+{
+  int i;
+  double y = 1;
+  for (i = 0; i < n; i++)
+    y *= x[i];
+  return y;
+}
+
+
 // computes the max of x
 double max(double x[], int n)
 {
@@ -727,6 +739,39 @@ double normpdf(double x, double mu, double sigma)
   double dx = x - mu;
 
   return exp(-dx*dx / (2*sigma*sigma)) / (sqrt(2*M_PI) * sigma);
+}
+
+
+// sample from a multivariate normal in principal components form
+void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d)
+{
+  int i;
+  double s, v[d];
+
+  memcpy(x, mu, d*sizeof(double));
+
+  for (i = 0; i < d; i++) {
+    s = normrand(0, z[i]);
+    mult(v, V[i], s, d);  // v = s*V[i]
+    add(x, x, v, d);      // x += v
+  }
+}
+
+
+// compute a multivariate normal pdf in principal components form
+double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d)
+{
+  int i;
+  double xv, dx[d];
+  sub(dx, x, mu, d);  // dx = x - mu
+
+  double logp = -(d/2)*log(2*M_PI) - log(prod(z,d));
+  for (i = 0; i < d; i++) {
+    xv = dot(dx, V[i], d) / z[i];
+    logp -= 0.5*xv*xv;
+  }
+
+  return exp(logp);
 }
 
 
