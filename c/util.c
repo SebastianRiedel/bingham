@@ -775,6 +775,35 @@ double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d)
 }
 
 
+// sample from an angular central gaussian in principal components form
+void acgrand_pcs(double *x, double *z, double **V, int d)
+{
+  int i;
+  double mu[d];
+  for (i = 0; i < d; i++)
+    mu[i] = 0;
+
+  mvnrand_pcs(x, mu, z, V, d);
+  normalize(x, x, d);
+}
+
+
+// compute an angular central gaussian pdf in principal components form
+double acgpdf_pcs(double *x, double *z, double **V, int d)
+{
+  int i;
+  double p = 1 / (prod(z,d) * surface_area_sphere(d-1));
+  double xv, md = 0;  // mahalanobis distance
+  for (i = 0; i < d; i++) {
+    xv = dot(x, V[i], d) / z[i];
+    md += xv*xv;
+  }
+  p *= pow(md, -d/2);
+  
+  return p;
+}
+
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {

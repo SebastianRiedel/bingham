@@ -34,6 +34,8 @@ SOON:
 
 
 DONE:
+ + Use ACG as proposal distribution in bingham_sample()
+ + Angular Central Gaussian sampling and pdf
  + Improve bingham_sample() with rejection sampling
  + bingham_sample()
  + Multivariate normal sampling and pdf
