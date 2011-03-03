@@ -918,29 +918,86 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
 
 
 /*
- * Metroplis-Hastings sampler for the Bingham distribution.
+ * Bingham mixture sampler
  *
+void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_stats, int n)
+{
+  int i;
+
+  if (n == 1) {
+    i = pmf_sample(BM->w, BM->n);
+    bingham_sample(X, &BM->B[i], &BM_stats[i], 1);
+  }
+  else if (n < 100) {
+    for (i = 0; i < n; i++)
+      bingham_mixture_sample(&X[i], BM, BM_stats, 1);
+  }
+  else {
+    
+  }
+}
+*/
+
+
+/*
+ * Metroplis-Hastings sampler for the Bingham distribution.
+ */
 void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
 {
-  int burn_in = 5;
-  int sample_rate = 1;
+  int burn_in = 30;
+  int sample_rate = 5;
 
   int i, j, d = B->d;
   double F = B->F;
-  double x[d];
+  double x[d], x2[d];
+  double pcs[d];
+  double **V = new_matrix2(d,d);
+  double mu[d];
+  for (i = 0; i < d; i++)
+    mu[i] = 0;
 
-  memcpy(x, stats->mode, d*sizeof(double));  // x = stats->mode
+  eigen_symm(pcs, V, stats->scatter, d);
+  //printf("pcs = [");
+  for (i = 0; i < d; i++) {
+    pcs[i] = sqrt(pcs[i]);
+    //printf("%f, ", pcs[i]);
+  }
+  //printf("]\n");
 
-  
+  memcpy(x, stats->mode, d*sizeof(double));
 
-S = bingham_scatter(B);
-d = length(x);
-z = zeros(1,d);
-t = bingham_pdf(x,B);  % target
-p = mvnpdf(x,z,S);    % proposal
+  double t = bingham_pdf(x, B);              // target
+  double p = mvnpdf_pcs(x, mu, pcs, V, d);   // proposal
 
+  int num_accepts = 0;
+  for (i = 0; i < n*sample_rate + burn_in; i++) {
+    mvnrand_pcs(x2, mu, pcs, V, d);
+    double x2_norm = norm(x2, d);
+
+    if (x2_norm > .9 && x2_norm < 1.1) {
+      normalize(x2, x2, d);
+      double t2 = bingham_pdf(x2, B);
+      double p2 = mvnpdf_pcs(x2, mu, pcs, V, d);
+      double a1 = t2 / t;
+      double a2 = p / p2;
+      double a = a1*a2;
+      if (a > frand()) {
+	memcpy(x, x2, d*sizeof(double));
+	p = p2;
+	t = t2;
+	num_accepts++;
+      }
+    }
+    if (i >= burn_in && (i - burn_in) % sample_rate == 0) {
+      j = (i - burn_in) / sample_rate;
+      memcpy(X[j], x, d*sizeof(double));
+    }
+  }
+
+  //printf("accept_rate = %f\n", num_accepts / (double)(n*sample_rate + burn_in));
+
+  free_matrix2(V);
 }
-*/
 
 
 /*
