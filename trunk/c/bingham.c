@@ -944,8 +944,8 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_s
  */
 void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
 {
-  int burn_in = 30;
-  int sample_rate = 5;
+  int burn_in = 10;
+  int sample_rate = 1;
 
   int i, j, d = B->d;
   double F = B->F;
@@ -967,17 +967,17 @@ void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
   memcpy(x, stats->mode, d*sizeof(double));
 
   double t = bingham_pdf(x, B);              // target
-  double p = mvnpdf_pcs(x, mu, pcs, V, d);   // proposal
+  double p = acgpdf_pcs(x, pcs, V, d);   // proposal
 
   int num_accepts = 0;
   for (i = 0; i < n*sample_rate + burn_in; i++) {
-    mvnrand_pcs(x2, mu, pcs, V, d);
-    double x2_norm = norm(x2, d);
+    acgrand_pcs(x2, pcs, V, d);
+    //double x2_norm = norm(x2, d);
 
-    if (x2_norm > .9 && x2_norm < 1.1) {
-      normalize(x2, x2, d);
+    //if (x2_norm > .9 && x2_norm < 1.1) {
+    //normalize(x2, x2, d);
       double t2 = bingham_pdf(x2, B);
-      double p2 = mvnpdf_pcs(x2, mu, pcs, V, d);
+      double p2 = acgpdf_pcs(x2, pcs, V, d);
       double a1 = t2 / t;
       double a2 = p / p2;
       double a = a1*a2;
@@ -987,14 +987,14 @@ void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
 	t = t2;
 	num_accepts++;
       }
-    }
+      //}
     if (i >= burn_in && (i - burn_in) % sample_rate == 0) {
       j = (i - burn_in) / sample_rate;
       memcpy(X[j], x, d*sizeof(double));
     }
   }
 
-  //printf("accept_rate = %f\n", num_accepts / (double)(n*sample_rate + burn_in));
+  printf("accept_rate = %f\n", num_accepts / (double)(n*sample_rate + burn_in));
 
   free_matrix2(V);
 }

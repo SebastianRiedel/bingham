@@ -46,6 +46,8 @@ double normpdf(double x, double mu, double sigma);      /* compute the pdf of a 
 
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d);   /* sample from a multivariate normal in principal components form */
 double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* compute a multivariate normal pdf in principal components form */
+void acgrand_pcs(double *x, double *z, double **V, int d);   /* sample from an angular central gaussian in principal components form */
+double acgpdf_pcs(double *x, double *z, double **V, int d);  /* compute an angular central gaussian pdf in principal components form */
 
 void vnot(int y[], int x[], int n);                                    /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
