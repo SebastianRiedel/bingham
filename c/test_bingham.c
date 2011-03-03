@@ -509,6 +509,65 @@ void test_bingham_pdf(int argc, char *argv[])
 }
 
 
+void test_bingham_sample(int argc, char *argv[])
+{
+  if (argc < 5) {
+    printf("usage: %s <z1> <z2> <z3> <num_samples>\n", argv[0]);
+    exit(1);
+  }
+
+  double z1 = atof(argv[1]);
+  double z2 = atof(argv[2]);
+  double z3 = atof(argv[3]);
+  int nsamples = atoi(argv[4]);
+
+  double Z[3] = {z1, z2, z3};
+  double V[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
+  double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
+
+  bingham_t B;
+  bingham_stats_t stats;
+  bingham_new(&B, 4, Vp, Z);
+  print_bingham(&B);
+
+  printf("---------------------------\n");
+
+  bingham_stats(&stats, &B);
+
+  double t0 = get_time_ms();
+  double **X = new_matrix2(nsamples, 4);
+  bingham_sample(X, &B, &stats, nsamples);
+  printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
+
+  bingham_fit(&B, X, nsamples, 4);
+
+  print_bingham(&B);
+
+  int d = 4;
+  int n = nsamples;
+  double **Xt = new_matrix2(d, n);
+  transpose(Xt, X, n, d);
+  double **S = new_matrix2(d, d);
+  matrix_mult(S, Xt, X, d, n, d);
+  mult(S[0], S[0], 1/(double)n, d*d);
+
+  printf("Original scatter matrix:\n");
+  int i, j;
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", stats.scatter[i][j]);
+    printf("\n");
+  }
+  printf("Sample scatter matrix:\n");
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", S[i][j]);
+    printf("\n");
+  }
+
+}
+
+
 void test_bingham_sample_pmf(int argc, char *argv[])
 {
   if (argc < 6) {
@@ -998,11 +1057,12 @@ int main(int argc, char *argv[])
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
+  test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-  test_bingham_discretize(argc, argv);
+  //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);

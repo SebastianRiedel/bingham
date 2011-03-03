@@ -20,19 +20,23 @@ BINGHAM
 -------
 
 NOW:
- - bingham_sample()
  - bingham_mixture_sample()
+ - pmf_sample()
  - Use bingham_F_lookup_3d() in bingham_new()
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
 
 
 SOON:
+ - Bingham importance sampling
  - Speed optimizations
  - Test for memory leaks (continuous operation)
 
 
 DONE:
+ + Improve bingham_sample() with rejection sampling
+ + bingham_sample()
+ + Multivariate normal sampling and pdf
  + Add function "F = bingham_F_lookup_3d(Z)" to bingham_constants.c
  + Improve speed of bingham_discretize()
  + Test speed of bingham_discretize()
