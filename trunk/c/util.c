@@ -742,6 +742,22 @@ double normpdf(double x, double mu, double sigma)
 }
 
 
+// samples from the probability mass function w with n elements
+int pmfrand(double *w, int n) {
+
+  int i;
+  double r = frand();
+  double wtot = 0;
+  for (i = 0; i < n; i++) {
+    wtot += w[i];
+    if (wtot >= r)
+      return i;
+  }
+
+  return 0;
+}
+
+
 // sample from a multivariate normal in principal components form
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d)
 {

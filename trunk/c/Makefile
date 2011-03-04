@@ -1,6 +1,6 @@
 IDIR=include
 ODIR=.
-LDIR =lib
+LDIR=lib
 
 INSTALL_DIR=/usr
 
@@ -22,7 +22,7 @@ endif
 LFLAGS=-lm -lgsl -lgslcblas #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
-	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h
+	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 ifdef CYGWIN
@@ -48,13 +48,13 @@ $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 #endif
 
-libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+libbingham.a: bingham.o bingham_constants.o hll.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(LINK) $@ $^
 
-libbingham.so.1.0.1: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+libbingham.so.1.0.1: bingham.o bingham_constants.o hll.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(CC) -shared -Wl,-soname,libbingham.so.1 -o $@ $^ $(LFLAGS)
 
-$(LDIR)/bingham.dll: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+$(LDIR)/bingham.dll: bingham.o bingham_constants.o hll.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(CC) -shared -o $@ $^ $(LFLAGS)
 
 test_bingham: test_bingham.o libbingham.a
@@ -67,6 +67,9 @@ cluster_bingham: cluster_bingham.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 test_util: test_util.o util.o
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+test_hll: test_hll.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 .PHONY: clean install

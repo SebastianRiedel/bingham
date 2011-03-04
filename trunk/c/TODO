@@ -10,9 +10,17 @@ NOW:
  - load_olf()
  - sope_sample()
  - sope_cloud_pdf()
- - qksample()
 
 
+-------------------------------
+HYPERSPHERICAL LOCAL LIKELIHOOD
+-------------------------------
+
+NOW:
+ - Make HLL library
+ - hll_new()
+ - hll_sample()
+ - Add caching to HLL model
 
 
 -------
@@ -20,20 +28,21 @@ BINGHAM
 -------
 
 NOW:
- - bingham_mixture_sample()
- - pmf_sample()
  - Use bingham_F_lookup_3d() in bingham_new()
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
 
 
 SOON:
- - Bingham importance sampling
+ - Recompute normalization constants
  - Speed optimizations
  - Test for memory leaks (continuous operation)
 
 
 DONE:
+ + bingham_mixture_sample()
+ + bingham_sample_uniform()
+ + pmfrand()
  + Use ACG as proposal distribution in bingham_sample()
  + Angular Central Gaussian sampling and pdf
  + Improve bingham_sample() with rejection sampling
