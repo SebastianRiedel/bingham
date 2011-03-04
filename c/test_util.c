@@ -158,6 +158,44 @@ void test_sort_indices()
 }
 
 
+void test_pmfrand(int argc, char *argv[])
+{
+  if (argc < 3) {
+    printf("usage: %s <n> <w1> ... <wn>\n", argv[0]);
+    return;
+  }
+
+  int n = atoi(argv[1]);
+  
+  if (argc < n+2) {
+    printf("usage: %s <n> <w1> ... <wn>\n", argv[0]);
+    return;
+  }
+
+  int i;
+  double w[n];
+  for (i = 0; i < n; i++)
+    w[i] = atof(argv[i+2]);
+
+  int nsamples = 10000;
+  int x[nsamples];
+
+  for (i = 0; i < nsamples; i++)
+    x[i] = pmfrand(w, n);
+
+  for (i = 0; i < n; i++)
+    w[i] = 0;
+  for (i = 0; i < nsamples; i++)
+    w[x[i]]++;
+  mult(w, w, 1/(double)nsamples, n);
+
+  printf("w2 = [");
+  for (i = 0; i < n; i++)
+    printf("%.2f, ", w[i]);
+  printf("]\n");
+}
+
+
 void test_mvnrand_pcs(int argc, char *argv[])
 {
   if (argc < 7) {
@@ -248,7 +286,8 @@ int main(int argc, char *argv[])
   //test_safe_alloc();
   //test_sort_indices();
   //test_mvnrand_pcs(argc, argv);
-  test_mvnpdf_pcs(argc, argv);
+  //test_mvnpdf_pcs(argc, argv);
+  test_pmfrand(argc, argv);
 
   return 0;
 }

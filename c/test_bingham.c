@@ -15,24 +15,6 @@
 //---------------------  main  ---------------------//
 
 
-void print_bingham(bingham_t *B)
-{
-  int i, j, d = B->d;
-
-  printf("B->F = %f\n", B->F);
-  printf("B->Z = [ ");
-  for (i = 0; i < d-1; i++)
-    printf("%f ", B->Z[i]);
-  printf("]\n");
-  for (i = 0; i < d-1; i++) {
-    printf("B->V[%d] = [ ", i);
-    for (j = 0; j < d; j++)
-      printf("%f ", B->V[i][j]);
-    printf("]\n");
-  }
-}
-
-
 void usage(char *argv[])
 {
   printf("usage: %s <2d|3d> <z_min> <z_max> <step>\n", argv[0]);
@@ -506,6 +488,34 @@ void test_bingham_pdf(int argc, char *argv[])
 
   for (i = 0; i < n; i++)
     printf("bingham_pdf(%.2f, %.2f, %.2f, %.2f) = %f\n", X[i][0], X[i][1], X[i][2], X[i][3], bingham_pdf(Xp[i], &B));
+}
+
+
+void test_bingham_mixture_sample(int argc, char *argv[])
+{
+  if (argc < 3) {
+    printf("usage: %s <bmx_file> <n>\n", argv[0]);
+    return;
+  }
+
+  int i, k, d = 4;
+  bingham_mix_t *bmx = load_bmx(argv[1], &k);
+  int n = atoi(argv[2]);
+
+  bingham_stats_t stats0[bmx[0].n];
+  for (i = 0; i < bmx[0].n; i++)
+    bingham_stats(&stats0[i], &bmx[0].B[i]);
+
+  double **X = new_matrix2(n, d);
+  bingham_mixture_sample(X, &bmx[0], stats0, n);
+
+  bingham_mix_t BM;
+  bingham_cluster(&BM, X, n, d);
+
+  for (i = 0; i < BM.n; i++) {
+    print_bingham(&BM.B[i]);
+    printf("---------------------------\n");
+  }
 }
 
 
@@ -1057,7 +1067,8 @@ int main(int argc, char *argv[])
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
-  test_bingham_sample(argc, argv);
+  test_bingham_mixture_sample(argc, argv);
+  //test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 

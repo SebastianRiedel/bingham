@@ -919,13 +919,13 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
 
 /*
  * Bingham mixture sampler
- *
+ */
 void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_stats, int n)
 {
-  int i;
+  int i, j;
 
   if (n == 1) {
-    i = pmf_sample(BM->w, BM->n);
+    i = pmfrand(BM->w, BM->n);
     bingham_sample(X, &BM->B[i], &BM_stats[i], 1);
   }
   else if (n < 100) {
@@ -933,10 +933,51 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_s
       bingham_mixture_sample(&X[i], BM, BM_stats, 1);
   }
   else {
-    
+    // apportion samples to each mixture component
+    int ni[BM->n];
+    int ntot = 0;
+    for (i = 0; i < BM->n; i++) {
+      ni[i] = round(n * BM->w[i]);
+      ntot += ni[i];
+    }
+    if (ntot < n) {  // too few samples
+      for (i = ntot; i < n; i++) {
+	j = pmfrand(BM->w, BM->n);
+	ni[j]++;
+      }
+    }
+    else {
+      while (ntot > n) {  // too many samples
+	j = pmfrand(BM->w, BM->n);
+	if (ni[j] > 0) {
+	  ni[j]--;
+	  ntot--;
+	}
+      }
+    }
+
+    // get ni[i] samples from each component, BM->B[i]
+    ntot = 0;
+    for (i = 0; i < BM->n; i++) {
+      bingham_sample(&X[ntot], &BM->B[i], &BM_stats[i], ni[i]);
+      ntot += ni[i];
+    }
   }
 }
-*/
+
+
+/*
+ * Sample n points uniformly from the hypersphere in d dimensions, S^{d-1}.
+ */
+void bingham_sample_uniform(double **X, int d, int n)
+{
+  int i, j;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < d; j++)
+      X[i][j] = normrand(0,1);
+    normalize(X[i], X[i], d);
+  }
+}
 
 
 /*
@@ -944,6 +985,11 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_s
  */
 void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
 {
+  if (bingham_is_uniform(B)) {
+    bingham_sample_uniform(X, B->d, n);
+    return;
+  }
+
   int burn_in = 10;
   int sample_rate = 1;
 
@@ -994,7 +1040,7 @@ void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
     }
   }
 
-  printf("accept_rate = %f\n", num_accepts / (double)(n*sample_rate + burn_in));
+  //printf("accept_rate = %f\n", num_accepts / (double)(n*sample_rate + burn_in));
 
   free_matrix2(V);
 }
@@ -1835,6 +1881,25 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
 }
 
 
+/*
+ * Print the fields of a Bingham (for debugging).
+ */
+void print_bingham(bingham_t *B)
+{
+  int i, j, d = B->d;
+
+  printf("B->F = %f\n", B->F);
+  printf("B->Z = [ ");
+  for (i = 0; i < d-1; i++)
+    printf("%f ", B->Z[i]);
+  printf("]\n");
+  for (i = 0; i < d-1; i++) {
+    printf("B->V[%d] = [ ", i);
+    for (j = 0; j < d; j++)
+      printf("%f ", B->V[i][j]);
+    printf("]\n");
+  }
+}
 
 
 

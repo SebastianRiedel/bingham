@@ -43,6 +43,7 @@ void randperm(int *x, int n, int d);                    /* samples d integers fr
 double erfinv(double x);                                /* approximation to the inverse error function */
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
+int pmfrand(double *w, int n);                          /* samples from the probability mass function w with n elements */
 
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d);   /* sample from a multivariate normal in principal components form */
 double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* compute a multivariate normal pdf in principal components form */
@@ -60,7 +61,7 @@ double min(double x[], int n) ;                                       /* compute
 double norm(double x[], int n);                                       /* computes the norm of x */
 double dist(double x[], double y[], int n);                           /* computes the norm of x-y */
 double dist2(double x[], double y[], int n);                          /* computes the norm^2 of x-y */
-double dot(double x[], double y[], int n);                            /* computes the dot product of z and y */
+double dot(double x[], double y[], int n);                            /* computes the dot product of x and y */
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */

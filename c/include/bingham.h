@@ -68,7 +68,7 @@ void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, doubl
 void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);
-
+void bingham_sample_uniform(double **X, int d, int n);
 void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n);
 void bingham_sample_pmf(double **X, bingham_pmf_t *pmf, int n);
 void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh);
@@ -77,8 +77,7 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
 void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *BM2);
 void bingham_mixture_copy(bingham_mix_t *dst, bingham_mix_t *src);
 void bingham_mixture_free(bingham_mix_t *BM);
-
-//void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_stats, int n);
+void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_stats, int n);
 void bingham_mixture_sample_ridge(double **X, bingham_mix_t *BM, int n, double pthresh);
 double bingham_mixture_pdf(double x[], bingham_mix_t *BM);
 void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src);
@@ -87,6 +86,7 @@ void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh);
 void bingham_mixture_thresh_weights(bingham_mix_t *BM, double wthresh);
 bingham_mix_t *load_bmx(char *f_bmx, int *k);
 void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout);
+void print_bingham(bingham_t *B);
 
 
 
