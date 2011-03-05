@@ -89,11 +89,25 @@ void inv(double **Y, double **X, int n);
 /* matrix copy, Y = X */
 void matrix_copy(double **Y, double **X, int n, int m);
 
+/* matrix clone, Y = new(X) */
+double **matrix_clone(double **X, int n, int m);
+
 /* matrix addition, Z = X+Y */
 void matrix_add(double **Z, double **X, double **Y, int n, int m);
 
 /* matrix multiplication, Z = X*Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);
+
+/* outer product of x and y, Z = x'*y */
+void outer_prod(double **Z, double x[], double y[], int n, int m);
+
+/* row vector mean */
+void mean(double *mu, double **X, int n, int m);
+
+/* compute the covariance of the rows of X, given mean mu */
+void cov(double **S, double **X, double *mu, int n, int m);
+
+
 
 /* compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X */
 void eigen_symm(double z[], double **V, double **X, int n);

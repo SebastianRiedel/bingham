@@ -22,17 +22,19 @@ extern "C" {
   typedef struct {
     double **Q;    /* input (S^{dq-1}) */
     double **X;    /* output (R^dx) */
-    int n;         /* number of rows */
+    int n;         /* number of samples (rows) in X,Q */
     int dq;        /* dimension (columns) of Q */
     int dx;        /* dimension (columns) of x */
+    double r;      /* kernel radius */
     double *x0;    /* prior mean */
-    double **s0;   /* prior covariance */
+    double **S0;   /* prior covariance */
     double w0;     /* prior weight */
   } hll_t;
 
 
   void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx);
-  void hll_sample(double **X, double **Q, hll_t *hll, int n);
+  void hll_free(hll_t *hll);
+  void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n);
 
 
 

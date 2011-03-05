@@ -1011,6 +1011,16 @@ void matrix_copy(double **Y, double **X, int n, int m)
 }
 
 
+// matrix clone, Y = new(X)
+double **matrix_clone(double **X, int n, int m)
+{
+  double **Y = new_matrix2(n,m);
+  matrix_copy(Y, X, n, m);
+
+  return Y;
+}
+
+
 // matrix addition, Z = X+Y
 void matrix_add(double **Z, double **X, double **Y, int n, int m)
 {
@@ -1029,6 +1039,48 @@ void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
 	Z[i][j] += X[i][k]*Y[k][j];
     }
   }
+}
+
+
+// outer product of x and y, Z = x'*y
+void outer_prod(double **Z, double x[], double y[], int n, int m)
+{
+  int i, j;
+  for (i = 0; i < n; i++)
+    for (j = 0; j < m; j++)
+      Z[i][j] = x[i]*y[j];
+}
+
+
+// row vector mean
+void mean(double *mu, double **X, int n, int m)
+{
+  memset(mu, 0, m*sizeof(double));  // mu = 0
+
+  int i, j;
+  for (i = 0; i < n; i++)
+    for (j = 0; j < m; j++)
+      mu[j] += X[i][j];
+
+  mult(mu, mu, 1/(double)n, m);
+}
+
+
+// compute the covariance of the rows of X, given mean mu
+void cov(double **S, double **X, double *mu, int n, int m)
+{
+  int i;
+  double **dX = matrix_clone(X, n, m);
+  if (mu != NULL)
+    for (i = 0; i < n; i++)
+      sub(dX[i], X[i], mu, m);
+  double **dXt = new_matrix2(m, n);
+  transpose(dXt, dX, n, m);
+  matrix_mult(S, dXt, dX, m, n, m);
+  mult(S[0], S[0], 1/(double)n, m*m);
+
+  free_matrix2(dX);
+  free_matrix2(dXt);
 }
 
 
