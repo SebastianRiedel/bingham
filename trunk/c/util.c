@@ -1620,6 +1620,58 @@ void sort_indices(double *x, int *idx, int n)
 }
 
 
+/*
+ * fills idx with the indices of the k min entries of x
+ *   --> works by maintaining the invariant that idx[0] always has the
+ *       largest x value of the min k found so far
+ */       
+void mink(double *x, int *idx, int n, int k)
+{
+  int i, j;
+
+  // initialize idx with 1:k
+  for (i = 0; i < k; i++)
+    idx[i] = i;
+
+  // maintain invariant
+  for (i = 1; i < k; i++) {
+    if (x[idx[i]] > x[idx[0]]) {
+      int tmp = idx[i];
+      idx[i] = idx[0];
+      idx[0] = tmp;
+    }
+  }
+
+  // process the rest of x
+  for (i = k; i < n; i++) {
+    if (x[i] < x[idx[0]]) {
+      idx[0] = i;
+
+      // maintain invariant
+      for (j = 1; j < k; j++) {
+	if (x[idx[j]] > x[idx[0]]) {
+	  int tmp = idx[j];
+	  idx[j] = idx[0];
+	  idx[0] = tmp;
+	}
+      }
+    }
+  }
+
+  // sort the min k values
+  double xmink[k];
+  int idx2[k];
+  for (i = 0; i < k; i++)
+    xmink[i] = x[idx[i]];
+  sort_indices(xmink, idx2, k);
+  for (i = 0; i < k; i++)
+    idx2[i] = idx[idx2[i]];
+  for (i = 0; i < k; i++)
+    idx[i] = idx2[i];
+}
+
+
+// fast select algorithm
 int qselect(double *x, int n, int k)
 {
   if (n == 1)

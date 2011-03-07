@@ -33,7 +33,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_util fit_bingham cluster_bingham
+TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham
 endif
 
 

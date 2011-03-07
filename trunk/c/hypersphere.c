@@ -3,14 +3,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include "bingham/util.h"
 #include "bingham/hypersphere.h"
 
 
 
-// cached tessellations
+// cached tessellations of S^3
 #define MAX_LEVELS 20
-tetramesh_t *tessellations[MAX_LEVELS];
+hypersphere_tessellation_t tessellations[MAX_LEVELS];
+
+#define PROXIMITY_QUEUE_SIZE 100
+#define PROXIMITY_QUEUE_MEMORY_LIMIT 1e6
 
 
 
@@ -74,6 +78,79 @@ static octetramesh_t *build_octetra(int level)
   return mesh;
 }
 
+
+/*
+ * Fill in the fields of a hypersphere_tessellation from an octetramesh.
+ */
+static void octetramesh_to_tessellation(hypersphere_tessellation_t *T, octetramesh_t *mesh)
+{
+  // get tetramesh
+  T->tetramesh = octetramesh_to_tetramesh(mesh);
+
+  // dimensions
+  T->d = 4;
+  T->n = T->tetramesh->nt;
+  int i, j, n = T->n, d = T->d;
+
+  // compute cell centroids and volumes
+  T->centroids = new_matrix2(n, d);
+  safe_calloc(T->volumes, n, double);
+  tetramesh_centroids(T->centroids, T->volumes, T->tetramesh);
+
+
+  /**********************************
+  // compute cell radii
+  safe_calloc(T->radii, n, double);
+  for (i = 0; i < n; i++) {
+    //double V = T->volumes[i];
+    //double a = cbrt(12*V/sqrt(2));  // edge length (for a regular tetrahedron)
+    double *v0 = T->tetramesh->vertices[ T->tetramesh->tetrahedra[i][0] ];
+    double *v1 = T->tetramesh->vertices[ T->tetramesh->tetrahedra[i][1] ];
+    double a = dist(v0, v1, d);
+    //printf("a = %f, %f\n", a, dist(v0,v1,d));
+
+    T->radii[i] = sqrt(3.0/8.0)*a;
+  }
+
+  // compute proximity queues (memory permitting)
+  if (n < PROXIMITY_QUEUE_SIZE || n*PROXIMITY_QUEUE_SIZE > PROXIMITY_QUEUE_MEMORY_LIMIT)
+    T->proximity_queue_size = 0;
+  else {
+    T->proximity_queue_size = PROXIMITY_QUEUE_SIZE;
+    int p = T->proximity_queue_size;
+    double min_dists[n];
+
+    T->proximity_queues = new_matrix2i(n, p);
+    T->proximity_queue_dists = new_matrix2(n, p);
+
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < n; j++)
+	min_dists[j] = MAX(0, dist(T->centroids[i], T->centroids[j], d) - T->radii[i] - T->radii[j]);
+      min_dists[i] = DBL_MAX;
+
+      //for (j = 0; j < n; j++)
+      //  printf("min_dists[%d] = %f, centroid dist = %f, r[i]=%f, r[j]=%f\n",
+      //       j, min_dists[j], dist(T->centroids[i], T->centroids[j], d), T->radii[i], T->radii[j]);
+
+      //if (1)
+      //  return;  //dbug
+
+
+      mink(min_dists, T->proximity_queues[i], n, p);
+      for (j = 0; j < p; j++)
+	T->proximity_queue_dists[i][j] = min_dists[T->proximity_queues[i][j]];
+    }
+  }
+
+  //printf("n = %d, proximity queue size = %d\n", n, T->proximity_queue_size);
+
+  //for (i = 0; i < T->proximity_queue_size; i++)
+  //  printf("proximity_queue_dists[0][%d] = %f\n", i, T->proximity_queue_dists[0][i]);
+
+  *****************************/
+}
+
+
 /*
  * Pre-cache some tessellations of hyperspheres.
  */
@@ -82,35 +159,36 @@ void hypersphere_init()
   double t0 = get_time_ms();
 
   int i;
-  const int levels = 7;
+  const int levels = 5; //7;
 
-  memset(tessellations, 0, MAX_LEVELS*sizeof(tetramesh_t *));
+  memset(tessellations, 0, MAX_LEVELS*sizeof(hypersphere_tessellation_t));
 
   for (i = 0; i < levels; i++) {
     octetramesh_t *mesh = build_octetra(i);
-    tessellations[i] = octetramesh_to_tetramesh(mesh);
+    octetramesh_to_tessellation(&tessellations[i], mesh);
   }
 
-  fprintf(stderr, "Initialized %d hypersphere tessellations (up to %d cells) in %.0f ms\n", levels, tessellations[levels-1]->nt, get_time_ms() - t0);
+  fprintf(stderr, "Initialized %d hypersphere tessellations (up to %d cells) in %.0f ms\n",
+	  levels, tessellations[levels-1].n, get_time_ms() - t0);
 }
 
 
 /*
  * Returns a tesselation of the 3-sphere (in R4) with at least n cells.
  */
-tetramesh_t *tessellate_S3(int n)
+hypersphere_tessellation_t *tessellate_S3(int n)
 {
   int i;
   for (i = 0; i < MAX_LEVELS; i++) {
-    if (tessellations[i] == NULL) {
+    if (tessellations[i].tetramesh == NULL) {
       octetramesh_t *mesh = build_octetra(i);
-      tessellations[i] = octetramesh_to_tetramesh(mesh);
+      octetramesh_to_tessellation(&tessellations[i], mesh);
     }
-    if (tessellations[i]->nt >= n)
-      return tessellations[i];
+    if (tessellations[i].tetramesh->nt >= n)
+      return &tessellations[i];
   }
 
-  return tessellations[MAX_LEVELS-1];
+  return &tessellations[MAX_LEVELS-1];
 }
 
 

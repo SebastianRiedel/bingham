@@ -9,7 +9,7 @@ extern "C" {
 
 
 
-#include "bingham/tetramesh.h"
+#include "bingham/hypersphere.h"
 
 
 typedef struct {
@@ -20,16 +20,11 @@ typedef struct {
 } bingham_t;
 
 typedef struct {
-  int n;                /* number of grid cells */
-  int d;                /* dimensions */
-  double resolution;    /* grid resolution */
-  union {               /* cell mesh */
-    tetramesh_t *tetramesh;
-    /* trimesh_t *trimesh; */
-  };
-  double **points;      /* cell centroids */
-  double *volumes;      /* cell volumes */
-  double *mass;         /* cell probability mass */
+  int n;                                     /* number of grid cells */
+  int d;                                     /* dimensions */
+  double resolution;                         /* grid resolution */
+  hypersphere_tessellation_t *tessellation;  /* hypersphere tessellation */
+  double *mass;                              /* cell probability mass */
 } bingham_pmf_t;
 
 typedef struct {

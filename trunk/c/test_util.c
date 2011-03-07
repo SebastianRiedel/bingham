@@ -158,6 +158,37 @@ void test_sort_indices()
 }
 
 
+void test_mink()
+{
+  double x[10] = {0, 90, 70, 40, 20, 10, 30, 80, 50, 60};
+  int idx[5];
+
+  mink(x, idx, 10, 5);
+
+  printf("idx = [ ");
+  int i;
+  for (i = 0; i < 5; i++)
+    printf("%d ", idx[i]);
+  printf("]\n");
+
+
+  // get timing info
+  int n = 100000;
+  double y[n];
+  for (i = 0; i < n; i++)
+    y[i] = normrand(0,1);
+  int yi[n];
+
+  double t = get_time_ms();
+  sort_indices(y, yi, n);
+  printf("sorted %d numbers in %f ms\n", n, get_time_ms() - t);
+  
+  t = get_time_ms();
+  mink(y, yi, n, 100);
+  printf("got the min %d numbers in %f ms\n", 100, get_time_ms() - t);
+}
+
+
 void test_pmfrand(int argc, char *argv[])
 {
   if (argc < 3) {
@@ -287,7 +318,8 @@ int main(int argc, char *argv[])
   //test_sort_indices();
   //test_mvnrand_pcs(argc, argv);
   //test_mvnpdf_pcs(argc, argv);
-  test_pmfrand(argc, argv);
+  //test_pmfrand(argc, argv);
+  test_mink();
 
   return 0;
 }

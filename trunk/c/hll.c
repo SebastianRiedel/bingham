@@ -46,7 +46,7 @@ void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx)
   hll->dq = dq;
   hll->dx = dx;
 
-  hll->r = .2;  //dbug: is there a more principled way of setting this?
+  hll->r = .1;  //dbug: is there a more principled way of setting this?
 
   hll_default_prior(hll);
 }
@@ -80,13 +80,21 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
 
   for (i = 0; i < n; i++) {
 
+    //printf("q = [%.2f %.2f %.2f %.2f]\n", Q[0][0], Q[0][1], Q[0][2], Q[0][3]);
+
+    //for (j = 0; j < hll->n; j++)
+    //  printf("hll->Q[%d] = [%.2f %.2f %.2f %.2f]\n", j, hll->Q[j][0], hll->Q[j][1], hll->Q[j][2], hll->Q[j][3]);
+
     // compute weights
     double dq;
     double w[hll->n];
+    //printf("w = [");
     for (j = 0; j < hll->n; j++) {
       dq = acos(fabs(dot(Q[i], hll->Q[j], nq)));
       w[j] = exp(-(dq/r)*(dq/r));
+      //printf("%.2f ", w[j]);
     }
+    //printf("]\n");
 
     // threshold weights
     double wmax = max(w, hll->n);

@@ -876,36 +876,19 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
   if (d == 4) {
 
     // mesh
-    //octetramesh_t *oct = hypersphere_tessellation_octetra(ncells);
-    //pmf->tetramesh = octetramesh_to_tetramesh(oct);
-    //octetramesh_free(oct);
-    //free(oct);
-    pmf->tetramesh = tessellate_S3(ncells);
+    pmf->tessellation = tessellate_S3(ncells);
+    pmf->n = pmf->tessellation->n;
 
     double t0 = get_time_ms();  //dbug
 
-    // points and volumes
-    int n = pmf->tetramesh->nt;
-    pmf->n = n;
-    pmf->points = new_matrix2(n, d);
-    safe_malloc(pmf->volumes, n, double);
-    tetramesh_centroids(pmf->points, pmf->volumes, pmf->tetramesh);
-
-    for (i = 0; i < n; i++)
-      mult(pmf->points[i], pmf->points[i], 1/norm(pmf->points[i], d), d);
-
-    fprintf(stderr, "Created points and volumes in %.0f ms\n", get_time_ms() - t0);  //dbug
-
-    t0 = get_time_ms();  //dbug
-
     // probability mass
-    safe_malloc(pmf->mass, n, double);
+    safe_malloc(pmf->mass, pmf->n, double);
     double tot_mass = 0;
-    for (i = 0; i < n; i++) {
-      pmf->mass[i] = pmf->volumes[i] * bingham_pdf(pmf->points[i], B);
+    for (i = 0; i < pmf->n; i++) {
+      pmf->mass[i] = pmf->tessellation->volumes[i] * bingham_pdf(pmf->tessellation->centroids[i], B);
       tot_mass += pmf->mass[i];
     }
-    mult(pmf->mass, pmf->mass, 1/tot_mass, n);
+    mult(pmf->mass, pmf->mass, 1/tot_mass, pmf->n);
 
     fprintf(stderr, "Computed probabilities in %.0f ms\n", get_time_ms() - t0);  //dbug
 
@@ -1068,10 +1051,10 @@ void bingham_sample_pmf(double **X, bingham_pmf_t *pmf, int n)
 
     if (pmf->d == 4) {
 
-      double *v0 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][0] ];
-      double *v1 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][1] ];
-      double *v2 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][2] ];
-      double *v3 = pmf->tetramesh->vertices[ pmf->tetramesh->tetrahedra[cell][3] ];
+      double *v0 = pmf->tessellation->tetramesh->vertices[ pmf->tessellation->tetramesh->tetrahedra[cell][0] ];
+      double *v1 = pmf->tessellation->tetramesh->vertices[ pmf->tessellation->tetramesh->tetrahedra[cell][1] ];
+      double *v2 = pmf->tessellation->tetramesh->vertices[ pmf->tessellation->tetramesh->tetrahedra[cell][2] ];
+      double *v3 = pmf->tessellation->tetramesh->vertices[ pmf->tessellation->tetramesh->tetrahedra[cell][3] ];
       double *S[4] = {v0, v1, v2, v3};
 
       //double x1[4], x2[4];

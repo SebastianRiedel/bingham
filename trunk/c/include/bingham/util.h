@@ -26,8 +26,10 @@ typedef struct {
   void *data;
 } sortable_t;
 
-void sort_data(sortable_t *x, size_t n);  /* sort an array of weighted data using qsort */
+void sort_data(sortable_t *x, size_t n);        /* sort an array of weighted data using qsort */
 void sort_indices(double *x, int *idx, int n);  /* sort the indices of x (leaving x unchanged) */
+int qselect(double *x, int n, int k);           /* fast select algorithm */
+void mink(double *x, int *idx, int n, int k);   /* fills idx with the indices of the k min entries of x */
 
 double get_time_ms();  /* get the current system time in millis */
 
@@ -50,7 +52,7 @@ double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* comp
 void acgrand_pcs(double *x, double *z, double **V, int d);   /* sample from an angular central gaussian in principal components form */
 double acgpdf_pcs(double *x, double *z, double **V, int d);  /* compute an angular central gaussian pdf in principal components form */
 
-void vnot(int y[], int x[], int n);                                    /* logical not of a binary array */
+void vnot(int y[], int x[], int n);                                   /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
 void find(int *k, int x[], int n);                                    /* computes a dense array of the indices of x's non-zero elements */
 void findinv(int *k, int x[], int n);                                 /* computes a sparse array of the indices of x's non-zero elements */
