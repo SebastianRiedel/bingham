@@ -17,10 +17,14 @@ HYPERSPHERICAL LOCAL LIKELIHOOD
 -------------------------------
 
 NOW:
- - Make HLL library
- - hll_new()
- - hll_sample()
  - Add caching to HLL model
+
+
+DONE:
+ + Make HLL library
+ + hll_new()
+ + hll_sample()
+ 
 
 
 -------

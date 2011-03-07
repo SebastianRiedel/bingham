@@ -10,11 +10,7 @@ extern "C" {
 
   /*
    * Optimizations:
-   *  - For S^3, add to hypersphere.h:
-   *     1) a kdtree for fast NN lookup
-   *     2) a graph of the tetramesh vertices for fast NN-radius searches via graph traversal
-   *     3) functions hypersphere_nn() and hypersphere_nn_radius()
-   *
+   *  - Fast NN-radius searches
    *  - Precompute local likelihood samples (should store them on disk--probably too slow at runtime)
    */
 

@@ -390,24 +390,24 @@ void test_bingham_discretize(int argc, char *argv[])
 
   //printf("Calling tetramesh_meshgraph()...");
   double t = get_time_ms();
-  meshgraph_t *graph = tetramesh_meshgraph(pmf.tetramesh);
+  meshgraph_t *graph = tetramesh_meshgraph(pmf.tessellation->tetramesh);
   //printf("%f ms\n", get_time_ms() - t);
 
   //printf("Calling tetramesh_graph()...");
   t = get_time_ms();
-  tetramesh_graph(pmf.tetramesh);
+  tetramesh_graph(pmf.tessellation->tetramesh);
   //printf("%f ms\n", get_time_ms() - t);
 
   //printf("Calling tetramesh_save_PLY_colors()...\n");
 
-  //tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mesh.ply", colors);
-  tetramesh_save_PLY(pmf.tetramesh, graph, "mesh.ply");
+  //tetramesh_save_PLY_colors(pmf.tessellation->tetramesh, graph, "mesh.ply", colors);
+  tetramesh_save_PLY(pmf.tessellation->tetramesh, graph, "mesh.ply");
 
   // print out the points
-  printf("pmf.points = [ ");
-  for (i = 0; i < pmf.n; i++)
-    printf("%f %f %f %f ; ", pmf.points[i][0], pmf.points[i][1], pmf.points[i][2], pmf.points[i][3]);
-  printf("];\n");
+  //printf("pmf.points = [ ");
+  //for (i = 0; i < pmf.n; i++)
+  //  printf("%f %f %f %f ; ", pmf.points[i][0], pmf.points[i][1], pmf.points[i][2], pmf.points[i][3]);
+  //printf("];\n");
 }
 
 /*
@@ -443,9 +443,9 @@ void test_bingham_mres(int argc, char *argv[])
   for (i = 0; i < pmf.n; i++)
     colors[i] = (int)(255*(pmf.mass[i] / max_mass));
 
-  meshgraph_t *graph = tetramesh_meshgraph(pmf.tetramesh);
+  meshgraph_t *graph = tetramesh_meshgraph(pmf.tessellation->tetramesh);
 
-  tetramesh_save_PLY_colors(pmf.tetramesh, graph, "mres.ply", colors);
+  tetramesh_save_PLY_colors(pmf.tessellation->tetramesh, graph, "mres.ply", colors);
 }
 */
 
@@ -1057,7 +1057,7 @@ void test_bingham_init()
 
 int main(int argc, char *argv[])
 {
-  //test_bingham_init();
+  test_bingham_init();
 
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
@@ -1067,7 +1067,7 @@ int main(int argc, char *argv[])
   //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
-  test_bingham_mixture_sample(argc, argv);
+  //test_bingham_mixture_sample(argc, argv);
   //test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
