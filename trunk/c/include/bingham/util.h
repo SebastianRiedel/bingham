@@ -33,7 +33,9 @@ void mink(double *x, int *idx, int n, int k);   /* fills idx with the indices of
 
 double get_time_ms();  /* get the current system time in millis */
 
-char *sword(char *s, const char *delim, int n);  /* returns a pointer to the nth word (starting from 0) in string s */
+char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
+char **split(char *s, const char *delim, int *k);    /* splits a string into k words */
+int wordcmp(char *s1, char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
 
 
 
