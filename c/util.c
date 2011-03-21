@@ -299,6 +299,51 @@ char *sword(char *s, const char *delim, int n)
 }
 
 
+// splits a string into k words
+char **split(char *s, const char *delim, int *k)
+{
+  char *sbuf = s + strspn(s, " \t");  // skip over initial whitespace
+  s = sbuf;
+
+  // determine the number of words
+  int num_words = 0;
+  while (*s != '\0') {
+    s = sword(s, " \t", 1);
+    num_words++;
+  }
+
+  // fill in the words
+  int i;
+  s = sbuf;
+  char **words;
+  safe_calloc(words, num_words, char *);
+  for (i = 0; i < num_words; i++) {
+    int slen = strcspn(s, " \t\n");
+    safe_calloc(words[i], slen+1, char);  // +1 to null-terminate the string
+    strncpy(words[i], s, slen);
+    s = sword(s, " \t", 1);
+  }
+
+  *k = num_words;
+  return words;
+}
+
+
+// compare the first word of s1 with the first word of s2
+int wordcmp(char *s1, char *s2, const char *delim)
+{
+  int n1 = strcspn(s1, delim);
+  int n2 = strcspn(s2, delim);
+
+  if (n1 < n2)
+    return -1;
+  else if (n1 > n2)
+    return 1;
+
+  return strncmp(s1, s2, n1);
+}
+
+
 // computes the log factorial of x
 double lfact(int x)
 {
