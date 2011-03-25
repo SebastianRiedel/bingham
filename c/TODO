@@ -5,13 +5,14 @@ OLF
 ---
 
 NOW:
- - load_olf()
+ - 
  - sope_sample()
  - sope_cloud_pdf()
 
 DONE:
- + Make OLF (Oriented Local Feature) library
+ + load_olf()
  + load_pcd()
+ + Make OLF (Oriented Local Feature) library
 
 
 

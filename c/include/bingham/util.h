@@ -36,8 +36,7 @@ double get_time_ms();  /* get the current system time in millis */
 char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
 char **split(char *s, const char *delim, int *k);    /* splits a string into k words */
 int wordcmp(char *s1, char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
-
-
+void replace_word(char **words, int num_words, const char *from, const char *to);   /* replace a word in a string array */
 
 double fact(int x);                                     /* computes the factorial of x */
 double lfact(int x);                                    /* computes the log factorial of x */
@@ -53,6 +52,10 @@ void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d);   /* samp
 double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* compute a multivariate normal pdf in principal components form */
 void acgrand_pcs(double *x, double *z, double **V, int d);   /* sample from an angular central gaussian in principal components form */
 double acgpdf_pcs(double *x, double *z, double **V, int d);  /* compute an angular central gaussian pdf in principal components form */
+
+double triangle_area(double x[], double y[], double z[], int n);                    /* calculate the area of a triangle */
+double tetrahedron_volume(double x[], double y[], double z[], double w[], int n);   /* calculate the volume of a tetrahedron */
+void sample_simplex(double x[], double **S, int n, int d);                          /* sample uniformly from a simplex */
 
 void vnot(int y[], int x[], int n);                                   /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
@@ -77,59 +80,29 @@ void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* average
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
 int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
 void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
+void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 
-/* transpose a matrix */
-void transpose(double **Y, double **X, int n, int m);
-
-/* solve the equation Ax = b, where A is a square n-by-n matrix */
-void solve(double x[], double A[], double b[], int n);
-
-/* compute the determinant of the n-by-n matrix X */
-double det(double **X, int n);
-
-/* compute the inverse (Y) of the n-by-n matrix X*/
-void inv(double **Y, double **X, int n);
-
-/* matrix copy, Y = X */
-void matrix_copy(double **Y, double **X, int n, int m);
-
-/* matrix clone, Y = new(X) */
-double **matrix_clone(double **X, int n, int m);
-
-/* matrix addition, Z = X+Y */
-void matrix_add(double **Z, double **X, double **Y, int n, int m);
-
-/* matrix multiplication, Z = X*Y */
-void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);
-
-/* outer product of x and y, Z = x'*y */
-void outer_prod(double **Z, double x[], double y[], int n, int m);
-
-/* row vector mean */
-void mean(double *mu, double **X, int n, int m);
-
-/* compute the covariance of the rows of X, given mean mu */
-void cov(double **S, double **X, double *mu, int n, int m);
+double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
+int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
+void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
+void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
+void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
+double **load_matrix(char *fin, int *n, int *m);                            /* load a matrix from a file */
+void transpose(double **Y, double **X, int n, int m);                       /* transpose a matrix */
+void solve(double x[], double A[], double b[], int n);                      /* solve the equation Ax = b, where A is a square n-by-n matrix */
+double det(double **X, int n);                                              /* compute the determinant of the n-by-n matrix X */
+void inv(double **Y, double **X, int n);                                    /* compute the inverse (Y) of the n-by-n matrix X*/
+void matrix_copy(double **Y, double **X, int n, int m);                     /* matrix copy, Y = X */
+double **matrix_clone(double **X, int n, int m);                            /* matrix clone, Y = new(X) */
+void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* matrix addition, Z = X+Y */
+void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
+void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
+void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
+void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
+void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 
 
 
-/* compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X */
-void eigen_symm(double z[], double **V, double **X, int n);
-
-
-
-double triangle_area(double x[], double y[], double z[], int n);                  /* calculate the area of a triangle */
-double tetrahedron_volume(double x[], double y[], double z[], double w[], int n);   /* calculate the volume of a tetrahedron */
-
-void sample_simplex(double x[], double **S, int n, int d);            /* sample uniformly from a simplex */
-
-double **new_matrix2(int n, int m);                     /* create a new n-by-m 2d matrix of doubles */
-int **new_matrix2i(int n, int m);                       /* create a new n-by-m 2d matrix of ints */
-void free_matrix2(double **X);                          /* free a 2d matrix of doubles */
-void free_matrix2i(int **X);                            /* free a 2d matrix of ints */
-
-void save_matrix(char *fout, double **X, int n, int m);   /* save a matrix to a file */
-double **load_matrix(char *fin, int *n, int *m);          /* load a matrix from a file */
 
 
 typedef struct ilist {

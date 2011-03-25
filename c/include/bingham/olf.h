@@ -16,7 +16,18 @@ extern "C" {
     int num_channels;
     int num_points;
     char **channels;  // e.g. {"x", "y", "z"}
-    double **data;    // e.g. data[0] = {x1,x2,x3}
+    double **data;    // e.g. data[0] = {x1,x2,x3}, data[1] = {y1,y2,y3}, etc.
+
+    // data pointers
+    double *clusters;
+    double **points;
+    double **normals;
+    double **principal_curvatures;
+    double **shapes;
+
+    // computed data
+    double **quaternions[2];
+
   } pcd_t;
 
 
@@ -32,12 +43,13 @@ extern "C" {
 
 
 
-  pcd_t *load_pcd(char *f_pcd);     // loads a pcd
-  void pcd_free(pcd_t *pcd);        // frees the contents of a pcd_t, but not the pointer itself
+  pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
+  void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
+  int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
 
   olf_t *load_olf(char *fname);     // loads an olf from fname.pcd and fname.olf
   void olf_free(olf_t *olf);        // frees the contents of an olf_t, but not the pointer itself
-
+  //double olf_pdf
 
 
 #ifdef __cplusplus
