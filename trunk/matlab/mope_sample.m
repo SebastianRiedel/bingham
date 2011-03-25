@@ -85,9 +85,10 @@ for i=1:nh
     H{i}.x = x2;
     H{i}.q = r2;
     
-    nsamples = 3;
+    nsamples = 5; %3
     sigma = .03;
-    I = pcd_random_walk(pcd, j, nsamples, sigma);
+    I = pcd_random_walk(pcd, j, 10*nsamples, sigma/10);
+    I = I(1:10:end);
     t2 = sope_cloud_pdf(H{i}.x, H{i}.q, models(H{i}.id).tofoo, pcd, [], nsamples, .5, I);
     
     W(i) = t2; %/p2;

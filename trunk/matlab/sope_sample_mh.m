@@ -1,18 +1,20 @@
-function [XQ W] = sope_sample(tofoo, pcd, n)
-%XQ = sope_sample(tofoo, pcd, n) -- importance sampling
+function XQ = sope_sample_mh(tofoo, pcd, n)
+%XQ = sope_sample_mh(tofoo, pcd, n) -- monte carlo (metropolis hasting) sampling
 %algorithm for object pose given a tofoo model.
 
 hard_assignment = 1;
-
-num_samples = 5;
-lambda = .5;
+burn_in = 10;
+sample_rate = 1; %10;
+always_accept = 0;
 
 npoints = size(pcd.X,1);
 FCP = compute_feature_class_probs(tofoo, pcd, hard_assignment);
 
+r = [];
+x = [];
+num_accepts = 0;
 XQ = zeros(n,7);
-W = zeros(1,n);
-for i=1:n
+for i=1:n*sample_rate+burn_in
     % sample a point feature
     j = ceil(rand()*npoints);
     f = pcd.F(j,:);
@@ -40,21 +42,39 @@ for i=1:n
     x2 = (xj' - R*x0')';
     p2 = p2*mvnpdf(x0, x_mean, x_cov);
     
-    % compute target density for the given orientation 
-    t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP, num_samples, lambda);
-        
-    XQ(i,:) = [x2 r2];
-    W(i) = t2; %/p2;
+    % sample a random acceptance threshold
+    if ~always_accept
+        if num_accepts==0
+            t2min = 0;
+        else
+            t2min = rand()*t*p2/p;
+        end
+
+        % compute target density for the given orientation 
+        t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP);
+    end
+
+    % a = p*t2/(p2*t) >= rand()
+    % t2 >= rand()*t*p2/p
+    
+    if always_accept || num_accepts==0 || t2 > t2min
+        num_accepts = num_accepts + 1;
+        x = x2;
+        r = r2;
+        p = p2;
+        if ~always_accept
+            t = t2;
+        end
+    end
+    XQ(i,:) = [x r];
     
     fprintf('.');
 end
 fprintf('\n');
 
+accept_rate = num_accepts / (n*sample_rate + burn_in)
 
-[W I] = sort(W,'descend');
-XQ = XQ(I,:);
-W = W/sum(W);
-
+XQ = XQ(burn_in+1:sample_rate:end,:);
 
 
 
