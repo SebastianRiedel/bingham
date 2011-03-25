@@ -344,6 +344,19 @@ int wordcmp(char *s1, char *s2, const char *delim)
 }
 
 
+// replace a word in a string array
+void replace_word(char **words, int num_words, const char *from, const char *to)
+{
+  int i;
+  for (i = 0; i < num_words; i++) {
+    if (!strcmp(words[i], from)) {
+      safe_realloc(words[i], strlen(to)+1, char *);
+      strcpy(words[i], to);
+    }
+  }
+}
+
+
 // computes the log factorial of x
 double lfact(int x)
 {
@@ -651,6 +664,42 @@ void quaternion_mult(double z[4], double x[4], double y[4])
   z[1] = b*y0 + a*y1 - d*y2 + c*y3;
   z[2] = c*y0 + d*y1 + a*y2 - b*y3;
   z[3] = d*y0 - c*y1 + b*y2 + a*y3;
+}
+
+
+// convert a rotation matrix to a unit quaternion
+void rotation_matrix_to_quaternion(double *q, double **R)
+{
+  double S;
+  double tr = R[0][0] + R[1][1] + R[2][2];
+  if (tr > 0) {
+    S = sqrt(tr+1.0) * 2;  // S=4*qw
+    q[0] = 0.25 * S;
+    q[1] = (R[2][1] - R[1][2]) / S;
+    q[2] = (R[0][2] - R[2][0]) / S;
+    q[3] = (R[1][0] - R[0][1]) / S;
+  }
+  else if ((R[0][0] > R[1][1]) && (R[0][0] > R[2][2])) {
+    S = sqrt(1.0 + R[0][0] - R[1][1] - R[2][2]) * 2;  // S=4*qx 
+    q[0] = (R[2][1] - R[1][2]) / S;
+    q[1] = 0.25 * S;
+    q[2] = (R[0][1] + R[1][0]) / S; 
+    q[3] = (R[0][2] + R[2][0]) / S; 
+  }
+  else if (R[1][1] > R[2][2]) {
+    S = sqrt(1.0 + R[1][1] - R[0][0] - R[2][2]) * 2;  // S=4*qy
+    q[0] = (R[0][2] - R[2][0]) / S;
+    q[1] = (R[0][1] + R[1][0]) / S; 
+    q[2] = 0.25 * S;
+    q[3] = (R[1][2] + R[2][1]) / S; 
+  }
+  else {
+    S = sqrt(1.0 + R[2][2] - R[0][0] - R[1][1]) * 2;  // S=4*qz
+    q[0] = (R[1][0] - R[0][1]) / S;
+    q[1] = (R[0][2] + R[2][0]) / S;
+    q[2] = (R[1][2] + R[2][1]) / S;
+    q[3] = 0.25 * S;
+  }
 }
 
 
