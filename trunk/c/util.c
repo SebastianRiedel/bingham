@@ -667,6 +667,16 @@ void quaternion_mult(double z[4], double x[4], double y[4])
 }
 
 
+// invert a quaternion
+void quaternion_inverse(double q_inv[4], double q[4])
+{
+  q_inv[0] = q[0];
+  q_inv[1] = -q[1];
+  q_inv[2] = -q[2];
+  q_inv[3] = -q[3];
+}
+
+
 // convert a rotation matrix to a unit quaternion
 void rotation_matrix_to_quaternion(double *q, double **R)
 {

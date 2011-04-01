@@ -80,6 +80,7 @@ void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* average
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
 int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
 void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
+void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
