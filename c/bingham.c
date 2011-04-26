@@ -795,8 +795,9 @@ void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, doubl
 /*
  * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
  * as the Bingham distribution is not closed under composition.
+ * Returns the scatter matrix.
  */
-void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
+void bingham_compose_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s2)
 {
   double d = s1->B->d;
   if (d != 4) {
@@ -826,7 +827,6 @@ void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
   double b34 = s2->scatter[2][3];
   double b44 = s2->scatter[3][3];
 
-  double **S = new_matrix2(d, d);
   S[0][0] =
     a11*b11 - 2*a12*b12 - 2*a13*b13 - 2*a14*b14 + a22*b22 + 2*a23*b23 + 2*a24*b24 + a33*b33 + 2*a34*b34 + a44*b44;
   S[0][1] = S[1][0] =
@@ -853,9 +853,19 @@ void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
     a33*b12 + a34*b11 + a23*b24 + a24*b23 - a12*b44 - a22*b34 - a34*b22 + a44*b12;
   S[3][3] =
     2*a14*b14 - 2*a13*b24 + 2*a24*b13 + 2*a12*b34 - 2*a23*b23 - 2*a34*b12 + a11*b44 + a22*b33 + a33*b22 + a44*b11;
+}
 
+
+/*
+ * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
+ * as the Bingham distribution is not closed under composition.
+ */
+void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
+{
+  double d = s1->B->d;
+  double **S = new_matrix2(d, d);
+  bingham_compose_scatter(S, s1, s2);
   bingham_fit_scatter(B, S, d);
-
   free_matrix2(S);
 }
 

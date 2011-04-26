@@ -614,6 +614,104 @@ void test_bingham_sample_pmf(int argc, char *argv[])
 }
 
 
+void test_bingham_compose(int argc, char *argv[])
+{
+  int i, j, d = 4;
+
+  if (argc < 8) {
+    printf("usage: %s <z11> <z12> <z13> <z21> <z22> <z23> <num_samples>\n", argv[0]);
+    exit(1);
+  }
+
+  double z11 = atof(argv[1]);
+  double z12 = atof(argv[2]);
+  double z13 = atof(argv[3]);
+  double z21 = atof(argv[4]);
+  double z22 = atof(argv[5]);
+  double z23 = atof(argv[6]);
+  int nsamples = atoi(argv[7]);
+
+  bingham_t B1;
+  bingham_stats_t stats1;
+  double Z1[3] = {z11, z12, z13};
+  double V1[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
+  double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
+  bingham_new(&B1, 4, Vp1, Z1);
+  bingham_stats(&stats1, &B1);
+  print_bingham(&B1);
+
+  printf("S1:\n");
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", stats1.scatter[i][j]);
+    printf("\n");
+  }
+
+  printf("---------------------------\n");
+
+  bingham_t B2;
+  bingham_stats_t stats2;
+  double Z2[3] = {z21, z22, z23};
+  double V2[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};  //{{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};  
+  double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
+  bingham_new(&B2, 4, Vp2, Z2);
+  bingham_stats(&stats2, &B2);
+  print_bingham(&B2);
+
+  printf("S2:\n");
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", stats2.scatter[i][j]);
+    printf("\n");
+  }
+
+  printf("---------------------------\n");
+
+  // compose with method of moments
+  double **S_mom = new_matrix2(4,4);
+  double t0 = get_time_ms();
+  for (i = 0; i < nsamples; i++)
+    bingham_compose_scatter(S_mom, &stats1, &stats2);
+  printf("Composed %d Bingham pairs with Method-of-Moments in %.0f ms\n", nsamples, get_time_ms() - t0);
+
+  // compose with sampling
+  t0 = get_time_ms();
+  double **X1 = new_matrix2(nsamples, 4);
+  bingham_sample(X1, &B1, &stats1, nsamples);
+  double **X2 = new_matrix2(nsamples, 4);
+  bingham_sample(X2, &B2, &stats2, nsamples);
+
+  double **Y = new_matrix2(nsamples, 4);
+  for (i = 0; i < nsamples; i++)
+    quaternion_mult(Y[i], X1[i], X2[i]);
+
+  int n = nsamples;
+  double **Yt = new_matrix2(d, n);
+  transpose(Yt, Y, n, d);
+  double **S_sam = new_matrix2(d, d);
+  matrix_mult(S_sam, Yt, Y, d, n, d);
+  mult(S_sam[0], S_sam[0], 1/(double)n, d*d);
+  printf("Composed 1 Bingham pair with %d samples in %.0f ms\n", nsamples, get_time_ms() - t0);
+
+  printf("---------------------------\n");
+
+
+  printf("Method-of-Moments scatter matrix:\n");
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", S_mom[i][j]);
+    printf("\n");
+  }
+  printf("---------------------------\n");
+  printf("Sample scatter matrix:\n");
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", S_sam[i][j]);
+    printf("\n");
+  }
+}
+
+
 void test_bingham_mult(int argc, char *argv[])
 {
   if (argc < 7) {
@@ -1059,6 +1157,7 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
+  test_bingham_compose(argc, argv);
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
 
