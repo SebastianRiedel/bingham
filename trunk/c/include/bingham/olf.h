@@ -10,6 +10,7 @@ extern "C" {
 
 
 #include "bingham.h"
+#include "hll.h"
 
 
   typedef struct {

@@ -793,6 +793,74 @@ void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, doubl
 
 
 /*
+ * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
+ * as the Bingham distribution is not closed under composition.
+ */
+void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
+{
+  double d = s1->B->d;
+  if (d != 4) {
+    fprintf(stderr, "Error: bingham_compose() is only implemented for d = 4!  Exiting...\n");
+    exit(1);
+  }
+
+  double a11 = s1->scatter[0][0];
+  double a12 = s1->scatter[0][1];
+  double a13 = s1->scatter[0][2];
+  double a14 = s1->scatter[0][3];
+  double a22 = s1->scatter[1][1];
+  double a23 = s1->scatter[1][2];
+  double a24 = s1->scatter[1][3];
+  double a33 = s1->scatter[2][2];
+  double a34 = s1->scatter[2][3];
+  double a44 = s1->scatter[3][3];
+
+  double b11 = s2->scatter[0][0];
+  double b12 = s2->scatter[0][1];
+  double b13 = s2->scatter[0][2];
+  double b14 = s2->scatter[0][3];
+  double b22 = s2->scatter[1][1];
+  double b23 = s2->scatter[1][2];
+  double b24 = s2->scatter[1][3];
+  double b33 = s2->scatter[2][2];
+  double b34 = s2->scatter[2][3];
+  double b44 = s2->scatter[3][3];
+
+  double **S = new_matrix2(d, d);
+  S[0][0] =
+    a11*b11 - 2*a12*b12 - 2*a13*b13 - 2*a14*b14 + a22*b22 + 2*a23*b23 + 2*a24*b24 + a33*b33 + 2*a34*b34 + a44*b44;
+  S[0][1] = S[1][0] =
+    a11*b12 + a12*b11 + a13*b14 - a14*b13 - a12*b22 - a22*b12 - a13*b23 - a23*b13 -
+    a14*b24 - a24*b14 - a23*b24 + a24*b23 - a33*b34 + a34*b33 - a34*b44 + a44*b34;
+  S[0][2] = S[2][0] =
+    a11*b13 + a13*b11 - a12*b14 + a14*b12 - a12*b23 - a23*b12 - a13*b33 + a22*b24 -
+    a24*b22 - a33*b13 - a14*b34 - a34*b14 + a23*b34 - a34*b23 + a24*b44 - a44*b24;
+  S[0][3] = S[3][0] =
+    a11*b14 + a12*b13 - a13*b12 + a14*b11 - a12*b24 - a24*b12 - a22*b23 + a23*b22 -
+    a13*b34 - a34*b13 - a23*b33 + a33*b23 - a14*b44 - a24*b34 + a34*b24 - a44*b14;
+  S[1][1] =
+    2*a12*b12 + a11*b22 + a22*b11 + 2*a13*b24 - 2*a14*b23 + 2*a23*b14 - 2*a24*b13 - 2*a34*b34 + a33*b44 + a44*b33;
+  S[1][2] = S[2][1] =
+    a12*b13 + a13*b12 + a11*b23 + a23*b11 - a12*b24 + a14*b22 - a22*b14 + a24*b12 +
+    a13*b34 - a14*b33 + a33*b14 - a34*b13 + a24*b34 + a34*b24 - a23*b44 - a44*b23;
+  S[1][3] = S[3][1] =
+    a12*b14 + a14*b12 + a11*b24 + a12*b23 - a13*b22 + a22*b13 - a23*b12 + a24*b11 -
+    a14*b34 + a34*b14 + a13*b44 + a23*b34 - a24*b33 - a33*b24 + a34*b23 - a44*b13;
+  S[2][2] =
+    2*a13*b13 + 2*a14*b23 - 2*a23*b14 + a11*b33 + a33*b11 - 2*a12*b34 + 2*a34*b12 - 2*a24*b24 + a22*b44 + a44*b22;
+  S[2][3] = S[3][2] =
+    a13*b14 + a14*b13 - a13*b23 + a23*b13 + a14*b24 - a24*b14 + a11*b34 + a12*b33 -
+    a33*b12 + a34*b11 + a23*b24 + a24*b23 - a12*b44 - a22*b34 - a34*b22 + a44*b12;
+  S[3][3] =
+    2*a14*b14 - 2*a13*b24 + 2*a24*b13 + 2*a12*b34 - 2*a23*b23 - 2*a34*b12 + a11*b44 + a22*b33 + a33*b22 + a44*b11;
+
+  bingham_fit_scatter(B, S, d);
+
+  free_matrix2(S);
+}
+
+
+/*
  * Fit a bingham to a set of samples.
  */
 void bingham_fit(bingham_t *B, double **X, int n, int d)
