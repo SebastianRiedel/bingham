@@ -1039,6 +1039,7 @@ double **load_matrix(char *fin, int *n, int *m)
 
   int i, j;
   for (i = 0; i < *n; i++) {
+    s = sbuf;
     if (fgets(s, 1024, f) == NULL)
       break;
     for (j = 0; j < *m; j++) {
