@@ -671,7 +671,7 @@ void test_bingham_compose(int argc, char *argv[])
   double **S_mom = new_matrix2(4,4);
   double t0 = get_time_ms();
   for (i = 0; i < nsamples; i++)
-    bingham_compose_scatter(S_mom, &stats1, &stats2);
+    bingham_compose_stats_scatter(S_mom, &stats1, &stats2);
   printf("Composed %d Bingham pairs with Method-of-Moments in %.0f ms\n", nsamples, get_time_ms() - t0);
 
   // compose with sampling
@@ -1157,7 +1157,7 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
-  test_bingham_compose(argc, argv);
+  //test_bingham_compose(argc, argv);
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
 
@@ -1172,7 +1172,7 @@ int main(int argc, char *argv[])
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-  //test_bingham_discretize(argc, argv);
+  test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
