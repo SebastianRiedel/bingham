@@ -1088,7 +1088,7 @@ double tetrahedron_volume(double x1[], double x2[], double x3[], double x4[], in
   double b = w+u-V;
   double c = u+v-W;
 
-  return sqrt( (4*u*v*w - u*a*a - v*b*b - w*c*c + a*b*c) / 12.0 );
+  return sqrt( (4*u*v*w - u*a*a - v*b*b - w*c*c + a*b*c) ) / 12.0 ;
 }
 
 

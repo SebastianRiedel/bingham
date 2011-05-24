@@ -689,6 +689,11 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
     free_matrix2(Si);
     stats->scatter = S;
   }
+  else {  // bingham is uniform
+    stats->scatter = new_matrix2(d, d);
+    for (i = 0; i < d; i++)
+      stats->scatter[i][i] = 1.0/(double)d;
+  }
 }
 
 
@@ -797,7 +802,7 @@ void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, doubl
  * as the Bingham distribution is not closed under composition.
  * Returns the scatter matrix.
  */
-void bingham_compose_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s2)
+void bingham_compose_stats_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s2)
 {
   double d = s1->B->d;
   if (d != 4) {
@@ -860,13 +865,28 @@ void bingham_compose_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s
  * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
  * as the Bingham distribution is not closed under composition.
  */
-void bingham_compose(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
+void bingham_compose_stats(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
 {
   double d = s1->B->d;
   double **S = new_matrix2(d, d);
-  bingham_compose_scatter(S, s1, s2);
+  bingham_compose_stats_scatter(S, s1, s2);
   bingham_fit_scatter(B, S, d);
   free_matrix2(S);
+}
+
+
+/*
+ * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
+ * as the Bingham distribution is not closed under composition.
+ */
+void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
+{
+  bingham_stats_t s1, s2;
+  bingham_stats(&s1, B1);
+  bingham_stats(&s2, B2);
+  bingham_compose_stats(B, &s1, &s2);
+  bingham_stats_free(&s1);
+  bingham_stats_free(&s2);
 }
 
 
@@ -962,10 +982,15 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
     // probability mass
     safe_malloc(pmf->mass, pmf->n, double);
     double tot_mass = 0;
+    //double tot_volume = 0;
     for (i = 0; i < pmf->n; i++) {
       pmf->mass[i] = pmf->tessellation->volumes[i] * bingham_pdf(pmf->tessellation->centroids[i], B);
       tot_mass += pmf->mass[i];
+      //tot_volume += pmf->tessellation->volumes[i];
     }
+
+    //printf("tot_mass = %f, tot_volume = %f\n", tot_mass, tot_volume); //dbug
+
     mult(pmf->mass, pmf->mass, 1/tot_mass, pmf->n);
 
     fprintf(stderr, "Computed probabilities in %.0f ms\n", get_time_ms() - t0);  //dbug
