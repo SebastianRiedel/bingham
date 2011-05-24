@@ -452,14 +452,21 @@ void bingham_new(bingham_t *B, int d, double **V, double *Z)
 
   B->d = d;
 
-  B->V = new_matrix2(d-1, d);
-  for (i = 0; i < d-1; i++)
-    memcpy(B->V[i], V[i], d*sizeof(double));
+  // sort Z
+  int idx[d-1];
+  sort_indices(Z, idx, d-1);
 
   safe_malloc(B->Z, d-1, double);
-  memcpy(B->Z, Z, (d-1)*sizeof(double));
+  B->V = new_matrix2(d-1, d);
+  for (i = 0; i < d-1; i++) {
+    B->Z[i] = Z[idx[i]];
+    memcpy(B->V[i], V[idx[i]], d*sizeof(double));
+  }
 
-  bingham_F(B);
+  if (d == 4)
+    B->F = bingham_F_lookup_3d(B->Z);
+  else
+    bingham_F(B);
 }
 
 
@@ -887,6 +894,57 @@ void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
   bingham_compose_stats(B, &s1, &s2);
   bingham_stats_free(&s1);
   bingham_stats_free(&s2);
+}
+
+
+/*
+ * Compute the true PDF at x of a composed S^3 Bingham, B = quaternion_mult(B1,B2).
+ */
+double bingham_compose_true_pdf(double *x, bingham_t *B1, bingham_t *B2)
+{
+  int d = 4;
+  double **C = new_matrix2(d,d);
+  double **C1 = new_matrix2(d,d);
+  double **C2 = new_matrix2(d,d);
+  double w[d], xw[d];
+
+  int i;
+  for (i = 0; i < d-1; i++) {
+    // C1
+    outer_prod(C1, B1->V[i], B1->V[i], d, d);
+    mult(C1[0], C1[0], B1->Z[i], d*d);
+
+    // C2
+    quaternion_inverse(w, B2->V[i]);
+    quaternion_mult(xw, x, w);
+    outer_prod(C2, xw, xw, d, d);
+    mult(C2[0], C2[0], B2->Z[i], d*d);
+
+    // C += C1 + C2
+    matrix_add(C, C, C1, d, d);
+    matrix_add(C, C, C2, d, d);
+  }
+
+  // compute eigenvalues of C
+  double z[d];
+  double **V = C1;  // save an alloc
+  eigen_symm(z, V, C, d);
+  double z2[d-1];
+  // set the smallest z[i] (in magnitude) to zero
+  for (i = 0; i < d-1; i++)
+    z2[i] = z[d-1-i] - z[0];
+
+  //printf("z = [%.2f, %.2f, %.2f, %.2f]\n", z[0], z[1], z[2], z[3]);  //dbug
+  //printf("C(s) = [%.2f, %.2f, %.2f]\n", z2[0], z2[1], z2[2]);  //dbug
+
+  double p = exp(z[0]) * bingham_F_lookup_3d(z2) / (B1->F * B2->F);
+  //double p = exp(z[0]) * bingham_F_3d(z2[0], z2[1], z2[2]) / (B1->F * B2->F);
+
+  free_matrix2(C);
+  free_matrix2(C1);
+  free_matrix2(C2);
+
+  return p;
 }
 
 

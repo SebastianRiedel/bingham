@@ -652,7 +652,7 @@ void test_bingham_compose(int argc, char *argv[])
   bingham_t B2;
   bingham_stats_t stats2;
   double Z2[3] = {z21, z22, z23};
-  double V2[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};  //{{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};  
+  double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};  //{{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
   double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
   bingham_new(&B2, 4, Vp2, Z2);
   bingham_stats(&stats2, &B2);
@@ -673,6 +673,8 @@ void test_bingham_compose(int argc, char *argv[])
   for (i = 0; i < nsamples; i++)
     bingham_compose_stats_scatter(S_mom, &stats1, &stats2);
   printf("Composed %d Bingham pairs with Method-of-Moments in %.0f ms\n", nsamples, get_time_ms() - t0);
+  bingham_t B_mom;
+  bingham_fit_scatter(&B_mom, S_mom, 4);
 
   // compose with sampling
   t0 = get_time_ms();
@@ -709,6 +711,123 @@ void test_bingham_compose(int argc, char *argv[])
       printf("%.4f, ", S_sam[i][j]);
     printf("\n");
   }
+
+  printf("\n---------------------------\n\n");
+
+  t0 = get_time_ms();
+  for (i = 0; i < nsamples; i++)
+    bingham_compose_true_pdf(X1[i], &B1, &B2);
+  printf("Computed %d true composition pdf's in %.0f ms\n", nsamples, get_time_ms() - t0);
+
+  // compute sample mean error
+  double tot_err = 0;
+  for (i = 0; i < nsamples; i++) {
+    double f_true = bingham_compose_true_pdf(X1[i], &B1, &B2);
+    double f_approx = bingham_pdf(X1[i], &B_mom);
+    //printf("f_true = %f, f_approx = %f\n", f_true, f_approx);
+    tot_err += 2*fabs((f_true - f_approx) / (f_true + f_approx));
+  }
+  printf("mean sample err = %.2f%%\n", 100*tot_err/nsamples);
+
+  // compute KL divergence
+  hypersphere_tessellation_t *T = tessellate_S3(nsamples);
+  double pmf_true[T->n], pmf_true_tot_mass = 0;
+  double pmf_approx[T->n], pmf_approx_tot_mass = 0;
+  for (i = 0; i < T->n; i++) {
+    pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
+    pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
+    pmf_true_tot_mass += pmf_true[i];
+    pmf_approx_tot_mass += pmf_approx[i];
+  }
+  mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
+  mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
+  double d_KL = 0;
+  for (i = 0; i < T->n; i++)
+    d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
+  printf("KL divergence = %f\n", d_KL);
+}
+
+
+void test_bingham_compose_multi(int argc, char *argv[])
+{
+  int a, b, i, j, d = 4, nsamples = 10000;
+  bingham_t B1, B2, B_mom;
+  double V1[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
+  double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
+  double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
+  double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
+  double z_range[10] = {-100, -81, -64, -49, -36, -25, -16, -9, -4, -1};
+
+  /*------------ isotropic-isotropic ------------//
+  printf("ISO_ISO = [ ...\n");
+  for (a = 0; a < 10; a++) {
+    fprintf(stderr, "\n");
+    for (b = 0; b < 10; b++) {
+      fprintf(stderr, ".");
+      double z1 = z_range[a];
+      double z2 = z_range[b];
+      double Z1[3] = {z1, z1, z1};
+      double Z2[3] = {z2, z2, z2};
+      bingham_new(&B1, d, Vp1, Z1);
+      bingham_new(&B2, d, Vp2, Z2);
+      
+      bingham_compose(&B_mom, &B1, &B2);
+
+      hypersphere_tessellation_t *T = tessellate_S3(nsamples);
+      double pmf_true[T->n], pmf_true_tot_mass = 0;
+      double pmf_approx[T->n], pmf_approx_tot_mass = 0;
+      for (i = 0; i < T->n; i++) {
+	pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
+	pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
+	pmf_true_tot_mass += pmf_true[i];
+	pmf_approx_tot_mass += pmf_approx[i];
+      }
+      mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
+      mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
+      double d_KL = 0;
+      for (i = 0; i < T->n; i++)
+	d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
+      //printf("KL divergence = %f\n", d_KL);
+      printf("%f, %f, %f; ...\n", z1, z2, d_KL);
+    }
+  }
+  printf("];\n\n\n");
+  */
+
+  //------------ anisotropic-anisotropic ------------//
+  printf("ANI_ANI = [ ...\n");
+  for (a = 0; a < 10; a++) {
+    fprintf(stderr, "\n");
+    for (b = a; b < 10; b++) {
+      fprintf(stderr, ".");
+      double z1 = z_range[a];
+      double z2 = z_range[9-b];
+      double Z1[3] = {-100, -100, z2};
+      double Z2[3] = {-100, z1, z2};
+      bingham_new(&B1, d, Vp1, Z1);
+      bingham_new(&B2, d, Vp2, Z2);
+      
+      bingham_compose(&B_mom, &B1, &B2);
+
+      hypersphere_tessellation_t *T = tessellate_S3(nsamples);
+      double pmf_true[T->n], pmf_true_tot_mass = 0;
+      double pmf_approx[T->n], pmf_approx_tot_mass = 0;
+      for (i = 0; i < T->n; i++) {
+	pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
+	pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
+	pmf_true_tot_mass += pmf_true[i];
+	pmf_approx_tot_mass += pmf_approx[i];
+      }
+      mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
+      mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
+      double d_KL = 0;
+      for (i = 0; i < T->n; i++)
+	d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
+      //printf("KL divergence = %f\n", d_KL);
+      printf("%f, %f, %f; ...\n", z1, z2, d_KL);
+    }
+  }
+  printf("];\n\n\n");  
 }
 
 
@@ -1149,7 +1268,7 @@ void test_bingham_init()
 
   double t1 = get_time_ms();
 
-  printf("Initialized bingham library in %.0f ms\n", t1-t0);
+  fprintf(stderr, "Initialized bingham library in %.0f ms\n", t1-t0);
 }
 
 
@@ -1157,6 +1276,7 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
+  test_bingham_compose_multi(argc, argv);
   //test_bingham_compose(argc, argv);
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
@@ -1172,7 +1292,7 @@ int main(int argc, char *argv[])
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
-  test_bingham_discretize(argc, argv);
+  //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
   //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
