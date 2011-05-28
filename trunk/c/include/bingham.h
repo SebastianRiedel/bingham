@@ -64,6 +64,7 @@ void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2);
 void bingham_compose_stats(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2);
 void bingham_compose_stats_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s2);
 double bingham_compose_true_pdf(double *x, bingham_t *B1, bingham_t *B2);
+double bingham_compose_error(bingham_t *B1, bingham_t *B2);
 void bingham_fit(bingham_t *B, double **X, int n, int d);
 void bingham_fit_scatter(bingham_t *B, double **S, int d);
 void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells);

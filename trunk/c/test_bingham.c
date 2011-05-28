@@ -730,28 +730,14 @@ void test_bingham_compose(int argc, char *argv[])
   printf("mean sample err = %.2f%%\n", 100*tot_err/nsamples);
 
   // compute KL divergence
-  hypersphere_tessellation_t *T = tessellate_S3(nsamples);
-  double pmf_true[T->n], pmf_true_tot_mass = 0;
-  double pmf_approx[T->n], pmf_approx_tot_mass = 0;
-  for (i = 0; i < T->n; i++) {
-    pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
-    pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
-    pmf_true_tot_mass += pmf_true[i];
-    pmf_approx_tot_mass += pmf_approx[i];
-  }
-  mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
-  mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
-  double d_KL = 0;
-  for (i = 0; i < T->n; i++)
-    d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
-  printf("KL divergence = %f\n", d_KL);
+  printf("KL divergence = %f\n", bingham_compose_error(&B1, &B2));
 }
 
 
 void test_bingham_compose_multi(int argc, char *argv[])
 {
-  int a, b, i, j, d = 4, nsamples = 10000;
-  bingham_t B1, B2, B_mom;
+  int a, b, d = 4;
+  bingham_t B1, B2;
   double V1[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
   double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
   double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
@@ -771,24 +757,7 @@ void test_bingham_compose_multi(int argc, char *argv[])
       bingham_new(&B1, d, Vp1, Z1);
       bingham_new(&B2, d, Vp2, Z2);
       
-      bingham_compose(&B_mom, &B1, &B2);
-
-      hypersphere_tessellation_t *T = tessellate_S3(nsamples);
-      double pmf_true[T->n], pmf_true_tot_mass = 0;
-      double pmf_approx[T->n], pmf_approx_tot_mass = 0;
-      for (i = 0; i < T->n; i++) {
-	pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
-	pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
-	pmf_true_tot_mass += pmf_true[i];
-	pmf_approx_tot_mass += pmf_approx[i];
-      }
-      mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
-      mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
-      double d_KL = 0;
-      for (i = 0; i < T->n; i++)
-	d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
-      //printf("KL divergence = %f\n", d_KL);
-      printf("%f, %f, %f; ...\n", z1, z2, d_KL);
+      printf("%f, %f, %f; ...\n", z1, z2, bingham_compose_error(&B1, &B2));
     }
   }
   printf("];\n\n\n");
@@ -807,24 +776,7 @@ void test_bingham_compose_multi(int argc, char *argv[])
       bingham_new(&B1, d, Vp1, Z1);
       bingham_new(&B2, d, Vp2, Z2);
       
-      bingham_compose(&B_mom, &B1, &B2);
-
-      hypersphere_tessellation_t *T = tessellate_S3(nsamples);
-      double pmf_true[T->n], pmf_true_tot_mass = 0;
-      double pmf_approx[T->n], pmf_approx_tot_mass = 0;
-      for (i = 0; i < T->n; i++) {
-	pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], &B1, &B2) * T->volumes[i];
-	pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
-	pmf_true_tot_mass += pmf_true[i];
-	pmf_approx_tot_mass += pmf_approx[i];
-      }
-      mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
-      mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
-      double d_KL = 0;
-      for (i = 0; i < T->n; i++)
-	d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
-      //printf("KL divergence = %f\n", d_KL);
-      printf("%f, %f, %f; ...\n", z1, z2, d_KL);
+      printf("%f, %f, %f; ...\n", z1, z2, bingham_compose_error(&B1, &B2));
     }
   }
   printf("];\n\n\n");  
@@ -1276,8 +1228,8 @@ int main(int argc, char *argv[])
 {
   test_bingham_init();
 
-  test_bingham_compose_multi(argc, argv);
-  //test_bingham_compose(argc, argv);
+  //test_bingham_compose_multi(argc, argv);
+  test_bingham_compose(argc, argv);
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
 

@@ -949,6 +949,35 @@ double bingham_compose_true_pdf(double *x, bingham_t *B1, bingham_t *B2)
 
 
 /*
+ * Estimate the KL divergence between the true and approximate composed distribution (B1 o B2)
+ */
+double bingham_compose_error(bingham_t *B1, bingham_t *B2)
+{
+  bingham_t B_mom;
+  bingham_compose(&B_mom, B1, B2);
+
+  int nsamples = 10000;
+  hypersphere_tessellation_t *T = tessellate_S3(nsamples);
+  double pmf_true[T->n], pmf_true_tot_mass = 0;
+  double pmf_approx[T->n], pmf_approx_tot_mass = 0;
+  int i;
+  for (i = 0; i < T->n; i++) {
+    pmf_true[i] = bingham_compose_true_pdf(T->centroids[i], B1, B2) * T->volumes[i];
+    pmf_approx[i] = bingham_pdf(T->centroids[i], &B_mom) * T->volumes[i];
+    pmf_true_tot_mass += pmf_true[i];
+    pmf_approx_tot_mass += pmf_approx[i];
+  }
+  mult(pmf_true, pmf_true, 1/pmf_true_tot_mass, T->n);
+  mult(pmf_approx, pmf_approx, 1/pmf_approx_tot_mass, T->n);
+  double d_KL = 0;
+  for (i = 0; i < T->n; i++)
+    d_KL += pmf_true[i] * log(pmf_true[i] / pmf_approx[i]);
+
+  return d_KL;
+}
+
+
+/*
  * Fit a bingham to a set of samples.
  */
 void bingham_fit(bingham_t *B, double **X, int n, int d)
@@ -1698,7 +1727,7 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
 
   // set the smallest z[i] (in magnitude) to zero
   for (i = 0; i < d-1; i++)
-    B->Z[i] = z[d-1-i] - z[0];
+    B->Z[i] = MAX(z[d-1-i] - z[0], -400);  //dbug
 
   // lookup F
   if (d == 4)
