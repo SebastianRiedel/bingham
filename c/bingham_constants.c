@@ -67,10 +67,20 @@ void bingham_constants_init()
 }
 
 
-/*
- * Look up concentration params Z and normalization constant F given dY.
- */
-void bingham_dY_params_3d(double *Z, double *F, double *dY)
+static double bingham_dY_params_3d_slow_eval(double *err, double *Z, double *dY)
+{
+  double F = bingham_F_lookup_3d(Z);
+  double dF[3];
+  bingham_dF_lookup_3d(dF, Z);
+  err[0] = dF[0]/F - dY[0];
+  err[1] = dF[1]/F - dY[1];
+  err[2] = dF[2]/F - dY[2];
+
+  return err[0]*err[0] + err[1]*err[1] + err[2]*err[2];
+}
+
+//dbug: improve this later!!!!
+static void bingham_dY_params_3d_slow(double *Z, double *F, double *dY)
 {
   if (dY_tree_3d == NULL)
     bingham_constants_init();
@@ -89,7 +99,91 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY)
   Z[1] = -r1*r1;
   Z[2] = -r2*r2;
 
+  // perform gradient descent to improve Z estimate
+  double dz = .01;
+  double delta = 1000;
+  double err[3];
+  int iter = 0;
+  int max_iter = 50;
+  for (iter = 0; iter < max_iter; iter++) {
+    double g = bingham_dY_params_3d_slow_eval(err, Z, dY);
+    //printf("Z = [%.2f, %.2f, %.2f], g = %.10f\n", Z[0], Z[1], Z[2], g);  //dbug
+
+    Z[0] += dz;
+    double g0 = bingham_dY_params_3d_slow_eval(err, Z, dY);
+    Z[0] -= dz;
+    double dgdZ0 = (g0 - g)/dz;
+
+    Z[1] += dz;
+    double g1 = bingham_dY_params_3d_slow_eval(err, Z, dY);
+    Z[1] -= dz;
+    double dgdZ1 = (g1 - g)/dz;
+    
+    Z[2] += dz;
+    double g2 = bingham_dY_params_3d_slow_eval(err, Z, dY);
+    Z[2] -= dz;
+    double dgdZ2 = (g2 - g)/dz;
+
+    //printf("dgdZ = [%.8f, %.8f, %.8f]\n", dgdZ0, dgdZ1, dgdZ2);  //dbug
+
+    // simple line search for delta
+    double Z2[3];
+    delta *= .6;
+    double delta2 = delta;
+    int a;
+    for (a = 0; a < 3; a++) {
+      Z2[0] = Z[0] - delta2*dgdZ0;
+      Z2[1] = Z[1] - delta2*dgdZ1;
+      Z2[2] = Z[2] - delta2*dgdZ2;
+      double g2 = bingham_dY_params_3d_slow_eval(err, Z2, dY);
+      if (g2 < g) {
+	g = g2;
+	delta = delta2;
+      }
+      delta2 *= 1.6;
+    }
+
+    Z[0] -= delta*dgdZ0;
+    Z[1] -= delta*dgdZ1;
+    Z[2] -= delta*dgdZ2;
+  }
+
+  *F = bingham_F_lookup_3d(Z);
+
+  //dbug
+  //double g = bingham_dY_params_3d_slow_eval(err, Z, dY);
+  //printf("Z = [%.2f, %.2f, %.2f], g = %.10f\n", Z[0], Z[1], Z[2], g);
+}
+
+
+/*
+ * Look up concentration params Z and normalization constant F given dY.
+ */
+void bingham_dY_params_3d(double *Z, double *F, double *dY)
+{
+  //dbug
+  bingham_dY_params_3d_slow(Z, F, dY);
+
+  /*
+  if (dY_tree_3d == NULL)
+    bingham_constants_init();
+
+  int nn_index = kdtree_NN(dY_tree_3d, dY);
+
+  int i = dY_indices_3d[nn_index][0];
+  int j = dY_indices_3d[nn_index][1];
+  int k = dY_indices_3d[nn_index][2];
+
+  double r0 = bingham_table_range[i];
+  double r1 = bingham_table_range[j];
+  double r2 = bingham_table_range[k];
+
+  Z[0] = -r0*r0;
+  Z[1] = -r1*r1;
+  Z[2] = -r2*r2;
+
   *F = bingham_F_table[i][j][k];
+  */
 }
 
 
