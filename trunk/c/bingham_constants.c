@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include "bingham/util.h"
 #include "bingham/bingham_constants.h"
 #include "bingham/bingham_constant_tables.h"
@@ -76,7 +77,9 @@ static double bingham_dY_params_3d_slow_eval(double *err, double *Z, double *dY)
   err[1] = dF[1]/F - dY[1];
   err[2] = dF[2]/F - dY[2];
 
-  return err[0]*err[0] + err[1]*err[1] + err[2]*err[2];
+  double g = err[0]*err[0] + err[1]*err[1] + err[2]*err[2];
+
+  return isnan(g) ? DBL_MAX : g;
 }
 
 //dbug: improve this later!!!!
@@ -128,24 +131,27 @@ static void bingham_dY_params_3d_slow(double *Z, double *F, double *dY)
 
     // simple line search for delta
     double Z2[3];
-    delta *= .6;
-    double delta2 = delta;
-    int a;
-    for (a = 0; a < 3; a++) {
-      Z2[0] = Z[0] - delta2*dgdZ0;
-      Z2[1] = Z[1] - delta2*dgdZ1;
-      Z2[2] = Z[2] - delta2*dgdZ2;
+    double new_delta[5] = {delta*.36, delta*.6, delta, delta*1.6, delta*2.6};
+    int a, amin = -1;
+    for (a = 0; a < 5; a++) {
+      Z2[0] = Z[0] - new_delta[a]*dgdZ0;
+      Z2[1] = Z[1] - new_delta[a]*dgdZ1;
+      Z2[2] = Z[2] - new_delta[a]*dgdZ2;
       double g2 = bingham_dY_params_3d_slow_eval(err, Z2, dY);
       if (g2 < g) {
 	g = g2;
-	delta = delta2;
+	amin = a;
       }
-      delta2 *= 1.6;
     }
 
-    Z[0] -= delta*dgdZ0;
-    Z[1] -= delta*dgdZ1;
-    Z[2] -= delta*dgdZ2;
+    if (amin >= 0) {
+      delta = new_delta[amin];
+      Z[0] -= delta*dgdZ0;
+      Z[1] -= delta*dgdZ1;
+      Z[2] -= delta*dgdZ2;
+    }
+    else
+      delta *= .2;
   }
 
   *F = bingham_F_lookup_3d(Z);
