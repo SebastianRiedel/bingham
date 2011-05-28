@@ -302,13 +302,13 @@ char *sword(char *s, const char *delim, int n)
 // splits a string into k words
 char **split(char *s, const char *delim, int *k)
 {
-  char *sbuf = s + strspn(s, " \t");  // skip over initial whitespace
+  char *sbuf = s + strspn(s, delim);  // skip over initial whitespace
   s = sbuf;
 
   // determine the number of words
   int num_words = 0;
   while (*s != '\0') {
-    s = sword(s, " \t", 1);
+    s = sword(s, delim, 1);
     num_words++;
   }
 
@@ -318,10 +318,10 @@ char **split(char *s, const char *delim, int *k)
   char **words;
   safe_calloc(words, num_words, char *);
   for (i = 0; i < num_words; i++) {
-    int slen = strcspn(s, " \t\n");
+    int slen = strcspn(s, delim);  // add "\n" ?
     safe_calloc(words[i], slen+1, char);  // +1 to null-terminate the string
     strncpy(words[i], s, slen);
-    s = sword(s, " \t", 1);
+    s = sword(s, delim, 1);
   }
 
   *k = num_words;
