@@ -5,7 +5,7 @@ function pcd = load_pcd(filename)
 f = fopen(filename);
 
 columns = {};
-%vp = [];
+vp = [];
 
 % read header
 while 1
@@ -30,8 +30,8 @@ while 1
          [t s] = strtok(s);
          columns{i} = t;
       end
-   %elseif strcmp(t, 'VIEWPOINT')
-   %    vp = sscanf(s, '%f', [1 inf]);
+   elseif strcmp(t, 'VIEWPOINT')
+       vp = sscanf(s, '%f', [1 inf]);
    elseif strcmp(t, 'DATA')
       [t s] = strtok(s);
       if ~strcmp(t, 'ascii')
@@ -49,4 +49,5 @@ data = fscanf(f, '%f', [length(columns) inf])';
 fclose(f);
 
 pcd = populate_pcd_fields(columns, data);
+pcd.vp = vp;
 

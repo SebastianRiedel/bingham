@@ -127,11 +127,11 @@ for i=0:max(L)
    figure(1);
    
    % plot points
-   plot3(X, Y, Z, 'b.');
+   plot3(X, Y, Z, '.', 'Color', [.9 .9 1]);
    hold on;
    
    % plot cluster
-   plot3(X(Li), Y(Li), Z(Li), 'r.');
+   plot3(X(Li), Y(Li), Z(Li), '.', 'Color', [1 0 0]);
    
    % plot normals
    if plot_normals
@@ -191,7 +191,7 @@ for i=0:max(L)
 %      Z2
 
       figure(3);
-      clf;
+      %clf;
       %plot_bingham_3d(V1, Z1, F1);
       plot_quaternions(Qi);
       
@@ -244,6 +244,8 @@ for i=0:max(L)
    hold off;
    axis vis3d;
    axis equal;
+   %axis off;
+
    
    figure(2);
    % plot pfh

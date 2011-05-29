@@ -16,7 +16,7 @@ else
     Z = pcd.Z(1:step:end);
 end
 
-plot3(X, Y, Z, style);
+plot3(X, Y, Z, style, 'MarkerSize', 20);
 axis vis3d;
 axis equal;
 
