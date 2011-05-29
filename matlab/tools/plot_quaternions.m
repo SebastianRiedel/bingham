@@ -54,9 +54,9 @@ for i=1:size(Q,1)
       subplot(2,1,2);
       plot(a, 0, 'o', 'Color', c);
    elseif plot_hopf
-      plot3(a*v(1), a*v(2), a*v(3), '.', 'Color', c, 'MarkerSize', 15);
+      plot3(a*v(1), a*v(2), a*v(3), '.', 'Color', c, 'MarkerSize', 10);  %15
    else
-      plot3(v(1), v(2), v(3), '.', 'Color', c, 'MarkerSize', 15);
+      plot3(v(1), v(2), v(3), '.', 'Color', c, 'MarkerSize', 10);  %15
    end   
 end
 
