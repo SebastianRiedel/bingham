@@ -36,6 +36,7 @@ BINGHAM
 -------
 
 NOW:
+ - 
  - Remove GSL dependencies
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
