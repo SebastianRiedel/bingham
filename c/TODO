@@ -36,7 +36,7 @@ BINGHAM
 -------
 
 NOW:
- - Use bingham_F_lookup_3d() in bingham_new()
+ - Remove GSL dependencies
  - Check for 0 mixtures in bingham_cluster
  - Triangular meshing of S2
 
@@ -48,6 +48,7 @@ SOON:
 
 
 DONE:
+ + Use bingham_F_lookup_3d() in bingham_new()
  + bingham_mixture_sample()
  + bingham_sample_uniform()
  + pmfrand()
