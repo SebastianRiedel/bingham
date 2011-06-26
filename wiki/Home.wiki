@@ -27,3 +27,4 @@ The library contains both C and Matlab code, but only the C code is currently su
 
 In bingham/c, run "make" and "make install" to install the C library, libbingham.a, on your machine.  To use the library in your own project, simply add "-lbingham" to your linker flags and include the appropriate headers as you would with any other C library.
 
+Documentation is still sparse, but there are many examples in the bingham/c directory in test_bingham.c, test_util.c, fit_bingham.c, bingham_lookup.c, bingham_sample.c, and cluster_bingham.c.
