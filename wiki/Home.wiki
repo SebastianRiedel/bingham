@@ -1,0 +1,20 @@
+#summary Wiki home page
+
+= Introduction =
+
+Welcome!  The main purpose of this page is to provide documentation, examples, tutorials, etc. for the Bingham Statistics Library.  The library itself is brand new, so please be patient while we finish the documentation.
+
+
+= What is the Bingham Statistics Library? =
+
+The Bingham Statistics Library contains 
+
+
+Many geometric quantities have a natural representation as a unit vector on a hypersphere. For example, an angle can be thought of as a point on a circle, a direction in 3-D as a point on a sphere, a 3-D rotation as a unit quaternion (which is a 4-D unit vector on the hypersphere S^3), and the "shape" (i.e. all the information that is left when you remove position, scale, and orientation) of a sequence of N points in 2 or 3 dimensions as a point on the hypersphere S^{2N-1} or S^{3N-1}, respectively. Since angles, rotations, and shapes are plentiful in physical systems, there is a need to perform probabilistic inference on hyperspheres when there is uncertainty in the system. However, most existing algorithms ignore the topology of hyperspheres, and instead use a Gaussian noise model in a local, linear, tangent space. These methods work well when the errors are small, but as the variance grows, so too does the error of the linear approximation. Thus, a major theme in my research is to develop practical algorithms for inference on hyperspheres, without making the local linear approximation. 
+
+
+= Overview =
+
+
+= Usage = 
+
