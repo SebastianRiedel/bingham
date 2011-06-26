@@ -7,7 +7,7 @@ Welcome!  The main purpose of this page is to provide documentation, examples, t
 
 = What is the Bingham Statistics Library? =
 
-The Bingham Statistics Library contains implementations of the Bingham distribution for directional (axial) statistics on the unit spheres S^1, S^2, and S^3.  A major focus of this project is to use the Bingham distribution to represent uncertainty on 3D rotations via the unit quaternion hypersphere (S^3), thus there are many additional features in the library which are quaternion-specific.
+The Bingham Statistics Library contains implementations of the Bingham distribution for directional (axial) statistics on the unit spheres S^{1}, S^{2}, and S^{3}.  A major focus of this project is to use the Bingham distribution to represent uncertainty on 3D rotations via the unit quaternion hypersphere (S^3), thus there are many additional features in the library which are quaternion-specific.
 
 In contrast to many statistics libraries which only provide a bare-bones implementation of each distribution (PDF, sampling, etc.), the Bingham Statistics Library contains functions for computing modes, entropy, KL divergence, parameter estimation, merging two Bingham distributions into one, multiplication of Bingham distributions, as well as discretization, composition, and many operations on Bingham mixture distributions.
 
