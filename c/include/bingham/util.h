@@ -3,11 +3,6 @@
 #define BINGHAM_UTIL_H
 
 
-#ifdef HAVE_WINDOWS
-#include <gsl/gsl_sf.h>
-#define lgamma(x) gsl_sf_lngamma(x)
-#endif
-
 
 #define MAXFACT 10000
 
@@ -41,6 +36,7 @@ void replace_word(char **words, int num_words, const char *from, const char *to)
 double fact(int x);                                     /* computes the factorial of x */
 double lfact(int x);                                    /* computes the log factorial of x */
 double surface_area_sphere(int d);                      /* computes the surface area of a unit sphere with dimension d */
+int irand(int n);                                       /* returns a random int between 0 and n-1 */
 double frand();                                         /* returns a random double in [0,1] */
 void randperm(int *x, int n, int d);                    /* samples d integers from 0:n-1 uniformly without replacement */
 double erfinv(double x);                                /* approximation to the inverse error function */
@@ -91,7 +87,7 @@ void free_matrix2i(int **X);                                                /* f
 void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                            /* load a matrix from a file */
 void transpose(double **Y, double **X, int n, int m);                       /* transpose a matrix */
-void solve(double x[], double A[], double b[], int n);                      /* solve the equation Ax = b, where A is a square n-by-n matrix */
+void solve(double *x, double **A, double *b, int n);                        /* solve the equation Ax = b, where A is a square n-by-n matrix */
 double det(double **X, int n);                                              /* compute the determinant of the n-by-n matrix X */
 void inv(double **Y, double **X, int n);                                    /* compute the inverse (Y) of the n-by-n matrix X*/
 void matrix_copy(double **Y, double **X, int n, int m);                     /* matrix copy, Y = X */
