@@ -36,14 +36,14 @@ BINGHAM
 -------
 
 NOW:
- -
- - Remove GSL dependencies
+ - Remove GSL dependencies (solve, det, inv, eigen_symm)
+ - Improve dY -> Z lookup via IDW interpolation
+ - Recompute normalization constants
  - Check for 0 mixtures in bingham_cluster
- - Triangular meshing of S2
 
 
 SOON:
- - Recompute normalization constants
+ - Triangular meshing of S2
  - Speed optimizations
  - Test for memory leaks (continuous operation)
 

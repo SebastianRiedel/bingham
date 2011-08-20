@@ -5,9 +5,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <math.h>
-#include <gsl/gsl_linalg.h>
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_eigen.h>
+#include <float.h>
 #include "bingham/util.h"
 
 
@@ -798,6 +796,15 @@ static void init_rand()
 }
 
 
+// returns a random int between 0 and n-1
+int irand(int n)
+{
+  init_rand();
+
+  return rand() % n;
+}
+
+
 // returns a random double in [0,1]
 double frand()
 {
@@ -1210,21 +1217,16 @@ void cov(double **S, double **X, double *mu, int n, int m)
 
 
 // solve the equation Ax = b, where A is a square n-by-n matrix
-void solve(double x[], double A[], double b[], int n)
+void solve(double *x, double **A, double *b, int n)
 {
-  int s;
-  gsl_matrix_view A_gsl = gsl_matrix_view_array(A, n, n);
-  gsl_vector_view b_gsl = gsl_vector_view_array(b, n);
-  gsl_vector *x_gsl = gsl_vector_alloc(n);
-  gsl_permutation *p = gsl_permutation_alloc(n);
-     
-  gsl_linalg_LU_decomp(&A_gsl.matrix, p, &s);
-  gsl_linalg_LU_solve(&A_gsl.matrix, p, &b_gsl.vector, x_gsl);
+  double **A_inv = new_matrix2(n,n);
+  inv(A_inv, A, n);
 
-  memcpy(x, x_gsl->data, n*sizeof(double));
+  int i;
+  for (i = 0; i < n; i++)
+    x[i] = dot(A_inv[i], b, n);
 
-  gsl_permutation_free(p);
-  gsl_vector_free(x_gsl);
+  free_matrix2(A_inv);
 }
 
 
@@ -1233,8 +1235,10 @@ double det(double **X, int n)
 {
   if (n == 1)
     return X[0][0];
+
   else if (n == 2)
     return X[0][0]*X[1][1] - X[0][1]*X[1][0];
+
   else if (n == 3) {
     double a = X[0][0];
     double b = X[0][1];
@@ -1248,57 +1252,199 @@ double det(double **X, int n)
     return a*e*i - a*f*h + b*f*g - b*d*i + c*d*h - c*e*g;
   }
 
-  int s;
-  gsl_matrix_view X_gsl = gsl_matrix_view_array(X[0], n, n);
-  gsl_permutation *p = gsl_permutation_alloc(n);
-     
-  gsl_linalg_LU_decomp(&X_gsl.matrix, p, &s);
-  double det_X = gsl_linalg_LU_det(&X_gsl.matrix, s);
-  gsl_permutation_free(p);
+  else if (n == 4) {
+    double a00 = X[0][0];
+    double a01 = X[0][1];
+    double a02 = X[0][2];
+    double a03 = X[0][3];
+    double a10 = X[1][0];
+    double a11 = X[1][1];
+    double a12 = X[1][2];
+    double a13 = X[1][3];
+    double a20 = X[2][0];
+    double a21 = X[2][1];
+    double a22 = X[2][2];
+    double a23 = X[2][3];
+    double a30 = X[3][0];
+    double a31 = X[3][1];
+    double a32 = X[3][2];
+    double a33 = X[3][3];
 
-  return det_X;
+    return a00*a11*a22*a33 - a00*a11*a23*a32 - a00*a12*a21*a33 + a00*a12*a23*a31 + a00*a13*a21*a32
+      - a00*a13*a22*a31 - a01*a10*a22*a33 + a01*a10*a23*a32 + a01*a12*a20*a33 - a01*a12*a23*a30
+      - a01*a13*a20*a32 + a01*a13*a22*a30 + a02*a10*a21*a33 - a02*a10*a23*a31 - a02*a11*a20*a33
+      + a02*a11*a23*a30 + a02*a13*a20*a31 - a02*a13*a21*a30 - a03*a10*a21*a32 + a03*a10*a22*a31
+      + a03*a11*a20*a32 - a03*a11*a22*a30 - a03*a12*a20*a31 + a03*a12*a21*a30;
+
+  }
+
+  else {
+    fprintf(stderr, "Error: det() not supported for > 4x4 matrices\n");
+    exit(1);
+  }
+
+  return 0;
 }
 
 
 // compute the inverse (Y) of the n-by-n matrix X
 void inv(double **Y, double **X, int n)
 {
-  int s;
-  gsl_matrix_view X_gsl = gsl_matrix_view_array(X[0], n, n);
-  gsl_matrix_view Y_gsl = gsl_matrix_view_array(Y[0], n, n);
-  gsl_permutation *p = gsl_permutation_alloc(n);
-     
-  gsl_linalg_LU_decomp(&X_gsl.matrix, p, &s);
-  gsl_linalg_LU_invert(&X_gsl.matrix, p, &Y_gsl.matrix);
-  gsl_permutation_free(p);
+  double d = det(X,n);
+
+  if (n == 1)
+    Y[0][0] = 1/d;
+
+  else if (n == 2) {
+    Y[0][0] = X[1][1] / d;
+    Y[0][1] = -X[0][1] / d;
+    Y[1][0] = -X[1][0] / d;
+    Y[1][1] = -X[0][0] / d;
+  }
+
+  else if (n == 3) {
+    Y[0][0] = (X[1][1]*X[2][2] - X[1][2]*X[2][1]) / d;
+    Y[0][1] = (X[0][2]*X[2][1] - X[0][1]*X[2][2]) / d;
+    Y[0][2] = (X[0][1]*X[1][2] - X[0][2]*X[1][1]) / d;
+    Y[1][0] = (X[1][2]*X[2][0] - X[1][0]*X[2][2]) / d;
+    Y[1][1] = (X[0][0]*X[2][2] - X[0][2]*X[2][0]) / d;
+    Y[1][2] = (X[0][2]*X[1][0] - X[0][0]*X[1][2]) / d;
+    Y[2][0] = (X[1][0]*X[2][1] - X[1][1]*X[2][0]) / d;
+    Y[2][1] = (X[0][1]*X[2][0] - X[0][0]*X[2][1]) / d;
+    Y[2][2] = (X[0][0]*X[1][1] - X[0][1]*X[1][0]) / d;
+  }
+
+  else if (n == 4) {
+    double a00 = X[0][0];
+    double a01 = X[0][1];
+    double a02 = X[0][2];
+    double a03 = X[0][3];
+    double a10 = X[1][0];
+    double a11 = X[1][1];
+    double a12 = X[1][2];
+    double a13 = X[1][3];
+    double a20 = X[2][0];
+    double a21 = X[2][1];
+    double a22 = X[2][2];
+    double a23 = X[2][3];
+    double a30 = X[3][0];
+    double a31 = X[3][1];
+    double a32 = X[3][2];
+    double a33 = X[3][3];
+
+    Y[0][0] = (a11*a22*a33 - a11*a23*a32 - a12*a21*a33 + a12*a23*a31 + a13*a21*a32 - a13*a22*a31) / d;
+    Y[0][1] = (a01*a23*a32 - a01*a22*a33 + a02*a21*a33 - a02*a23*a31 - a03*a21*a32 + a03*a22*a31) / d;
+    Y[0][2] = (a01*a12*a33 - a01*a13*a32 - a02*a11*a33 + a02*a13*a31 + a03*a11*a32 - a03*a12*a31) / d;
+    Y[0][3] = (a01*a13*a22 - a01*a12*a23 + a02*a11*a23 - a02*a13*a21 - a03*a11*a22 + a03*a12*a21) / d;
+    Y[1][0] = (a10*a23*a32 - a10*a22*a33 + a12*a20*a33 - a12*a23*a30 - a13*a20*a32 + a13*a22*a30) / d;
+    Y[1][1] = (a00*a22*a33 - a00*a23*a32 - a02*a20*a33 + a02*a23*a30 + a03*a20*a32 - a03*a22*a30) / d;
+    Y[1][2] = (a00*a13*a32 - a00*a12*a33 + a02*a10*a33 - a02*a13*a30 - a03*a10*a32 + a03*a12*a30) / d;
+    Y[1][3] = (a00*a12*a23 - a00*a13*a22 - a02*a10*a23 + a02*a13*a20 + a03*a10*a22 - a03*a12*a20) / d;
+    Y[2][0] = (a10*a21*a33 - a10*a23*a31 - a11*a20*a33 + a11*a23*a30 + a13*a20*a31 - a13*a21*a30) / d;
+    Y[2][1] = (a00*a23*a31 - a00*a21*a33 + a01*a20*a33 - a01*a23*a30 - a03*a20*a31 + a03*a21*a30) / d;
+    Y[2][2] = (a00*a11*a33 - a00*a13*a31 - a01*a10*a33 + a01*a13*a30 + a03*a10*a31 - a03*a11*a30) / d;
+    Y[2][3] = (a00*a13*a21 - a00*a11*a23 + a01*a10*a23 - a01*a13*a20 - a03*a10*a21 + a03*a11*a20) / d;
+    Y[3][0] = (a10*a22*a31 - a10*a21*a32 + a11*a20*a32 - a11*a22*a30 - a12*a20*a31 + a12*a21*a30) / d;
+    Y[3][1] = (a00*a21*a32 - a00*a22*a31 - a01*a20*a32 + a01*a22*a30 + a02*a20*a31 - a02*a21*a30) / d;
+    Y[3][2] = (a00*a12*a31 - a00*a11*a32 + a01*a10*a32 - a01*a12*a30 - a02*a10*a31 + a02*a11*a30) / d;
+    Y[3][3] = (a00*a11*a22 - a00*a12*a21 - a01*a10*a22 + a01*a12*a20 + a02*a10*a21 - a02*a11*a20) / d;
+  }
+
+  else {
+    fprintf(stderr, "Error: inv() not supported for > 4x4 matrices\n");
+    exit(1);
+  }
 }
 
 
 // compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
 void eigen_symm(double z[], double **V, double **X, int n)
 {
-  double A[n*n];
-  //safe_malloc(A, n*n, double);
-  memcpy(A, X[0], n*n*sizeof(double));
+  // naive Jacobi method
+  int i, j;
+  double tolerance = 1e-32;
+  double **A = matrix_clone(X,n,n);
+  double **B = new_matrix2(n,n);
+  double **G = new_matrix2(n,n);
+  double **Gt = new_matrix2(n,n);
 
-  gsl_matrix_view m = gsl_matrix_view_array(A, n, n);
-  gsl_vector *eval = gsl_vector_alloc(n);
-  gsl_matrix *evec = gsl_matrix_alloc(n, n);
-  gsl_eigen_symmv_workspace *w = gsl_eigen_symmv_alloc(n);
+  // initialize V = I
+  for (i = 0; i < n; i++) {
+    V[i][i] = 1;
+    for (j = i+1; j < n; j++)
+      V[i][j] = V[j][i] = 0;
+  }
 
-  gsl_eigen_symmv (&m.matrix, eval, evec, w);  
-  gsl_eigen_symmv_free(w);
-  gsl_eigen_symmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
+  while (1) {
+    // check for convergence
+    double d = 0;
+    for (i = 0; i < n; i++)
+      for (j = i+1; j < n; j++)
+	d += fabs(A[i][j]);
+    if (d < tolerance)
+      break;
 
-  memcpy(z, eval->data, n*sizeof(double));
+    // find largest pivot
+    double pivot = 0;
+    int ip, jp;
+    for (i = 0; i < n; i++) {
+      for (j = i+1; j < n; j++) {
+	double p = fabs(A[i][j]);
+	if (p > pivot) {
+	  pivot = p;
+	  ip = i;
+	  jp = j;
+	}
+      }
+    }
+    
+    // compute Givens theta
+    double a = (A[jp][jp] - A[ip][ip]) / (2 * A[ip][jp]);
+    double t = 1 / (fabs(a) + sqrt(1 + a*a));  // tan
+    if (a < 0)
+      t = -t;
+    double c = 1 / sqrt(1 + t*t);  // cos
+    double s = t*c;  // sin
+    
+    // compute Givens rotation matrix
+    for (i = 0; i < n; i++) {
+      G[i][i] = 1;
+      for (j = i+1; j < n; j++)
+	G[i][j] = G[j][i] = 0;
+    }
+    G[ip][ip] = G[jp][jp] = c;
+    G[ip][jp] = -s;
+    G[jp][ip] = s;
+    
+    // compute new A
+    transpose(Gt, G, n, n);
+    matrix_mult(B, A, G, n, n, n);   // B = A*G
+    matrix_mult(A, Gt, B, n, n, n);  // A = Gt*B
+    
+    // compute new V (with eigenvectors in the rows)
+    matrix_mult(B, Gt, V, n, n, n);  // B = Gt*V
+    matrix_copy(V, B, n, n);     // V = B;
+  }
 
-  double **Vt = new_matrix2(n,n);
-  memcpy(Vt[0], evec->data, n*n*sizeof(double));
-  transpose(V, Vt, n, n);
-  free_matrix2(Vt);
+  // sort eigenvalues
+  int idx[n];
+  double z2[n];
+  for (i = 0; i < n; i++)
+    z[i] = A[i][i];
+  sort_indices(z, idx, n);
+  for (i = 0; i < n; i++)
+    z2[i] = z[idx[i]];
+  for (i = 0; i < n; i++)
+    z[i] = z2[i];
+  for (i = 0; i < n; i++)
+    for (j = 0; j < n; j++)
+      B[i][j] = V[idx[i]][j];
+  matrix_copy(V, B, n, n);
 
-  gsl_vector_free(eval);
-  gsl_matrix_free(evec);
+  free_matrix2(A);
+  free_matrix2(B);
+  free_matrix2(G);
+  free_matrix2(Gt);
 }
 
 
