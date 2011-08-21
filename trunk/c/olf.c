@@ -341,7 +341,7 @@ olf_t *load_olf(char *fname)
   // get cluster weights
   safe_calloc(olf->cluster_weights, num_clusters, double);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = pcd->clusters[i];
+    int c = (int)(pcd->clusters[i]);
     olf->cluster_weights[c]++;
   }
   mult(olf->cluster_weights, olf->cluster_weights, 1/(double)pcd->num_points, num_clusters);
@@ -349,7 +349,7 @@ olf_t *load_olf(char *fname)
   // get mean shapes
   olf->mean_shapes = new_matrix2(num_clusters, olf->shape_length);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = pcd->clusters[i];
+    int c = (int)(pcd->clusters[i]);
     add(olf->mean_shapes[c], olf->mean_shapes[c], S[i], olf->shape_length);
   }
   for (i = 0; i < num_clusters; i++) {
@@ -360,7 +360,7 @@ olf_t *load_olf(char *fname)
   // get shape variances
   safe_calloc(olf->shape_variances, num_clusters, double);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = pcd->clusters[i];
+    int c = (int)(pcd->clusters[i]);
     olf->shape_variances[c] += dist2(S[i], olf->mean_shapes[c], olf->shape_length);
   }
   for (i = 0; i < num_clusters; i++) {
@@ -473,7 +473,7 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
   free_matrix2(R_inv);
 
   // p(q2)
-  int c = pcd->clusters[i];
+  int c = (int)(pcd->clusters[i]);
   double p = bingham_mixture_pdf(q2, &olf->bmx[c]);
 
   // p(x2|q2)
@@ -492,8 +492,68 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
 
 /*
  * samples n weighted poses (X,Q,W) using olf model "olf" and point cloud "pcd"
- */  
+ */
 void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, int n)
 {
+  int num_samples = 5;  // num validation points
+  double lambda = .5;
 
+  int npoints = pcd->num_points;
+
+  /***
+
+  double *q;
+  double *f;
+  int i;
+  for (i = 0; i < n; i++) {
+
+    // sample a point feature
+    int j = irand(npoints);
+    f = pcd->shapes[j];
+
+    if (frand() < .5)
+      q = pcd->quaternions[0][j];
+    else
+      q = pcd->quaternions[1][j];
+
+    
+    // sample a feature orientation
+    int c = (int)(pcd->clusters[j]);
+
+
+
+    // compute the model orientation posterior given the feature
+    BMM = tofoo_posterior(tofoo, q, f);
+    
+    % sample an orientation from the proposal distribution
+    r2 = bingham_mixture_sample(BMM.B, BMM.W, 1);
+    p2 = bingham_mixture_pdf(r2, BMM.B, BMM.W);
+    %r2_err = acos(abs(r2(1)^2 - r2(2)^2 - r2(3)^2 + r2(4)^2))'
+
+    % sample from the proposal distribution of position given orientation
+    xj = [pcd.X(j) pcd.Y(j) pcd.Z(j)];
+    c = find(FCP(j,:));
+    q2 = quaternion_mult(q, qinv(r2));
+    [x_mean x_cov] = qksample_tofoo(q2,c,tofoo);
+    x0 = mvnrnd(x_mean, x_cov);
+    R = quaternionToRotationMatrix(r2);
+    x2 = (xj' - R*x0')';
+    p2 = p2*mvnpdf(x0, x_mean, x_cov);
+    
+    % compute target density for the given orientation 
+    t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP, num_samples, lambda);
+        
+    XQ(i,:) = [x2 r2];
+    W(i) = t2; %/p2;
+    
+    fprintf('.');
+end
+fprintf('\n');
+
+
+[W I] = sort(W,'descend');
+XQ = XQ(I,:);
+W = W/sum(W);
+
+  ***/
 }

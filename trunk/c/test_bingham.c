@@ -502,12 +502,8 @@ void test_bingham_mixture_sample(int argc, char *argv[])
   bingham_mix_t *bmx = load_bmx(argv[1], &k);
   int n = atoi(argv[2]);
 
-  bingham_stats_t stats0[bmx[0].n];
-  for (i = 0; i < bmx[0].n; i++)
-    bingham_stats(&stats0[i], &bmx[0].B[i]);
-
   double **X = new_matrix2(n, d);
-  bingham_mixture_sample(X, &bmx[0], stats0, n);
+  bingham_mixture_sample(X, &bmx[0], n);
 
   bingham_mix_t BM;
   bingham_cluster(&BM, X, n, d);
@@ -536,17 +532,16 @@ void test_bingham_sample(int argc, char *argv[])
   double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
 
   bingham_t B;
-  bingham_stats_t stats;
   bingham_new(&B, 4, Vp, Z);
   print_bingham(&B);
 
   printf("---------------------------\n");
 
-  bingham_stats(&stats, &B);
+  bingham_stats(&B);
 
   double t0 = get_time_ms();
   double **X = new_matrix2(nsamples, 4);
-  bingham_sample(X, &B, &stats, nsamples);
+  bingham_sample(X, &B, nsamples);
   printf("Sampled %d points in %.0f ms\n", nsamples, get_time_ms() - t0);
 
   bingham_fit(&B, X, nsamples, 4);
@@ -565,7 +560,7 @@ void test_bingham_sample(int argc, char *argv[])
   int i, j;
   for (i = 0; i < d; i++) {
     for (j = 0; j < d; j++)
-      printf("%.4f, ", stats.scatter[i][j]);
+      printf("%.4f, ", B.stats->scatter[i][j]);
     printf("\n");
   }
   printf("Sample scatter matrix:\n");
@@ -632,56 +627,53 @@ void test_bingham_compose(int argc, char *argv[])
   int nsamples = atoi(argv[7]);
 
   bingham_t B1;
-  bingham_stats_t stats1;
   double Z1[3] = {z11, z12, z13};
   double V1[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};
   double *Vp1[3] = {&V1[0][0], &V1[1][0], &V1[2][0]};
   bingham_new(&B1, 4, Vp1, Z1);
-  bingham_stats(&stats1, &B1);
+  bingham_stats(&B1);
   print_bingham(&B1);
 
   printf("S1:\n");
   for (i = 0; i < d; i++) {
     for (j = 0; j < d; j++)
-      printf("%.4f, ", stats1.scatter[i][j]);
+      printf("%.4f, ", B1.stats->scatter[i][j]);
     printf("\n");
   }
 
   printf("---------------------------\n");
 
   bingham_t B2;
-  bingham_stats_t stats2;
   double Z2[3] = {z21, z22, z23};
   double V2[3][4] = {{0,1,0,0}, {0,0,1,0}, {0,0,0,1}};  //{{1,0,0,0}, {0,1,0,0}, {0,0,1,0}};
   double *Vp2[3] = {&V2[0][0], &V2[1][0], &V2[2][0]};
   bingham_new(&B2, 4, Vp2, Z2);
-  bingham_stats(&stats2, &B2);
+  bingham_stats(&B2);
   print_bingham(&B2);
 
   printf("S2:\n");
   for (i = 0; i < d; i++) {
     for (j = 0; j < d; j++)
-      printf("%.4f, ", stats2.scatter[i][j]);
+      printf("%.4f, ", B2.stats->scatter[i][j]);
     printf("\n");
   }
 
   printf("---------------------------\n");
 
   // compose with method of moments
-  double **S_mom = new_matrix2(4,4);
+  //double **S_mom = new_matrix2(4,4);
+  bingham_t B_mom;
   double t0 = get_time_ms();
   for (i = 0; i < nsamples; i++)
-    bingham_compose_stats_scatter(S_mom, &stats1, &stats2);
+    bingham_compose(&B_mom, &B1, &B2);
   printf("Composed %d Bingham pairs with Method-of-Moments in %.0f ms\n", nsamples, get_time_ms() - t0);
-  bingham_t B_mom;
-  bingham_fit_scatter(&B_mom, S_mom, 4);
 
   // compose with sampling
   t0 = get_time_ms();
   double **X1 = new_matrix2(nsamples, 4);
-  bingham_sample(X1, &B1, &stats1, nsamples);
+  bingham_sample(X1, &B1, nsamples);
   double **X2 = new_matrix2(nsamples, 4);
-  bingham_sample(X2, &B2, &stats2, nsamples);
+  bingham_sample(X2, &B2, nsamples);
 
   double **Y = new_matrix2(nsamples, 4);
   for (i = 0; i < nsamples; i++)
@@ -699,9 +691,10 @@ void test_bingham_compose(int argc, char *argv[])
 
 
   printf("Method-of-Moments scatter matrix:\n");
+  bingham_stats(&B_mom);
   for (i = 0; i < d; i++) {
     for (j = 0; j < d; j++)
-      printf("%.4f, ", S_mom[i][j]);
+      printf("%.4f, ", B_mom.stats->scatter[i][j]);
     printf("\n");
   }
   printf("---------------------------\n");
@@ -1083,18 +1076,17 @@ void test_bingham_stats(int argc, char *argv[])
 
   int i, j, n = 1; //1000000;
   double t0 = get_time_ms();
-  bingham_stats_t stats;
   for (i = 0; i < n; i++)
-    bingham_stats(&stats, &B);
+    bingham_stats(&B);
   printf("Computed stats %d times in %.0f ms\n", n, get_time_ms() - t0);
 
-  printf("stats.mode = [ %f %f %f %f ]\n", stats.mode[0], stats.mode[1], stats.mode[2], stats.mode[3]);
-  printf("stats.dF = [ %f %f %f ]\n", stats.dF[0], stats.dF[1], stats.dF[2]);
-  printf("stats.entropy = %f\n", stats.entropy);
+  printf("B.stats->mode = [ %f %f %f %f ]\n", B.stats->mode[0], B.stats->mode[1], B.stats->mode[2], B.stats->mode[3]);
+  printf("B.stats->dF = [ %f %f %f ]\n", B.stats->dF[0], B.stats->dF[1], B.stats->dF[2]);
+  printf("B.stats->entropy = %f\n", B.stats->entropy);
   for (i = 0; i < B.d; i++) {
-    printf("stats.scatter[%d] = [ ", i);
+    printf("B.stats->scatter[%d] = [ ", i);
     for (j = 0; j < B.d; j++)
-      printf("%f ", stats.scatter[i][j]);
+      printf("%f ", B.stats->scatter[i][j]);
     printf("]\n");
   }
 
@@ -1104,7 +1096,7 @@ void test_bingham_stats(int argc, char *argv[])
   printf("bingham_dF2_table[%d][%d][%d] = %f\n", yi, yi, yi, bingham_dF2_table_get(yi,yi,yi));
   printf("bingham_dF3_table[%d][%d][%d] = %f\n", yi, yi, yi, bingham_dF3_table_get(yi,yi,yi));
 
-  bingham_fit_scatter(&B, stats.scatter, B.d);
+  bingham_fit_scatter(&B, B.stats->scatter, B.d);
 
   print_bingham(&B);
 }
@@ -1156,29 +1148,28 @@ void test_bingham_KL_divergence(int argc, char *argv[])
   print_bingham(&B2);
   printf("\n");
 
-  bingham_stats_t s1, s2;
-  bingham_stats(&s1, &B1);
-  bingham_stats(&s2, &B2);
+  bingham_stats(&B1);
+  bingham_stats(&B2);
 
   int i, j;
   printf("\n");
-  printf("s1.mode = [ %f %f %f %f ]\n", s1.mode[0], s1.mode[1], s1.mode[2], s1.mode[3]);
-  printf("s1.dF = [ %f %f %f ]\n", s1.dF[0], s1.dF[1], s1.dF[2]);
-  printf("s1.entropy = %f\n", s1.entropy);
+  printf("B1.stats->mode = [ %f %f %f %f ]\n", B1.stats->mode[0], B1.stats->mode[1], B1.stats->mode[2], B1.stats->mode[3]);
+  printf("B1.stats->dF = [ %f %f %f ]\n", B1.stats->dF[0], B1.stats->dF[1], B1.stats->dF[2]);
+  printf("B1.stats->entropy = %f\n", B1.stats->entropy);
   for (i = 0; i < B1.d; i++) {
-    printf("s1.scatter[%d] = [ ", i);
+    printf("B1.stats->scatter[%d] = [ ", i);
     for (j = 0; j < B1.d; j++)
-      printf("%f ", s1.scatter[i][j]);
+      printf("%f ", B1.stats->scatter[i][j]);
     printf("]\n");
   }
   printf("\n");
-  printf("s2.mode = [ %f %f %f %f ]\n", s2.mode[0], s2.mode[1], s2.mode[2], s2.mode[3]);
-  printf("s2.dF = [ %f %f %f ]\n", s2.dF[0], s2.dF[1], s2.dF[2]);
-  printf("s2.entropy = %f\n", s2.entropy);
+  printf("B2.stats->mode = [ %f %f %f %f ]\n", B2.stats->mode[0], B2.stats->mode[1], B2.stats->mode[2], B2.stats->mode[3]);
+  printf("B2.stats->dF = [ %f %f %f ]\n", B2.stats->dF[0], B2.stats->dF[1], B2.stats->dF[2]);
+  printf("B2.stats->entropy = %f\n", B2.stats->entropy);
   for (i = 0; i < B2.d; i++) {
-    printf("s2.scatter[%d] = [ ", i);
+    printf("B2.stats->scatter[%d] = [ ", i);
     for (j = 0; j < B2.d; j++)
-      printf("%f ", s2.scatter[i][j]);
+      printf("%f ", B2.stats->scatter[i][j]);
     printf("]\n");
   }
 
@@ -1187,26 +1178,25 @@ void test_bingham_KL_divergence(int argc, char *argv[])
   double t0 = get_time_ms();
   double d_KL;
   for (i = 0; i < n; i++)
-    d_KL = bingham_KL_divergence(&s1, &s2);
+    d_KL = bingham_KL_divergence(&B1, &B2);
   printf("Computed KL divergence %d times in %.0f ms\n", n, get_time_ms() - t0);
   printf("d_KL = %f\n", d_KL);
 
   bingham_t B;
-  bingham_stats_t stats;
-  bingham_merge(&B, &s1, &s2, .5);
-  bingham_stats(&stats, &B);
+  bingham_merge(&B, &B1, &B2, .5);
+  bingham_stats(&B);
 
   printf("\nMerged binghams:\n");
   print_bingham(&B);
 
   printf("\n");
-  printf("stats.mode = [ %f %f %f %f ]\n", stats.mode[0], stats.mode[1], stats.mode[2], stats.mode[3]);
-  printf("stats.dF = [ %f %f %f ]\n", stats.dF[0], stats.dF[1], stats.dF[2]);
-  printf("stats.entropy = %f\n", stats.entropy);
+  printf("B.stats->mode = [ %f %f %f %f ]\n", B.stats->mode[0], B.stats->mode[1], B.stats->mode[2], B.stats->mode[3]);
+  printf("B.stats->dF = [ %f %f %f ]\n", B.stats->dF[0], B.stats->dF[1], B.stats->dF[2]);
+  printf("B.stats->entropy = %f\n", B.stats->entropy);
   for (i = 0; i < B.d; i++) {
-    printf("stats.scatter[%d] = [ ", i);
+    printf("B.stats->scatter[%d] = [ ", i);
     for (j = 0; j < B.d; j++)
-      printf("%f ", stats.scatter[i][j]);
+      printf("%f ", B.stats->scatter[i][j]);
     printf("]\n");
   }
 }

@@ -61,12 +61,10 @@ void test_hll_sample(int argc, char *argv[])
 
   // get timing info for bingham sampling
   bingham_t B;
-  bingham_stats_t stats;
   bingham_fit(&B, Q, n, 4);
-  bingham_stats(&stats, &B);
   t = get_time_ms();
   for (i = 0; i < 1000; i++)
-    bingham_sample(&q, &B, &stats, 1);
+    bingham_sample(&q, &B, 1);
   printf("Got %d samples from p(q) in %f ms\n", 1000, get_time_ms() - t);
 }
 
