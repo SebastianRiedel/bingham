@@ -24,14 +24,14 @@ int main(int argc, char *argv[])
   double *Vp[3] = {&V[0][0], &V[1][0], &V[2][0]};
 
   bingham_t B;
-  bingham_stats_t stats;
   bingham_new(&B, 4, Vp, Z);
-  bingham_stats(&stats, &B);
 
   double **X = new_matrix2(nsamples, 4);
-  bingham_sample(X, &B, &stats, nsamples);
+  bingham_sample(X, &B, nsamples);
 
   int i;
   for (i = 0; i < nsamples; i++)
     printf("%f %f %f %f\n", X[i][0], X[i][1], X[i][2], X[i][3]);
+
+  return 0;
 }

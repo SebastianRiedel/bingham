@@ -396,7 +396,7 @@ double bingham_F(bingham_t *B)
 
 
 /*
- * Copy the contents of one bingham distribution into another.
+ * Copy the contents (but not the stats) of one bingham distribution into another.
  * Note: bingham_copy() blindly allocates space for dst->V and dst->Z
  * without freeing them first, so it should only be called on a freshly
  * allocated bingham_t struct.
@@ -414,6 +414,22 @@ void bingham_copy(bingham_t *dst, bingham_t *src)
   memcpy(dst->Z, src->Z, (d-1)*sizeof(double));
 
   dst->F = src->F;
+
+  dst->stats = NULL;
+}
+
+
+/*
+ * Frees a bingham_stats_t.
+ */
+void bingham_stats_free(bingham_stats_t *stats)
+{
+  if (stats->mode)
+    free(stats->mode);
+  if (stats->dF)
+    free(stats->dF);
+  if (stats->scatter)
+    free_matrix2(stats->scatter);
 }
 
 
@@ -424,6 +440,10 @@ void bingham_free(bingham_t *B)
 {
   free_matrix2(B->V);
   free(B->Z);
+  if (B->stats) {
+    bingham_stats_free(B->stats);
+    free(B->stats);
+  }
 }
 
 
@@ -435,6 +455,7 @@ void bingham_alloc(bingham_t *B, int d)
   B->d = d;
   B->V = new_matrix2(d-1, d);
   safe_malloc(B->Z, d-1, double);
+  B->stats = NULL;
 }
 
 
@@ -467,6 +488,8 @@ void bingham_new(bingham_t *B, int d, double **V, double *Z)
     B->F = bingham_F_lookup_3d(B->Z);
   else
     bingham_F(B);
+
+  B->stats = NULL;
 }
 
 
@@ -618,7 +641,7 @@ void bingham_mode(double *mode, bingham_t *B)
   printf("b = [%f %f %f]\n", b[0], b[1], b[2]);
   */
 
-  solve(x, Vcut[0], b, d-1);
+  solve(x, Vcut, b, d-1);
 
   //printf("x = [%f %f %f]\n\n", x[0], x[1], x[2]);
 
@@ -636,40 +659,42 @@ void bingham_mode(double *mode, bingham_t *B)
 
 /*
  * Computes some statistics of a bingham.
- * Note: allocates space in stats.
+ * Note: allocates space in B->stats.
  */
-void bingham_stats(bingham_stats_t *stats, bingham_t *B)
+void bingham_stats(bingham_t *B)
 {
+  if (B->stats)
+    return;
+
   int i, j, d = B->d;
   double F = B->F;
 
-  memset(stats, 0, sizeof(bingham_stats_t));
-  stats->B = B;
+  safe_calloc(B->stats, 1, bingham_stats_t);
 
   // look up dF
-  safe_calloc(stats->dF, d-1, double);
+  safe_calloc(B->stats->dF, d-1, double);
   if (d == 4)
-    bingham_dF_lookup_3d(stats->dF, B->Z);
+    bingham_dF_lookup_3d(B->stats->dF, B->Z);
   else if (d == 3) {
-    stats->dF[0] = bingham_dF1_2d(B->Z[0], B->Z[1]);
-    stats->dF[1] = bingham_dF2_2d(B->Z[0], B->Z[1]);
+    B->stats->dF[0] = bingham_dF1_2d(B->Z[0], B->Z[1]);
+    B->stats->dF[1] = bingham_dF2_2d(B->Z[0], B->Z[1]);
   }
   else if (d == 2)
-    stats->dF[0] = bingham_dF_1d(B->Z[0]);
+    B->stats->dF[0] = bingham_dF_1d(B->Z[0]);
   else {
     fprintf(stderr, "Error: bingham_stats() only supports 1D, 2D, and 3D binghams.\n");
   }
 
   // compute the entropy
-  stats->entropy = log(F);
+  B->stats->entropy = log(F);
   for (i = 0; i < d-1; i++)
-    stats->entropy -= B->Z[i] * stats->dF[i] / F;
+    B->stats->entropy -= B->Z[i] * B->stats->dF[i] / F;
 
   if (!bingham_is_uniform(B)) {
 
     // compute the mode
-    safe_calloc(stats->mode, d, double);
-    bingham_mode(stats->mode, B);
+    safe_calloc(B->stats->mode, d, double);
+    bingham_mode(B->stats->mode, B);
 
     // compute the scatter matrix
     double **Si = new_matrix2(d, d);
@@ -677,11 +702,11 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
     double **v;
     double *vt[d];
     double sigma;
-    v = &stats->mode;
+    v = &B->stats->mode;
     for (j = 0; j < d; j++)
       vt[j] = &v[0][j];
     matrix_mult(Si, vt, v, d, 1, d);
-    sigma = 1 - sum(stats->dF, d-1)/F;
+    sigma = 1 - sum(B->stats->dF, d-1)/F;
     mult(Si[0], Si[0], sigma, d*d);
     matrix_add(S, S, Si, d, d);
     for (i = 0; i < d-1; i++) {
@@ -689,53 +714,42 @@ void bingham_stats(bingham_stats_t *stats, bingham_t *B)
       for (j = 0; j < d; j++)
 	vt[j] = &v[0][j];
       matrix_mult(Si, vt, v, d, 1, d);
-      sigma = stats->dF[i]/F;
+      sigma = B->stats->dF[i]/F;
       mult(Si[0], Si[0], sigma, d*d);
       matrix_add(S, S, Si, d, d);
     }
     free_matrix2(Si);
-    stats->scatter = S;
+    B->stats->scatter = S;
   }
   else {  // bingham is uniform
-    stats->scatter = new_matrix2(d, d);
+    B->stats->scatter = new_matrix2(d, d);
     for (i = 0; i < d; i++)
-      stats->scatter[i][i] = 1.0/(double)d;
+      B->stats->scatter[i][i] = 1.0/(double)d;
   }
-}
-
-
-/*
- * Frees a bingham_stats_t (but not the underlying bingham_t).
- */
-void bingham_stats_free(bingham_stats_t *stats)
-{
-  if (stats->mode)
-    free(stats->mode);
-  if (stats->dF)
-    free(stats->dF);
-  if (stats->scatter)
-    free_matrix2(stats->scatter);
 }
 
 
 /*
  * Computes the cross entropy H(B1,B2) between two binghams.
  */
-double bingham_cross_entropy(bingham_stats_t *s1, bingham_stats_t *s2)
+double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
 {
+  bingham_stats(B1);
+  bingham_stats(B2);
+
   int i, j;
-  int d = s1->B->d;
-  double F1 = s1->B->F;
-  double **V1 = s1->B->V;
-  double *dF1 = s1->dF;
-  double F2 = s2->B->F;
-  double *Z2 = s2->B->Z;
-  double **V2 = s2->B->V;
+  int d = B1->d;
+  double F1 = B1->F;
+  double **V1 = B1->V;
+  double *dF1 = B1->stats->dF;
+  double F2 = B2->F;
+  double *Z2 = B2->Z;
+  double **V2 = B2->V;
 
   // compute the full, transposed V1
   double **V1_ft = new_matrix2(d, d);
   for (i = 0; i < d; i++)
-    V1_ft[i][0] = s1->mode[i];
+    V1_ft[i][0] = B1->stats->mode[i];
   for (i = 0; i < d; i++)
     for (j = 1; j < d; j++)
       V1_ft[i][j] = V1[j-1][i];
@@ -779,23 +793,27 @@ double bingham_cross_entropy(bingham_stats_t *s1, bingham_stats_t *s2)
 /*
  * Computes the KL divergence D_KL(B1||B2) between two binghams.
  */
-double bingham_KL_divergence(bingham_stats_t *s1, bingham_stats_t *s2)
+double bingham_KL_divergence(bingham_t *B1, bingham_t *B2)
 {
-  return bingham_cross_entropy(s1, s2) - s1->entropy;
+  bingham_stats(B1);
+
+  return bingham_cross_entropy(B1, B2) - B1->stats->entropy;
 }
 
 
 /*
  * Merge two binghams: B = a*B1 + (1-a)*B2.
  */
-void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, double alpha)
+void bingham_merge(bingham_t *B, bingham_t *B1, bingham_t *B2, double alpha)
 {
-  int d = s1->B->d;
+  bingham_stats(B1);
+  bingham_stats(B2);
 
+  int d = B1->d;
   double **S = new_matrix2(d, d);
-  matrix_copy(S, s2->scatter, d, d);
+  matrix_copy(S, B2->stats->scatter, d, d);
   mult(S[0], S[0], (1-alpha)/alpha, d*d);
-  matrix_add(S, S, s1->scatter, d, d);
+  matrix_add(S, S, B1->stats->scatter, d, d);
   mult(S[0], S[0], alpha, d*d);
 
   bingham_fit_scatter(B, S, d);
@@ -807,37 +825,42 @@ void bingham_merge(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2, doubl
 /*
  * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
  * as the Bingham distribution is not closed under composition.
- * Returns the scatter matrix.
  */
-void bingham_compose_stats_scatter(double **S, bingham_stats_t *s1, bingham_stats_t *s2)
+void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
 {
-  double d = s1->B->d;
+  bingham_stats(B1);
+  bingham_stats(B2);
+
+  double d = B1->d;
+
   if (d != 4) {
     fprintf(stderr, "Error: bingham_compose() is only implemented for d = 4!  Exiting...\n");
     exit(1);
   }
 
-  double a11 = s1->scatter[0][0];
-  double a12 = s1->scatter[0][1];
-  double a13 = s1->scatter[0][2];
-  double a14 = s1->scatter[0][3];
-  double a22 = s1->scatter[1][1];
-  double a23 = s1->scatter[1][2];
-  double a24 = s1->scatter[1][3];
-  double a33 = s1->scatter[2][2];
-  double a34 = s1->scatter[2][3];
-  double a44 = s1->scatter[3][3];
+  double a11 = B1->stats->scatter[0][0];
+  double a12 = B1->stats->scatter[0][1];
+  double a13 = B1->stats->scatter[0][2];
+  double a14 = B1->stats->scatter[0][3];
+  double a22 = B1->stats->scatter[1][1];
+  double a23 = B1->stats->scatter[1][2];
+  double a24 = B1->stats->scatter[1][3];
+  double a33 = B1->stats->scatter[2][2];
+  double a34 = B1->stats->scatter[2][3];
+  double a44 = B1->stats->scatter[3][3];
 
-  double b11 = s2->scatter[0][0];
-  double b12 = s2->scatter[0][1];
-  double b13 = s2->scatter[0][2];
-  double b14 = s2->scatter[0][3];
-  double b22 = s2->scatter[1][1];
-  double b23 = s2->scatter[1][2];
-  double b24 = s2->scatter[1][3];
-  double b33 = s2->scatter[2][2];
-  double b34 = s2->scatter[2][3];
-  double b44 = s2->scatter[3][3];
+  double b11 = B2->stats->scatter[0][0];
+  double b12 = B2->stats->scatter[0][1];
+  double b13 = B2->stats->scatter[0][2];
+  double b14 = B2->stats->scatter[0][3];
+  double b22 = B2->stats->scatter[1][1];
+  double b23 = B2->stats->scatter[1][2];
+  double b24 = B2->stats->scatter[1][3];
+  double b33 = B2->stats->scatter[2][2];
+  double b34 = B2->stats->scatter[2][3];
+  double b44 = B2->stats->scatter[3][3];
+
+  double **S = new_matrix2(d, d);
 
   S[0][0] =
     a11*b11 - 2*a12*b12 - 2*a13*b13 - 2*a14*b14 + a22*b22 + 2*a23*b23 + 2*a24*b24 + a33*b33 + 2*a34*b34 + a44*b44;
@@ -865,35 +888,9 @@ void bingham_compose_stats_scatter(double **S, bingham_stats_t *s1, bingham_stat
     a33*b12 + a34*b11 + a23*b24 + a24*b23 - a12*b44 - a22*b34 - a34*b22 + a44*b12;
   S[3][3] =
     2*a14*b14 - 2*a13*b24 + 2*a24*b13 + 2*a12*b34 - 2*a23*b23 - 2*a34*b12 + a11*b44 + a22*b33 + a33*b22 + a44*b11;
-}
 
-
-/*
- * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
- * as the Bingham distribution is not closed under composition.
- */
-void bingham_compose_stats(bingham_t *B, bingham_stats_t *s1, bingham_stats_t *s2)
-{
-  double d = s1->B->d;
-  double **S = new_matrix2(d, d);
-  bingham_compose_stats_scatter(S, s1, s2);
   bingham_fit_scatter(B, S, d);
   free_matrix2(S);
-}
-
-
-/*
- * Compose two S^3 Binghams: B = quaternion_mult(B1,B2).  Note that this is an approximation,
- * as the Bingham distribution is not closed under composition.
- */
-void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
-{
-  bingham_stats_t s1, s2;
-  bingham_stats(&s1, B1);
-  bingham_stats(&s2, B2);
-  bingham_compose_stats(B, &s1, &s2);
-  bingham_stats_free(&s1);
-  bingham_stats_free(&s2);
 }
 
 
@@ -1045,6 +1042,8 @@ void bingham_fit_scatter(bingham_t *B, double **S, int d)
   //printf("Computed MLE (grad) in %.2f ms:  Z = (%f, %f, %f) --> L = %f\n", t1-t0, B->Z[0], B->Z[1], B->Z[2], L);
 
   free(eigenvals);
+
+  B->stats = NULL;
 }
 
 
@@ -1093,17 +1092,17 @@ void bingham_discretize(bingham_pmf_t *pmf, bingham_t *B, int ncells)
 /*
  * Bingham mixture sampler
  */
-void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_stats, int n)
+void bingham_mixture_sample(double **X, bingham_mix_t *BM, int n)
 {
   int i, j;
 
   if (n == 1) {
     i = pmfrand(BM->w, BM->n);
-    bingham_sample(X, &BM->B[i], &BM_stats[i], 1);
+    bingham_sample(X, &BM->B[i], 1);
   }
   else if (n < 100) {
     for (i = 0; i < n; i++)
-      bingham_mixture_sample(&X[i], BM, BM_stats, 1);
+      bingham_mixture_sample(&X[i], BM, 1);
   }
   else {
     // apportion samples to each mixture component
@@ -1132,7 +1131,7 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, bingham_stats_t *BM_s
     // get ni[i] samples from each component, BM->B[i]
     ntot = 0;
     for (i = 0; i < BM->n; i++) {
-      bingham_sample(&X[ntot], &BM->B[i], &BM_stats[i], ni[i]);
+      bingham_sample(&X[ntot], &BM->B[i], ni[i]);
       ntot += ni[i];
     }
   }
@@ -1156,18 +1155,19 @@ void bingham_sample_uniform(double **X, int d, int n)
 /*
  * Metroplis-Hastings sampler for the Bingham distribution.
  */
-void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
+void bingham_sample(double **X, bingham_t *B, int n)
 {
   if (bingham_is_uniform(B)) {
     bingham_sample_uniform(X, B->d, n);
     return;
   }
 
+  bingham_stats(B);
+
   int burn_in = 10;
   int sample_rate = 1;
 
   int i, j, d = B->d;
-  double F = B->F;
   double x[d], x2[d];
   double pcs[d];
   double **V = new_matrix2(d,d);
@@ -1175,7 +1175,7 @@ void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
   for (i = 0; i < d; i++)
     mu[i] = 0;
 
-  eigen_symm(pcs, V, stats->scatter, d);
+  eigen_symm(pcs, V, B->stats->scatter, d);
   //printf("pcs = [");
   for (i = 0; i < d; i++) {
     pcs[i] = sqrt(pcs[i]);
@@ -1183,7 +1183,7 @@ void bingham_sample(double **X, bingham_t *B, bingham_stats_t *stats, int n)
   }
   //printf("]\n");
 
-  memcpy(x, stats->mode, d*sizeof(double));
+  memcpy(x, B->stats->mode, d*sizeof(double));
 
   double t = bingham_pdf(x, B);              // target
   double p = acgpdf_pcs(x, pcs, V, d);   // proposal
@@ -1931,9 +1931,9 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
   char sbuf[1024], *s = sbuf;
   int c;
   while (!feof(f)) {
-    fgets(s, 1024, f);
-    if (s[0] == 'B' && sscanf(s, "B %d", &c) && c+1 > *k)
-      *k = c+1;
+    if (fgets(s, 1024, f))
+      if (s[0] == 'B' && sscanf(s, "B %d", &c) && c+1 > *k)
+	*k = c+1;
   }
   rewind(f);
 
@@ -1942,9 +1942,9 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
   // get the number of binghams in each mixture
   int i;
   while (!feof(f)) {
-    fgets(s, 1024, f);
-    if (s[0] == 'B' && sscanf(s, "B %d %d", &c, &i) == 2 && i+1 > BM[c].n)
-      BM[c].n = i+1;
+    if (fgets(s, 1024, f))
+      if (s[0] == 'B' && sscanf(s, "B %d %d", &c, &i) == 2 && i+1 > BM[c].n)
+	BM[c].n = i+1;
   }
   rewind(f);
 
@@ -1961,43 +1961,44 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
   while (!feof(f)) {
     line++;
     s = sbuf;
-    fgets(s, 1024, f);
-    if (s[0] == 'B' && sscanf(s, "B %d %d %lf %d", &c, &i, &w, &d) == 4) {
-      BM[c].w[i] = w;
-      BM[c].B[i].d = d;
-      BM[c].B[i].Z = (double *)calloc(d-1, sizeof(double));
-      BM[c].B[i].V = new_matrix2(d-1, d);
-      s = sword(s, " \t", 5);
-      if (sscanf(s, "%lf", &BM[c].B[i].F) < 1)  // read F
-	break;
-      s = sword(s, " \t", 1);
-
-      for (j = 0; j < d-1; j++) {  // read dF -- dbug: add dF to bingham_t
-	if (sscanf(s, "%lf", &xxx) < 1)
+    if (fgets(s, 1024, f)) {
+      if (s[0] == 'B' && sscanf(s, "B %d %d %lf %d", &c, &i, &w, &d) == 4) {
+	BM[c].w[i] = w;
+	BM[c].B[i].d = d;
+	BM[c].B[i].Z = (double *)calloc(d-1, sizeof(double));
+	BM[c].B[i].V = new_matrix2(d-1, d);
+	s = sword(s, " \t", 5);
+	if (sscanf(s, "%lf", &BM[c].B[i].F) < 1)  // read F
 	  break;
 	s = sword(s, " \t", 1);
-      }
-      if (j < d-1)  // error
-	break;
-
-      for (j = 0; j < d-1; j++) {  // read Z
-	if (sscanf(s, "%lf", &BM[c].B[i].Z[j]) < 1)
-	  break;
-	s = sword(s, " \t", 1);
-      }
-      if (j < d-1)  // error
-	break;
-      for (j = 0; j < d-1; j++) {  // read V
-	for (j2 = 0; j2 < d; j2++) {
-	  if (sscanf(s, "%lf", &BM[c].B[i].V[j][j2]) < 1)
+	
+	for (j = 0; j < d-1; j++) {  // read dF -- dbug: add dF to bingham_t
+	  if (sscanf(s, "%lf", &xxx) < 1)
 	    break;
 	  s = sword(s, " \t", 1);
 	}
-	if (j2 < d)  // error
+	if (j < d-1)  // error
+	  break;
+	
+	for (j = 0; j < d-1; j++) {  // read Z
+	  if (sscanf(s, "%lf", &BM[c].B[i].Z[j]) < 1)
+	    break;
+	  s = sword(s, " \t", 1);
+	}
+	if (j < d-1)  // error
+	  break;
+	for (j = 0; j < d-1; j++) {  // read V
+	  for (j2 = 0; j2 < d; j2++) {
+	    if (sscanf(s, "%lf", &BM[c].B[i].V[j][j2]) < 1)
+	      break;
+	    s = sword(s, " \t", 1);
+	  }
+	  if (j2 < d)  // error
+	    break;
+	}
+	if (j < d-1)  // error
 	  break;
       }
-      if (j < d-1)  // error
-	break;
     }
   }
   if (!feof(f)) {  // error
@@ -2021,7 +2022,6 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
 
   FILE *f = fopen(fout, "w");
   int c, i, j, k;
-  bingham_stats_t stats;
 
   for (c = 0; c < num_clusters; c++) {
     for (i = 0; i < BM[c].n; i++) {
@@ -2032,8 +2032,8 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
       double *Z = BM[c].B[i].Z;
       double **V = BM[c].B[i].V;
 
-      bingham_stats(&stats, &BM[c].B[i]);
-      double *dF = stats.dF;
+      bingham_stats(&BM[c].B[i]);
+      double *dF = BM[c].B[i].stats->dF;
 
       fprintf(f, "B %d %d %f ", c, i, w);
       fprintf(f, "%d %f ", d, F);
@@ -2045,8 +2045,6 @@ void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout)
 	for (k = 0; k < d; k++)
 	  fprintf(f, "%f ", V[j][k]);
       fprintf(f, "\n");
-
-      bingham_stats_free(&stats);
     }
   }
 

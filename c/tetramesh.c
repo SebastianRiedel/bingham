@@ -416,180 +416,6 @@ void tetramesh_subdivide(tetramesh_t *dst, tetramesh_t *src)
   //free_midpoint_map(&M);
 }
 
-// TODO: generalize to N-D
-static void adjust_edge_4d(tetramesh_t *mesh, graph_t *graph, int i, int j)
-{
-  int iter = 100;
-  double thresh = .0001;
-  
-  int d = mesh->d;
-  double *u = mesh->vertices[i];
-  double *v = mesh->vertices[j];
-
-  //double rx[4] = {.1*frand(), .1*frand(), .1*frand(), .1*frand()};
-  //double ry[4] = {.1*frand(), .1*frand(), .1*frand(), .1*frand()};
-  //add(u, u, rx, d);
-  //add(v, v, ry, d);
-  
-  double a[4] = {0,0,0,0};
-  double b[4] = {0,0,0,0};
-  ilist_t *tmp;
-  for (tmp = graph->vertices[i].neighbors; tmp; tmp = tmp->next)
-    if (tmp->x != j)
-      add(a, a, mesh->vertices[tmp->x], d);
-  for (tmp = graph->vertices[j].neighbors; tmp; tmp = tmp->next)
-    if (tmp->x != i)
-      add(b, b, mesh->vertices[tmp->x], d);
-
-  int k;
-  for (k = 0; k < iter; k++) {
-    double F[] = {(v[1]+a[1])*u[0] - (v[0]+a[0])*u[1],
-		  (v[2]+a[2])*u[0] - (v[0]+a[0])*u[2],
-		  (v[3]+a[3])*u[0] - (v[0]+a[0])*u[3],
-		  (u[1]+b[1])*v[0] - (u[0]+b[0])*v[1],
-		  (u[2]+b[2])*v[0] - (u[0]+b[0])*v[2],
-		  (u[3]+b[3])*v[0] - (u[0]+b[0])*v[3],
-		  norm(u, d) - 1,
-		  norm(v, d) - 1};
-
-    //printf("  u = (%f, %f, %f, %f)\n", u[0], u[1], u[2], u[3]);
-    //printf("  v = (%f, %f, %f, %f)\n", v[0], v[1], v[2], v[3]);
-    //printf("  a = (%f, %f, %f, %f)\n", a[0], a[1], a[2], a[3]);
-    //printf("  b = (%f, %f, %f, %f)\n", b[0], b[1], b[2], b[3]);
-
-    //printf("  k = %d, norm(F) = %f\n", k, norm(F,8));
-
-    if (norm(F, 8) < thresh)
-      break;
-
-    double J[] = {v[1]+a[1],  -v[0]-a[0],           0,           0,       -u[1],        u[0],           0,           0,
-		  v[2]+a[2],           0,  -v[0]-a[0],           0,       -u[2],           0,        u[0],           0,
-		  v[3]+a[3],           0,           0,  -v[0]-a[0],       -u[3],           0,           0,        u[0],
-		  -v[1],            v[0],           0,           0,   u[1]+b[1],  -u[0]-b[0],           0,           0,
-		  -v[2],               0,        v[0],           0,   u[2]+b[2],           0,  -u[0]-b[0],           0,
-		  -v[3],               0,           0,        v[0],   u[3]+b[3],           0,           0,  -u[0]-b[0],
-		  2*u[0],         2*u[1],      2*u[2],      2*u[3],           0,           0,           0,           0,
-		  0,                   0,           0,           0,      2*v[0],      2*v[1],      2*v[2],      2*v[3]};
-
-    double duv[8];
-    mult(F, F, -1, d);
-    solve(duv, J, F, d);
-
-    //printf("  duv = (%f, %f, %f, %f, %f, %f, %f, %f)\n", duv[0], duv[1], duv[2], duv[3], duv[4], duv[5], duv[6], duv[7]);
-
-    add(u, u, duv, d);
-    add(v, v, duv+d, d);
-  }
-}
-
-
-void tetramesh_smooth_edges(tetramesh_t *dst, tetramesh_t *src, double w)
-{
-  graph_t *graph = tetramesh_graph(src);
-
-  if (dst != src)
-    tetramesh_copy(dst, src);
-  
-  int i;
-  for (i = 0; i < graph->ne; i++)
-    adjust_edge_4d(dst, graph, graph->edges[i].i, graph->edges[i].j);
-}
-
-
-void tetramesh_smooth2(tetramesh_t *dst, tetramesh_t *src, double w)
-{
-  int i, j, d = src->d;
-  double p[d];
-  ilist_t *v;
-  graph_t *graph = tetramesh_graph(src);
-
-  if (dst != src)
-    tetramesh_copy(dst, src);
-
-  for (i = 0; i < graph->nv; i++) {
-    memset(p, 0, d * sizeof(double));                          // p = 0
-    for (v = graph->vertices[i].neighbors; v; v = v->next) {
-      j = v->x;
-      //      printf("  dst->vertices[%d] = (%.2f, %.2f, %.2f, %.2f) --> dist(%d,%d) = %f\n",
-      //	     j, dst->vertices[j][0], dst->vertices[j][1], dst->vertices[j][2], dst->vertices[j][3],
-      //	     i, j, dist(dst->vertices[i], dst->vertices[j], d));
-      add(p, p, dst->vertices[j], d);                          // p += dst->vertices[j]
-    }
-    mult(p, p, 1/norm(p, d), d);                               // p = p/norm(p)
-    //    printf("p = (%.2f, %.2f, %.2f, %.2f), dst->vertices[i] = (%.2f, %.2f, %.2f, %.2f)\n",
-    //	   p[0], p[1], p[2], p[3], dst->vertices[i][0], dst->vertices[i][1], dst->vertices[i][2], dst->vertices[i][3]);
-    wavg(dst->vertices[i], p, dst->vertices[i], w, d);         // dst->vertices[i] = w*p + (1-w)*dst->vertices[i]
-  }
-}
-
-
-/*
- * Smooth the tetrahedral mesh
- */
-void tetramesh_smooth(tetramesh_t *dst, tetramesh_t *src, double w)
-{
-  // Laplacian
-  //static double L[4][4] = {{0, 1/3.0, 1/3.0, 1/3.0},
-  //			     {1/3.0, 0, 1/3.0, 1/3.0},
-  //			     {1/3.0, 1/3.0, 0, 1/3.0},
-  //			     {1/3.0, 1/3.0, 1/3.0, 0}};
-
-  int i, j, i0, i1, i2, i3;
-  int nv = src->nv;
-  int nt = src->nt;
-  int d = src->d;
-  tetramesh_t tmp;
-  int cnt[nv];
-
-  tetramesh_new(&tmp, nv, nt, d);
-  memset(cnt, 0, nv*sizeof(int));
-
-  for (i = 0; i < nt; i++) {      // for each tetrahedron
-
-    i0 = src->tetrahedra[i][0];
-    i1 = src->tetrahedra[i][1];
-    i2 = src->tetrahedra[i][2];
-    i3 = src->tetrahedra[i][3];
-
-    double *p0 = src->vertices[i0];
-    double *p1 = src->vertices[i1];
-    double *p2 = src->vertices[i2];
-    double *p3 = src->vertices[i3];
-
-    double m0[d], m1[d], m2[d], m3[d];
-
-    avg3(m0, p1, p2, p3, d);
-    avg3(m1, p0, p2, p3, d);
-    avg3(m2, p0, p1, p3, d);
-    avg3(m3, p0, p1, p2, d);
-
-    wavg(m0, m0, p0, w, d);
-    wavg(m1, m1, p1, w, d);
-    wavg(m2, m2, p2, w, d);
-    wavg(m3, m3, p3, w, d);
-
-    add(tmp.vertices[i0], tmp.vertices[i0], m0, d);
-    add(tmp.vertices[i1], tmp.vertices[i1], m1, d);
-    add(tmp.vertices[i2], tmp.vertices[i2], m2, d);
-    add(tmp.vertices[i3], tmp.vertices[i3], m3, d);
-
-    cnt[i0]++;
-    cnt[i1]++;
-    cnt[i2]++;
-    cnt[i3]++;
-  }
-
-  for (i = 0; i < nv; i++)
-    for (j = 0; j < d; j++)
-      tmp.vertices[i][j] /= (double) cnt[i];
-
-  tetramesh_copy_vertices(dst, &tmp);
-  tetramesh_copy_tetrahedra(dst, src);
-
-  tetramesh_free(&tmp);
-}
-
-
 
 /*
  * Copy the contents of one mesh into another mesh.
@@ -698,7 +524,7 @@ void tetramesh_save_PLY_colors(tetramesh_t *mesh, meshgraph_t *graph, char *file
     fprintf(f, "\n");
   }
 
-  int *face_colors;
+  int *face_colors = NULL;
   if (colors) {
     // determine what color each face should be
     safe_calloc(face_colors, num_faces, int);
@@ -916,3 +742,191 @@ void tetramesh_print_stats(tetramesh_stats_t stats)
 
   printf("}\n");
 }
+
+
+
+
+
+
+
+
+
+
+
+/**********  DEPRECATED  ***********
+
+
+
+static void adjust_edge_4d(tetramesh_t *mesh, graph_t *graph, int i, int j)
+{
+  int iter = 100;
+  double thresh = .0001;
+  
+  int d = mesh->d;
+  double *u = mesh->vertices[i];
+  double *v = mesh->vertices[j];
+
+  //double rx[4] = {.1*frand(), .1*frand(), .1*frand(), .1*frand()};
+  //double ry[4] = {.1*frand(), .1*frand(), .1*frand(), .1*frand()};
+  //add(u, u, rx, d);
+  //add(v, v, ry, d);
+  
+  double a[4] = {0,0,0,0};
+  double b[4] = {0,0,0,0};
+  ilist_t *tmp;
+  for (tmp = graph->vertices[i].neighbors; tmp; tmp = tmp->next)
+    if (tmp->x != j)
+      add(a, a, mesh->vertices[tmp->x], d);
+  for (tmp = graph->vertices[j].neighbors; tmp; tmp = tmp->next)
+    if (tmp->x != i)
+      add(b, b, mesh->vertices[tmp->x], d);
+
+  int k;
+  for (k = 0; k < iter; k++) {
+    double F[] = {(v[1]+a[1])*u[0] - (v[0]+a[0])*u[1],
+		  (v[2]+a[2])*u[0] - (v[0]+a[0])*u[2],
+		  (v[3]+a[3])*u[0] - (v[0]+a[0])*u[3],
+		  (u[1]+b[1])*v[0] - (u[0]+b[0])*v[1],
+		  (u[2]+b[2])*v[0] - (u[0]+b[0])*v[2],
+		  (u[3]+b[3])*v[0] - (u[0]+b[0])*v[3],
+		  norm(u, d) - 1,
+		  norm(v, d) - 1};
+
+    //printf("  u = (%f, %f, %f, %f)\n", u[0], u[1], u[2], u[3]);
+    //printf("  v = (%f, %f, %f, %f)\n", v[0], v[1], v[2], v[3]);
+    //printf("  a = (%f, %f, %f, %f)\n", a[0], a[1], a[2], a[3]);
+    //printf("  b = (%f, %f, %f, %f)\n", b[0], b[1], b[2], b[3]);
+
+    //printf("  k = %d, norm(F) = %f\n", k, norm(F,8));
+
+    if (norm(F, 8) < thresh)
+      break;
+
+    double J[] = {v[1]+a[1],  -v[0]-a[0],           0,           0,       -u[1],        u[0],           0,           0,
+		  v[2]+a[2],           0,  -v[0]-a[0],           0,       -u[2],           0,        u[0],           0,
+		  v[3]+a[3],           0,           0,  -v[0]-a[0],       -u[3],           0,           0,        u[0],
+		  -v[1],            v[0],           0,           0,   u[1]+b[1],  -u[0]-b[0],           0,           0,
+		  -v[2],               0,        v[0],           0,   u[2]+b[2],           0,  -u[0]-b[0],           0,
+		  -v[3],               0,           0,        v[0],   u[3]+b[3],           0,           0,  -u[0]-b[0],
+		  2*u[0],         2*u[1],      2*u[2],      2*u[3],           0,           0,           0,           0,
+		  0,                   0,           0,           0,      2*v[0],      2*v[1],      2*v[2],      2*v[3]};
+
+    double duv[8];
+    mult(F, F, -1, d);
+    solve(duv, J, F, d);
+
+    //printf("  duv = (%f, %f, %f, %f, %f, %f, %f, %f)\n", duv[0], duv[1], duv[2], duv[3], duv[4], duv[5], duv[6], duv[7]);
+
+    add(u, u, duv, d);
+    add(v, v, duv+d, d);
+  }
+}
+
+
+void tetramesh_smooth_edges(tetramesh_t *dst, tetramesh_t *src, double w)
+{
+  graph_t *graph = tetramesh_graph(src);
+
+  if (dst != src)
+    tetramesh_copy(dst, src);
+  
+  int i;
+  for (i = 0; i < graph->ne; i++)
+    adjust_edge_4d(dst, graph, graph->edges[i].i, graph->edges[i].j);
+}
+
+
+void tetramesh_smooth2(tetramesh_t *dst, tetramesh_t *src, double w)
+{
+  int i, j, d = src->d;
+  double p[d];
+  ilist_t *v;
+  graph_t *graph = tetramesh_graph(src);
+
+  if (dst != src)
+    tetramesh_copy(dst, src);
+
+  for (i = 0; i < graph->nv; i++) {
+    memset(p, 0, d * sizeof(double));                          // p = 0
+    for (v = graph->vertices[i].neighbors; v; v = v->next) {
+      j = v->x;
+      //      printf("  dst->vertices[%d] = (%.2f, %.2f, %.2f, %.2f) --> dist(%d,%d) = %f\n",
+      //	     j, dst->vertices[j][0], dst->vertices[j][1], dst->vertices[j][2], dst->vertices[j][3],
+      //	     i, j, dist(dst->vertices[i], dst->vertices[j], d));
+      add(p, p, dst->vertices[j], d);                          // p += dst->vertices[j]
+    }
+    mult(p, p, 1/norm(p, d), d);                               // p = p/norm(p)
+    //    printf("p = (%.2f, %.2f, %.2f, %.2f), dst->vertices[i] = (%.2f, %.2f, %.2f, %.2f)\n",
+    //	   p[0], p[1], p[2], p[3], dst->vertices[i][0], dst->vertices[i][1], dst->vertices[i][2], dst->vertices[i][3]);
+    wavg(dst->vertices[i], p, dst->vertices[i], w, d);         // dst->vertices[i] = w*p + (1-w)*dst->vertices[i]
+  }
+}
+
+
+// Smooth the tetrahedral mesh
+void tetramesh_smooth(tetramesh_t *dst, tetramesh_t *src, double w)
+{
+  // Laplacian
+  //static double L[4][4] = {{0, 1/3.0, 1/3.0, 1/3.0},
+  //			     {1/3.0, 0, 1/3.0, 1/3.0},
+  //			     {1/3.0, 1/3.0, 0, 1/3.0},
+  //			     {1/3.0, 1/3.0, 1/3.0, 0}};
+
+  int i, j, i0, i1, i2, i3;
+  int nv = src->nv;
+  int nt = src->nt;
+  int d = src->d;
+  tetramesh_t tmp;
+  int cnt[nv];
+
+  tetramesh_new(&tmp, nv, nt, d);
+  memset(cnt, 0, nv*sizeof(int));
+
+  for (i = 0; i < nt; i++) {      // for each tetrahedron
+
+    i0 = src->tetrahedra[i][0];
+    i1 = src->tetrahedra[i][1];
+    i2 = src->tetrahedra[i][2];
+    i3 = src->tetrahedra[i][3];
+
+    double *p0 = src->vertices[i0];
+    double *p1 = src->vertices[i1];
+    double *p2 = src->vertices[i2];
+    double *p3 = src->vertices[i3];
+
+    double m0[d], m1[d], m2[d], m3[d];
+
+    avg3(m0, p1, p2, p3, d);
+    avg3(m1, p0, p2, p3, d);
+    avg3(m2, p0, p1, p3, d);
+    avg3(m3, p0, p1, p2, d);
+
+    wavg(m0, m0, p0, w, d);
+    wavg(m1, m1, p1, w, d);
+    wavg(m2, m2, p2, w, d);
+    wavg(m3, m3, p3, w, d);
+
+    add(tmp.vertices[i0], tmp.vertices[i0], m0, d);
+    add(tmp.vertices[i1], tmp.vertices[i1], m1, d);
+    add(tmp.vertices[i2], tmp.vertices[i2], m2, d);
+    add(tmp.vertices[i3], tmp.vertices[i3], m3, d);
+
+    cnt[i0]++;
+    cnt[i1]++;
+    cnt[i2]++;
+    cnt[i3]++;
+  }
+
+  for (i = 0; i < nv; i++)
+    for (j = 0; j < d; j++)
+      tmp.vertices[i][j] /= (double) cnt[i];
+
+  tetramesh_copy_vertices(dst, &tmp);
+  tetramesh_copy_tetrahedra(dst, src);
+
+  tetramesh_free(&tmp);
+}
+
+******************************************************/
+
+

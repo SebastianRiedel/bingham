@@ -49,6 +49,7 @@ SOON:
 
 
 DONE:
+ + Move bingham_stats_t inside bingham_t and lazy auto compute stats
  + Use bingham_F_lookup_3d() in bingham_new()
  + bingham_mixture_sample()
  + bingham_sample_uniform()
