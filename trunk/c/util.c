@@ -889,6 +889,27 @@ int pmfrand(double *w, int n) {
 }
 
 
+// sample from a multivariate normal
+void mvnrand(double *x, double *mu, double **S, int d)
+{
+  double z[d], **V = new_matrix2(d,d);
+  eigen_symm(z,V,S,d);
+  mvnrand_pcs(x,mu,z,V,d);
+  free_matrix2(V);
+}
+
+
+// compute a multivariate normal pdf
+double mvnpdf(double *x, double *mu, double **S, int d)
+{
+  double z[d], **V = new_matrix2(d,d);
+  eigen_symm(z,V,S,d);
+  double p = mvnpdf_pcs(x,mu,z,V,d);
+  free_matrix2(V);
+  return p;
+}
+
+
 // sample from a multivariate normal in principal components form
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d)
 {
@@ -1171,6 +1192,15 @@ void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
 	Z[i][j] += X[i][k]*Y[k][j];
     }
   }
+}
+
+
+// matrix-vector multiplication, y = A*x
+void matrix_vec_mult(double *y, double **A, double *x, int n, int m)
+{
+  int i;
+  for (i = 0; i < n; i++)
+    y[i] = dot(A[i], x, m);
 }
 
 
