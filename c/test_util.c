@@ -316,10 +316,10 @@ int main(int argc, char *argv[])
   //test_normrand(argc, argv);
   //test_safe_alloc();
   //test_sort_indices();
-  //test_mvnrand_pcs(argc, argv);
+  test_mvnrand_pcs(argc, argv);
   //test_mvnpdf_pcs(argc, argv);
   //test_pmfrand(argc, argv);
-  test_mink();
+  //test_mink();
 
   return 0;
 }
