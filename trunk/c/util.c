@@ -1405,7 +1405,15 @@ void eigen_symm(double z[], double **V, double **X, int n)
       V[i][j] = V[j][i] = 0;
   }
 
+  //printf("break 1\n");  //dbug
+
   while (1) {
+
+    //dbug
+    //printf("A:\n");
+    //print_matrix(A, n, n);
+    //printf("\n");
+
     // check for convergence
     double d = 0;
     for (i = 0; i < n; i++)
@@ -1413,6 +1421,8 @@ void eigen_symm(double z[], double **V, double **X, int n)
 	d += fabs(A[i][j]);
     if (d < tolerance)
       break;
+
+    //printf("d = %f\n", d);  //dbug
 
     // find largest pivot
     double pivot = 0;
@@ -1427,15 +1437,19 @@ void eigen_symm(double z[], double **V, double **X, int n)
 	}
       }
     }
+
+    //printf("pivot = %f, ip = %d, jp = %d\n", pivot, ip, jp);  //dbug
     
-    // compute Givens theta
+    // compute Givens cos, sin
     double a = (A[jp][jp] - A[ip][ip]) / (2 * A[ip][jp]);
     double t = 1 / (fabs(a) + sqrt(1 + a*a));  // tan
     if (a < 0)
       t = -t;
     double c = 1 / sqrt(1 + t*t);  // cos
     double s = t*c;  // sin
-    
+
+    //printf("a = %f, t = %f, c = %f, s = %f\n", a, t, c, s);  //dbug
+
     // compute Givens rotation matrix
     for (i = 0; i < n; i++) {
       G[i][i] = 1;
@@ -1443,8 +1457,13 @@ void eigen_symm(double z[], double **V, double **X, int n)
 	G[i][j] = G[j][i] = 0;
     }
     G[ip][ip] = G[jp][jp] = c;
-    G[ip][jp] = -s;
-    G[jp][ip] = s;
+    G[ip][jp] = s;
+    G[jp][ip] = -s;
+
+    //dbug
+    //printf("givens rotation matrix:\n");
+    //print_matrix(G, n, n);
+    //printf("\n");
     
     // compute new A
     transpose(Gt, G, n, n);
@@ -1454,7 +1473,11 @@ void eigen_symm(double z[], double **V, double **X, int n)
     // compute new V (with eigenvectors in the rows)
     matrix_mult(B, Gt, V, n, n, n);  // B = Gt*V
     matrix_copy(V, B, n, n);     // V = B;
+
+    printf("------------------------------\n\n");
   }
+
+  //printf("break 2\n");  //dbug
 
   // sort eigenvalues
   int idx[n];
@@ -1475,6 +1498,17 @@ void eigen_symm(double z[], double **V, double **X, int n)
   free_matrix2(B);
   free_matrix2(G);
   free_matrix2(Gt);
+}
+
+
+void print_matrix(double **X, int n, int m)
+{
+  int i, j;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++)
+      printf("%f ", X[i][j]);
+    printf("\n");
+  }
 }
 
 

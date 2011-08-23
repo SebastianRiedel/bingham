@@ -102,6 +102,7 @@ void mean(double *mu, double **X, int n, int m);                            /* r
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 
+void print_matrix(double **X, int n, int m);
 
 
 
