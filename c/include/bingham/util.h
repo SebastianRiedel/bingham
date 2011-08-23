@@ -44,6 +44,8 @@ double normrand(double mu, double sigma);               /* generate a random sam
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 int pmfrand(double *w, int n);                          /* samples from the probability mass function w with n elements */
 
+void mvnrand(double *x, double *mu, double **S, int d);   /* sample from a multivariate normal */
+double mvnpdf(double *x, double *mu, double **S, int d);  /* compute a multivariate normal pdf */
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d);   /* sample from a multivariate normal in principal components form */
 double mvnpdf_pcs(double *x, double *mu, double *z, double **V, int d);  /* compute a multivariate normal pdf in principal components form */
 void acgrand_pcs(double *x, double *z, double **V, int d);   /* sample from an angular central gaussian in principal components form */
@@ -94,6 +96,7 @@ void matrix_copy(double **Y, double **X, int n, int m);                     /* m
 double **matrix_clone(double **X, int n, int m);                            /* matrix clone, Y = new(X) */
 void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* matrix addition, Z = X+Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
+void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* matrix-vector multiplication, y = A*x */
 void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
 void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */

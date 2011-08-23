@@ -273,8 +273,8 @@ int pcd_add_channel(pcd_t *pcd, char *channel)
 {
   int ch = pcd_channel(pcd, channel);
   if (ch >= 0) {
-    fprintf("Warning: channel %s already exists\n", channel);
-    return;
+    fprintf("Warning: channel %d already exists\n", channel);
+    return ch;
   }
 
   // add channel name
@@ -500,60 +500,53 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
 
   int npoints = pcd->num_points;
 
-  /***
-
-  double *q;
-  double *f;
+  double *q_feature, q_model_to_feature[4], q_feature_to_model[4], q_model[4];
+  double x_mean[3], **x_cov = new_matrix2(3,3);
+  double *x_feature, x_model_to_feature[3], x_model_to_feature_rot[3], x_model[3];
+  double z[3], **V = new_matrix2(3,3);
+  double **R = new_matrix2(3,3);
   int i;
   for (i = 0; i < n; i++) {
 
     // sample a point feature
     int j = irand(npoints);
-    f = pcd->shapes[j];
 
     if (frand() < .5)
-      q = pcd->quaternions[0][j];
+      q_feature = pcd->quaternions[0][j];
     else
-      q = pcd->quaternions[1][j];
+      q_feature = pcd->quaternions[1][j];
 
-    
-    // sample a feature orientation
+    // sample model orientation
     int c = (int)(pcd->clusters[j]);
+    bingham_mixture_sample(&q_model_to_feature, &olf->bmx[c], 1);
+    quaternion_inverse(q_feature_to_model, q_model_to_feature);
+    quaternion_mult(q_model, q_feature_to_model, q_feature);
+
+    // sample model position given orientation
+    x_feature = pcd->points[j];
+    hll_sample(&x_mean, &x_cov, &q_model_to_feature, &olf->hll[c], 1);
+    mvnrand(x_model_to_feature, x_mean, x_cov, 3);
+    quaternion_to_rotation_matrix(R, q_model);
+    matrix_vec_mult(x_model_to_feature_rot, R, x_model_to_feature, 3, 3);
+    sub(x_model, x_feature, x_model_to_feature_rot, 3);
+
+    // compute target density for the given orientation 
 
 
-
-    // compute the model orientation posterior given the feature
-    BMM = tofoo_posterior(tofoo, q, f);
-    
-    % sample an orientation from the proposal distribution
-    r2 = bingham_mixture_sample(BMM.B, BMM.W, 1);
-    p2 = bingham_mixture_pdf(r2, BMM.B, BMM.W);
-    %r2_err = acos(abs(r2(1)^2 - r2(2)^2 - r2(3)^2 + r2(4)^2))'
-
-    % sample from the proposal distribution of position given orientation
-    xj = [pcd.X(j) pcd.Y(j) pcd.Z(j)];
-    c = find(FCP(j,:));
-    q2 = quaternion_mult(q, qinv(r2));
-    [x_mean x_cov] = qksample_tofoo(q2,c,tofoo);
-    x0 = mvnrnd(x_mean, x_cov);
-    R = quaternionToRotationMatrix(r2);
-    x2 = (xj' - R*x0')';
-    p2 = p2*mvnpdf(x0, x_mean, x_cov);
-    
-    % compute target density for the given orientation 
-    t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP, num_samples, lambda);
+    /*
+      t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP, num_samples, lambda);
         
-    XQ(i,:) = [x2 r2];
-    W(i) = t2; %/p2;
+      XQ(i,:) = [x2 r2];
+      W(i) = t2; %/p2;
     
-    fprintf('.');
-end
-fprintf('\n');
+      fprintf('.');
+      end
+      fprintf('\n');
+      
 
-
-[W I] = sort(W,'descend');
-XQ = XQ(I,:);
-W = W/sum(W);
-
-  ***/
+      [W I] = sort(W,'descend');
+      XQ = XQ(I,:);
+      W = W/sum(W);
+    */
+  }
 }
