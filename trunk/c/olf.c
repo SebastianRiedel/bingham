@@ -20,7 +20,6 @@ void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int 
 {
   int i;
   double nx, ny, nz, pcx, pcy, pcz, pcx2, pcy2, pcz2;
-  double q[4];
   double **R = new_matrix2(3,3);
 
   for (i = 0; i < num_points; i++) {
@@ -166,55 +165,56 @@ pcd_t *load_pcd(char *f_pcd)
 
   char sbuf[1024], *s = sbuf;
   while (!feof(f)) {
-    fgets(s, 1024, f);
+    if (fgets(s, 1024, f)) {
     
-    if (!wordcmp(s, "COLUMNS", " \t\n") || !wordcmp(s, "FIELDS", " \t\n")) {
-      s = sword(s, " \t", 1);
-      pcd->channels = split(s, " \t", &pcd->num_channels);
+      if (!wordcmp(s, "COLUMNS", " \t\n") || !wordcmp(s, "FIELDS", " \t\n")) {
+	s = sword(s, " \t", 1);
+	pcd->channels = split(s, " \t", &pcd->num_channels);
 
-      /* TODO: make a file converter?
-      replace_word(pcd->channels, pcd->num_channels, "normal_x", "nx");
-      replace_word(pcd->channels, pcd->num_channels, "normal_y", "ny");
-      replace_word(pcd->channels, pcd->num_channels, "normal_z", "nz");
-      replace_word(pcd->channels, pcd->num_channels, "principal_curvature_x", "pcx");
-      replace_word(pcd->channels, pcd->num_channels, "principal_curvature_y", "pcy");
-      replace_word(pcd->channels, pcd->num_channels, "principal_curvature_z", "pcz");
-      //s = strrep(s, 'fpfh', ['f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 ' ...
-     //                       'f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 f32 f33']);
-     */
+	/* TODO: make a file converter?
+	   replace_word(pcd->channels, pcd->num_channels, "normal_x", "nx");
+	   replace_word(pcd->channels, pcd->num_channels, "normal_y", "ny");
+	   replace_word(pcd->channels, pcd->num_channels, "normal_z", "nz");
+	   replace_word(pcd->channels, pcd->num_channels, "principal_curvature_x", "pcx");
+	   replace_word(pcd->channels, pcd->num_channels, "principal_curvature_y", "pcy");
+	   replace_word(pcd->channels, pcd->num_channels, "principal_curvature_z", "pcz");
+	   //s = strrep(s, 'fpfh', ['f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 ' ...
+	   //                       'f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 f32 f33']);
+	   */
 
-    }
-    else if (!wordcmp(s, "POINTS", " \t\n")) {
-      s = sword(s, " \t", 1);
-      sscanf(s, "%d", &pcd->num_points);
-    }
-    else if (!wordcmp(s, "DATA", " \t\n")) {
-      s = sword(s, " \t", 1);
-      if (wordcmp(s, "ascii", " \t\n")) {
-	fprintf(stderr, "Error: only ascii pcd files are supported.\n");
-	pcd_free(pcd);
-	free(pcd);
-	return NULL;
       }
-      safe_calloc(pcd->data, pcd->num_channels, double *);
-      for (i = 0; i < pcd->num_channels; i++)
-	safe_calloc(pcd->data[i], pcd->num_points, double);
-      for (i = 0; i < pcd->num_points; i++) {
-	if (fgets(s, 1024, f) == NULL)
-	  break;
-	for (j = 0; j < pcd->num_channels; j++) {
-	  if (sscanf(s, "%lf", &pcd->data[j][i]) < 1)
-	    break;
-	  s = sword(s, " \t", 1);
+      else if (!wordcmp(s, "POINTS", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &pcd->num_points);
+      }
+      else if (!wordcmp(s, "DATA", " \t\n")) {
+	s = sword(s, " \t", 1);
+	if (wordcmp(s, "ascii", " \t\n")) {
+	  fprintf(stderr, "Error: only ascii pcd files are supported.\n");
+	  pcd_free(pcd);
+	  free(pcd);
+	  return NULL;
 	}
-	if (j < pcd->num_channels)
-	  break;
-      }
-      if (i < pcd->num_points) {
-	fprintf(stderr, "Error: corrupt pcd data at row %d\n", i);
-	pcd_free(pcd);
-	free(pcd);
-	return NULL;
+	safe_calloc(pcd->data, pcd->num_channels, double *);
+	for (i = 0; i < pcd->num_channels; i++)
+	  safe_calloc(pcd->data[i], pcd->num_points, double);
+	for (i = 0; i < pcd->num_points; i++) {
+	  if (fgets(s, 1024, f) == NULL)
+	    break;
+	  for (j = 0; j < pcd->num_channels; j++) {
+	    if (sscanf(s, "%lf", &pcd->data[j][i]) < 1)
+	      break;
+	    s = sword(s, " \t", 1);
+	  }
+	  if (j < pcd->num_channels)
+	    break;
+	}
+	if (i < pcd->num_points) {
+	  fprintf(stderr, "Error: corrupt pcd data at row %d\n", i);
+	  pcd_free(pcd);
+	  free(pcd);
+	  return NULL;
+	}
       }
     }
   }
@@ -273,7 +273,7 @@ int pcd_add_channel(pcd_t *pcd, char *channel)
 {
   int ch = pcd_channel(pcd, channel);
   if (ch >= 0) {
-    fprintf("Warning: channel %d already exists\n", channel);
+    printf("Warning: channel %s already exists\n", channel);
     return ch;
   }
 
@@ -293,7 +293,7 @@ int pcd_add_channel(pcd_t *pcd, char *channel)
 
 
 /*
- * loads an olf from fname.pcd and fname.olf
+ * loads an olf from fname.pcd and fname.bmx
  */
 olf_t *load_olf(char *fname)
 {
@@ -479,7 +479,7 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
   // p(x2|q2)
   double x_mean[3];
   double **x_cov = new_matrix2(3,3);
-  hll_sample(&x_mean, &x_cov, &q2, &olf->hll[c], 1);
+  hll_sample((double **)&x_mean, &x_cov, (double **)&q2, &olf->hll[c], 1);
   double z[3], **V = new_matrix2(3,3);
   eigen_symm(z, V, x_cov, 3);
   p *= mvnpdf_pcs(x2, x_mean, z, V, 3);
@@ -500,11 +500,12 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
 
   int npoints = pcd->num_points;
 
-  double *q_feature, q_model_to_feature[4], q_feature_to_model[4], q_model[4];
+  double *q_feature, q_model_to_feature[4], q_feature_to_model[4];
   double x_mean[3], **x_cov = new_matrix2(3,3);
-  double *x_feature, x_model_to_feature[3], x_model_to_feature_rot[3], x_model[3];
+  double *x_feature, x_model_to_feature[3], x_model_to_feature_rot[3];
   double z[3], **V = new_matrix2(3,3);
   double **R = new_matrix2(3,3);
+  int indices[num_samples];
   int i;
   for (i = 0; i < n; i++) {
 
@@ -518,35 +519,39 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
 
     // sample model orientation
     int c = (int)(pcd->clusters[j]);
-    bingham_mixture_sample(&q_model_to_feature, &olf->bmx[c], 1);
+    bingham_mixture_sample((double **)&q_model_to_feature, &olf->bmx[c], 1);
     quaternion_inverse(q_feature_to_model, q_model_to_feature);
-    quaternion_mult(q_model, q_feature_to_model, q_feature);
+    quaternion_mult(Q[i], q_feature_to_model, q_feature);
 
     // sample model position given orientation
     x_feature = pcd->points[j];
-    hll_sample(&x_mean, &x_cov, &q_model_to_feature, &olf->hll[c], 1);
+    hll_sample((double **)&x_mean, &x_cov, (double **)&q_model_to_feature, &olf->hll[c], 1);
     mvnrand(x_model_to_feature, x_mean, x_cov, 3);
-    quaternion_to_rotation_matrix(R, q_model);
+    quaternion_to_rotation_matrix(R, Q[i]);
     matrix_vec_mult(x_model_to_feature_rot, R, x_model_to_feature, 3, 3);
-    sub(x_model, x_feature, x_model_to_feature_rot, 3);
+    sub(X[i], x_feature, x_model_to_feature_rot, 3);
 
-    // compute target density for the given orientation 
-
-
-    /*
-      t2 = sope_cloud_pdf(x2, r2, tofoo, pcd, FCP, num_samples, lambda);
-        
-      XQ(i,:) = [x2 r2];
-      W(i) = t2; %/p2;
-    
-      fprintf('.');
-      end
-      fprintf('\n');
-      
-
-      [W I] = sort(W,'descend');
-      XQ = XQ(I,:);
-      W = W/sum(W);
-    */
+    // compute target density for the given pose
+    int k;
+    for (k = 0; k < num_samples; k++)
+      indices[k] = irand(npoints);     
+    W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_samples);
   }
+
+  // sort pose samples by weight
+  int I[n];
+  double W2[n];
+  mult(W2, W, -1, n);
+  sort_indices(W2, I, n);  // sort -W (i.e. descending W)
+  for (i = 0; i < n; i++)
+    W[i] = -W2[I[i]];
+  reorder_rows(X, I, n, 3);
+  reorder_rows(Q, I, n, 4);
+
+  // normalize W
+  mult(W, W, 1.0/sum(W,n), n);
+
+  free_matrix2(x_cov);
+  free_matrix2(V);
+  free_matrix2(R);
 }
