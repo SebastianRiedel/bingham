@@ -1501,6 +1501,17 @@ void eigen_symm(double z[], double **V, double **X, int n)
 }
 
 
+// reorder the rows of X, X = X(idx,:)
+void reorder_rows(double **X, int *idx, int n, int m)
+{
+  double **X2 = matrix_clone(X, n, m);
+  int i;
+  for (i = 0; i < n; i++)
+    memcpy(X[i], X2[idx[i]], m*sizeof(double));
+  free_matrix2(X2);
+}
+
+
 void print_matrix(double **X, int n, int m)
 {
   int i, j;
