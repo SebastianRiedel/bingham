@@ -1404,11 +1404,13 @@ void eigen_symm(double z[], double **V, double **X, int n)
 {
   // naive Jacobi method
   int i, j;
-  double tolerance = 1e-32;
+  double tolerance = 1e-10;
   double **A = matrix_clone(X,n,n);
   double **B = new_matrix2(n,n);
   double **G = new_matrix2(n,n);
   double **Gt = new_matrix2(n,n);
+
+  int cnt = 1; //dbug
 
   // initialize V = I
   for (i = 0; i < n; i++) {
@@ -1427,14 +1429,19 @@ void eigen_symm(double z[], double **V, double **X, int n)
     //printf("\n");
 
     // check for convergence
-    double d = 0;
-    for (i = 0; i < n; i++)
+    double d_off = 0, d_diag = 0;
+    for (i = 0; i < n; i++) {
+      d_diag += A[i][i]*A[i][i];
       for (j = i+1; j < n; j++)
-	d += fabs(A[i][j]);
-    if (d < tolerance)
+	d_off = MAX(d_off, fabs(A[i][j]));
+    }
+    d_diag = sqrt(d_diag / (double)n);
+    if (d_off < tolerance * d_diag)
       break;
 
-    //printf("d = %f\n", d);  //dbug
+    //dbug
+    if (cnt++ % 1000 == 0)
+      fprintf(stderr, "d_off / d_diag = %e\n", d_off / d_diag);  //dbug
 
     // find largest pivot
     double pivot = 0;

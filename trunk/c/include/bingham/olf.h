@@ -28,6 +28,7 @@ extern "C" {
 
     // computed data
     double **quaternions[2];
+    kdtree_t *points_kdtree;
 
   } pcd_t;
 

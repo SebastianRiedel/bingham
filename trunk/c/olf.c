@@ -55,7 +55,7 @@ void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int 
  */
 static void pcd_add_data_pointers(pcd_t *pcd)
 {
-  int i;
+  int i, j;
   int ch_cluster = pcd_channel(pcd, "cluster");
   int ch_x = pcd_channel(pcd, "x");
   int ch_y = pcd_channel(pcd, "y");
@@ -103,6 +103,11 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->quaternions[1] = new_matrix2(pcd->num_points, 4);
     compute_orientation_quaternions(pcd->quaternions, pcd->normals, pcd->principal_curvatures, pcd->num_points);
   }
+
+  // add points kdtree
+  double **X = new_matrix2(pcd->num_points, 3);
+  transpose(X, pcd->points, 3, pcd->num_points);
+  pcd->points_kdtree = kdtree(X, pcd->num_points, 3);
 }
 
 
@@ -156,6 +161,20 @@ static int pcd_has_olf_channels(pcd_t *pcd)
 }
 
 
+static void pcd_random_walk(int *I, pcd_t *pcd, int i0, int n, double sigma)
+{
+  I[0] = i0;
+  int cnt, i = i0;
+  double x[3];
+  for (cnt = 1; cnt < n; cnt++) {
+    x[0] = normrand(pcd->points[0][i], sigma);
+    x[1] = normrand(pcd->points[1][i], sigma);
+    x[2] = normrand(pcd->points[2][i], sigma);
+
+    i = kdtree_NN(pcd->points_kdtree, x);
+    I[cnt] = i;
+  }
+}
 
 
 
@@ -598,7 +617,16 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     //int k;
     //for (k = 0; k < num_validators; k++)
     //  indices[k] = irand(npoints);
-    randperm(indices, npoints, num_validators);
+    //randperm(indices, npoints, num_validators);
+
+    //dbug: test random walk
+    double sigma = 30;
+    int indices_walk[10*num_validators];
+    pcd_random_walk(indices_walk, pcd, j, 10*num_validators, sigma/10.0);
+    int k;
+    for (k = 0; k < num_validators; k++)
+      indices[k] = indices_walk[10*k];
+
     W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
   }
 
