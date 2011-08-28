@@ -1563,7 +1563,7 @@ void eigen_symm(double z[], double **V, double **X, int n)
 void reorder_rows(double **Y, double **X, int *idx, int n, int m)
 {
   int i;
-  double **X2 = matrix_clone(X, imax(idx,n), m);
+  double **X2 = matrix_clone(X, imax(idx,n) + 1, m);
   for (i = 0; i < n; i++)
     memcpy(Y[i], X2[idx[i]], m*sizeof(double));
   free_matrix2(X2);
