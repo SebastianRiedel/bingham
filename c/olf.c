@@ -55,7 +55,7 @@ void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int 
  */
 static void pcd_add_data_pointers(pcd_t *pcd)
 {
-  int i, j;
+  int i;
   int ch_cluster = pcd_channel(pcd, "cluster");
   int ch_x = pcd_channel(pcd, "x");
   int ch_y = pcd_channel(pcd, "y");
@@ -102,12 +102,28 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->quaternions[0] = new_matrix2(pcd->num_points, 4);
     pcd->quaternions[1] = new_matrix2(pcd->num_points, 4);
     compute_orientation_quaternions(pcd->quaternions, pcd->normals, pcd->principal_curvatures, pcd->num_points);
+
+    // add quaternion cluster kdtrees
+    if (ch_cluster>=0) {
+      int num_clusters = max(pcd->clusters, pcd->num_points) + 1;
+      safe_calloc(pcd->quaternion_kdtrees, num_clusters, kdtree_t*);
+      int I[pcd->num_points];
+      double **Q = new_matrix2(2*pcd->num_points, 4);
+      for (i = 0; i < num_clusters; i++) {
+	int n = findeq(I, pcd->clusters, i, pcd->num_points);
+	reorder_rows(Q, pcd->quaternions[0], I, n, 4);
+	reorder_rows(&Q[n], pcd->quaternions[1], I, n, 4);
+	pcd->quaternion_kdtrees[i] = kdtree(Q, 2*n, 4);
+      }
+      free_matrix2(Q);
+    }
   }
 
   // add points kdtree
   double **X = new_matrix2(pcd->num_points, 3);
   transpose(X, pcd->points, 3, pcd->num_points);
   pcd->points_kdtree = kdtree(X, pcd->num_points, 3);
+  free_matrix2(X);
 }
 
 
@@ -124,10 +140,21 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free(pcd->principal_curvatures);
   if (pcd->shapes)
     free(pcd->shapes);
+
   if (pcd->quaternions[0])
     free_matrix2(pcd->quaternions[0]);
   if (pcd->quaternions[1])
     free_matrix2(pcd->quaternions[1]);
+
+  if (pcd->quaternion_kdtrees) {
+    int i, num_clusters = max(pcd->clusters, pcd->num_points) + 1;
+    for (i = 0; i < num_clusters; i++)
+      kdtree_free(pcd->quaternion_kdtrees[i]);
+    free(pcd->quaternion_kdtrees);
+  }
+
+  if (pcd->points_kdtree)
+    kdtree_free(pcd->points_kdtree);
 }
 
 
@@ -163,6 +190,10 @@ static int pcd_has_olf_channels(pcd_t *pcd)
 
 static void pcd_random_walk(int *I, pcd_t *pcd, int i0, int n, double sigma)
 {
+  //dbug
+  double **X = new_matrix2(pcd->num_points, 3);
+  transpose(X, pcd->points, 3, pcd->num_points);
+
   I[0] = i0;
   int cnt, i = i0;
   double x[3];
@@ -173,6 +204,8 @@ static void pcd_random_walk(int *I, pcd_t *pcd, int i0, int n, double sigma)
 
     i = kdtree_NN(pcd->points_kdtree, x);
     I[cnt] = i;
+
+    fprintf(stderr, "random walk step = %f\n", dist(X[I[cnt]], X[I[cnt-1]], 3)); //dbug
   }
 }
 
@@ -434,7 +467,7 @@ olf_t *load_olf(char *fname)
   // set olf params (TODO--load this from a .olf file)
   olf->rot_symm = 1;
   olf->num_validators = 5;
-  olf->lambda = .5;
+  olf->lambda = 1; //.5;
   olf->pose_agg_x = 50;  // mm
   olf->pose_agg_q = .2;  // radians
 
@@ -592,6 +625,10 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     // sample a point feature
     int j = irand(npoints);
 
+    //dbug
+    while (pcd->clusters[j] != 5)
+      j = irand(npoints);
+
     if (frand() < .5)
       q_feature = pcd->quaternions[0][j];
     else
@@ -614,18 +651,18 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     sub(X[i], x_feature, x_model_to_feature_rot, 3);
 
     // compute target density for the given pose
-    //int k;
-    //for (k = 0; k < num_validators; k++)
-    //  indices[k] = irand(npoints);
+    int k;
+    for (k = 0; k < num_validators; k++)
+      indices[k] = irand(npoints);
     //randperm(indices, npoints, num_validators);
 
     //dbug: test random walk
-    double sigma = 30;
-    int indices_walk[10*num_validators];
-    pcd_random_walk(indices_walk, pcd, j, 10*num_validators, sigma/10.0);
-    int k;
-    for (k = 0; k < num_validators; k++)
-      indices[k] = indices_walk[10*k];
+    //double sigma = 30;
+    //int indices_walk[10*num_validators];
+    //pcd_random_walk(indices_walk, pcd, j, 10*num_validators, sigma/10.0);
+    //int k;
+    //for (k = 0; k < num_validators; k++)
+    //  indices[k] = indices_walk[10*k];
 
     W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
   }
@@ -638,8 +675,8 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
 
   for (i = 0; i < n; i++)
     W[i] = -W2[I[i]];
-  reorder_rows(X, I, n, 3);
-  reorder_rows(Q, I, n, 4);
+  reorder_rows(X, X, I, n, 3);
+  reorder_rows(Q, Q, I, n, 4);
 
   // normalize W
   mult(W, W, 1.0/sum(W,n), n);
@@ -740,8 +777,8 @@ olf_pose_samples_t *olf_aggregate_pose_samples(olf_pose_samples_t *poses, olf_t 
 
   for (i = 0; i < n; i++)
     agg_poses->W[i] = -W2[I[i]];
-  reorder_rows(agg_poses->X, I, n, 3);
-  reorder_rows(agg_poses->Q, I, n, 4);
+  reorder_rows(agg_poses->X, agg_poses->X, I, n, 3);
+  reorder_rows(agg_poses->Q, agg_poses->Q, I, n, 4);
 
   agg_poses->n = n;
 

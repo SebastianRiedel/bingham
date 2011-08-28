@@ -30,4 +30,6 @@ int main(int argc, char *argv[])
   bingham_dF_lookup_3d(dF, Z);
 
   printf("F = %f, dF = [%f, %f, %f]\n", F, dF[0], dF[1], dF[2]);
+
+  return 0;
 }

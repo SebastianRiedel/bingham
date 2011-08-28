@@ -28,6 +28,7 @@ extern "C" {
 
     // computed data
     double **quaternions[2];
+    kdtree_t **quaternion_kdtrees;  // one per cluster
     kdtree_t *points_kdtree;
 
   } pcd_t;
