@@ -33,7 +33,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample
+TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample olf_pose_sample
 endif
 
 
@@ -79,6 +79,9 @@ test_hll: test_hll.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 test_olf: test_olf.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+olf_pose_sample: olf_pose_sample.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 .PHONY: clean install

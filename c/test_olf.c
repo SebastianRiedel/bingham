@@ -47,9 +47,13 @@ void test_olf_pose_sample(int argc, char *argv[])
   }
 
   double t = get_time_ms();
-
   olf_t *olf = load_olf(argv[1]);
+  fprintf(stderr, "Loaded olf in %f ms\n", get_time_ms() - t);
+
+  t = get_time_ms();
   pcd_t *pcd = load_pcd(argv[2]);
+  fprintf(stderr, "Loaded pcd in %f ms\n", get_time_ms() - t);
+
   int n = atof(argv[3]);
 
   if (olf == NULL) {
@@ -60,13 +64,18 @@ void test_olf_pose_sample(int argc, char *argv[])
     printf("Error loading pcd\n");
     return;
   }
-
-  olf_classify_points(pcd, olf);
-  fprintf(stderr, "Loaded olf and pcd in %f ms\n", get_time_ms() - t);
-
+  
   t = get_time_ms();
-  olf_pose_samples_t *poses = olf_pose_sample(olf, pcd, n);
+  olf_classify_points(pcd, olf);
+  fprintf(stderr, "Classified local shapes in %f ms\n", get_time_ms() - t);
+
+  olf_pose_samples_t *poses;
+  //int xxx;
+  //for (xxx = 0; xxx < 10000; xxx++) {
+  t = get_time_ms();
+  poses = olf_pose_sample(olf, pcd, n);
   fprintf(stderr, "Sampled %d poses in %f ms\n", n, get_time_ms() - t);
+  //}
 
   fprintf(stderr, "W[0] = %f\n", poses->W[0]);
 
