@@ -102,21 +102,6 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->quaternions[0] = new_matrix2(pcd->num_points, 4);
     pcd->quaternions[1] = new_matrix2(pcd->num_points, 4);
     compute_orientation_quaternions(pcd->quaternions, pcd->normals, pcd->principal_curvatures, pcd->num_points);
-
-    // add quaternion cluster kdtrees
-    if (ch_cluster>=0) {
-      int num_clusters = max(pcd->clusters, pcd->num_points) + 1;
-      safe_calloc(pcd->quaternion_kdtrees, num_clusters, kdtree_t*);
-      int I[pcd->num_points];
-      double **Q = new_matrix2(2*pcd->num_points, 4);
-      for (i = 0; i < num_clusters; i++) {
-	int n = findeq(I, pcd->clusters, i, pcd->num_points);
-	reorder_rows(Q, pcd->quaternions[0], I, n, 4);
-	reorder_rows(&Q[n], pcd->quaternions[1], I, n, 4);
-	pcd->quaternion_kdtrees[i] = kdtree(Q, 2*n, 4);
-      }
-      free_matrix2(Q);
-    }
   }
 
   // add points kdtree
@@ -145,13 +130,6 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free_matrix2(pcd->quaternions[0]);
   if (pcd->quaternions[1])
     free_matrix2(pcd->quaternions[1]);
-
-  if (pcd->quaternion_kdtrees) {
-    int i, num_clusters = max(pcd->clusters, pcd->num_points) + 1;
-    for (i = 0; i < num_clusters; i++)
-      kdtree_free(pcd->quaternion_kdtrees[i]);
-    free(pcd->quaternion_kdtrees);
-  }
 
   if (pcd->points_kdtree)
     kdtree_free(pcd->points_kdtree);
@@ -462,6 +440,7 @@ olf_t *load_olf(char *fname)
       }
     }
     hll_new(&olf->hll[c], Q, X, 2*n, 4, 3);
+    hll_cache(&olf->hll[c], Q, 2*n);
   }
 
   // set olf params (TODO--load this from a .olf file)
@@ -626,8 +605,8 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     int j = irand(npoints);
 
     //dbug
-    while (pcd->clusters[j] != 5)
-      j = irand(npoints);
+    //while (pcd->clusters[j] != 5)
+    //  j = irand(npoints);
 
     if (frand() < .5)
       q_feature = pcd->quaternions[0][j];

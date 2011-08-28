@@ -48,6 +48,25 @@ static void hll_default_prior(hll_t *hll)
 
 
 /*
+ * Sample from an hll cache
+ */
+static void hll_sample_cache(double **X, double ***S, double **Q, hll_t *hll, int n)
+{
+  int i;
+  for (i = 0; i < n; i++) {
+    int j = kdtree_NN(hll->cache.Q_kdtree, Q[i]);
+    memcpy(X[i], hll->cache.X[j], hll->dx * sizeof(double));
+    matrix_copy(S[i], hll->cache.S[j], hll->dx, hll->dx);
+  }
+}
+
+
+
+//-----------------------------  EXTERNAL API  -------------------------------//
+
+
+
+/*
  * Make a new HLL model from Q->X, with a default prior.
  */
 void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx)
@@ -79,14 +98,49 @@ void hll_free(hll_t *hll)
 
 
 /*
+ * Cache the Local Likelihood distributions for Q
+ */
+void hll_cache(hll_t *hll, double **Q, int n)
+{
+  int i;
+
+  // allocate space, build kdtree
+  double **X = new_matrix2(n, hll->dx);
+  double ***S;
+  safe_calloc(S, n, double**);
+  for (i = 0; i < n; i++)
+    S[i] = new_matrix2(hll->dx, hll->dx);
+  kdtree_t *Q_kdtree = kdtree(Q, n, hll->dq);
+
+  // precompute LL distributions
+  hll_sample(X, S, Q, hll, n);
+
+  // cache in hll
+  hll->cache.Q_kdtree = Q_kdtree;
+  hll->cache.X = X;
+  hll->cache.S = S;
+  hll->cache.n = n;
+}
+
+
+/*
  * Sample n Gaussians (with means X and covariances S) from HLL at sample points Q.
  */
 void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
 {
+  int i, j;
+  if (hll->cache.n > 0) {
+    for (i = 0; i < n; i++) {
+      j = kdtree_NN(hll->cache.Q_kdtree, Q[i]);
+      memcpy(X[i], hll->cache.X[j], hll->dx * sizeof(double));
+      matrix_copy(S[i], hll->cache.S[j], hll->dx, hll->dx);
+    }
+    return;
+  }
+
   double r = hll->r;
   int nx = hll->dx;
   int nq = hll->dq;
-  int i, j;
 
   double **WS = new_matrix2(nx, nx);
 
