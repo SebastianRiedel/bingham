@@ -353,6 +353,10 @@ olf_t *load_olf(char *fname)
   int i;
   char f[1024];
 
+  //dbug
+  //double t;
+  //t = get_time_ms();
+
   // load pcd
   sprintf(f, "%s.pcd", fname);
   pcd_t *pcd = load_pcd(f);
@@ -365,6 +369,10 @@ olf_t *load_olf(char *fname)
     return NULL;
   }
 
+  //dbug
+  //fprintf(stderr, "Loaded olf pcd in %f ms\n", get_time_ms() - t);
+  //t = get_time_ms();  
+
   // load bmx
   sprintf(f, "%s.bmx", fname);
   int num_clusters;
@@ -374,6 +382,10 @@ olf_t *load_olf(char *fname)
     free(pcd);
     return NULL;
   }
+
+  //dbug
+  //fprintf(stderr, "Loaded olf bmx in %f ms\n", get_time_ms() - t);
+  //t = get_time_ms();  
 
   // create olf
   olf_t *olf;
@@ -421,6 +433,10 @@ olf_t *load_olf(char *fname)
 
   free_matrix2(S);
 
+  //dbug
+  //fprintf(stderr, "Computed cluster shapes in %f ms\n", get_time_ms() - t);
+  //t = get_time_ms();  
+
   // create hll model
   safe_calloc(olf->hll, num_clusters, hll_t);
   int c;
@@ -442,6 +458,10 @@ olf_t *load_olf(char *fname)
     hll_new(&olf->hll[c], Q, X, 2*n, 4, 3);
     hll_cache(&olf->hll[c], Q, 2*n);
   }
+
+  //dbug
+  //fprintf(stderr, "Created HLL in %f ms\n", get_time_ms() - t);
+  //t = get_time_ms();
 
   // set olf params (TODO--load this from a .olf file)
   olf->rot_symm = 1;

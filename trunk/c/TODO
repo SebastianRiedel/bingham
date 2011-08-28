@@ -5,11 +5,10 @@ OLF
 ---
 
 NOW:
- - 
- - sope_sample()
- - sope_cloud_pdf()
 
 DONE:
+ + olf_pose_sample()
+ + olf_pose_pdf()
  + load_olf()
  + load_pcd()
  + Make OLF (Oriented Local Feature) library
@@ -21,10 +20,9 @@ HYPERSPHERICAL LOCAL LIKELIHOOD
 -------------------------------
 
 NOW:
- - Add caching to HLL model
-
 
 DONE:
+ + Add caching to HLL model
  + Make HLL library
  + hll_new()
  + hll_sample()
@@ -36,7 +34,6 @@ BINGHAM
 -------
 
 NOW:
- - Remove GSL dependencies (solve, det, inv, eigen_symm)
  - Improve dY -> Z lookup via IDW interpolation
  - Recompute normalization constants
  - Check for 0 mixtures in bingham_cluster
@@ -49,6 +46,7 @@ SOON:
 
 
 DONE:
+ + Remove GSL dependencies (solve, det, inv, eigen_symm)
  + Move bingham_stats_t inside bingham_t and lazy auto compute stats
  + Use bingham_F_lookup_3d() in bingham_new()
  + bingham_mixture_sample()
