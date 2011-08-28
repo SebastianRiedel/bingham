@@ -19,11 +19,21 @@ static void hll_default_prior(hll_t *hll)
   int dx = hll->dx;
   int n = hll->n;
 
-  safe_malloc(hll->x0, dx, double);
-  mean(hll->x0, hll->X, n, dx);  // x0 = mean(X)
+  safe_calloc(hll->x0, dx, double);
+  //mean(hll->x0, hll->X, n, dx);  // x0 = mean(X)
 
   hll->S0 = new_matrix2(dx, dx);
-  cov(hll->S0, hll->X, hll->x0, n, dx);
+  //cov(hll->S0, hll->X, hll->x0, n, dx);
+
+  int i;
+  double d2_tot = 0.0;
+  for (i = 0; i < n; i++) {
+    double d = norm(hll->X[i], dx);
+    d2_tot += d*d;
+  }
+  double sigma = d2_tot/(3.0*n);
+  for (i = 0; i < dx; i++)
+    hll->S0[i][i] = sigma;
 
   hll->w0 = 2;
 
@@ -40,13 +50,13 @@ static void hll_default_prior(hll_t *hll)
  */
 void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx)
 {
-  hll->Q = matrix_clone(Q, n, dq);
+  hll->Q = Q;
   hll->X = X;
   hll->n = n;
   hll->dq = dq;
   hll->dx = dx;
 
-  hll->r = .1;  //dbug: is there a more principled way of setting this?
+  hll->r = .2;  //dbug: is there a more principled way of setting this?
 
   hll_default_prior(hll);
 }
@@ -86,11 +96,12 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
     //  printf("hll->Q[%d] = [%.2f %.2f %.2f %.2f]\n", j, hll->Q[j][0], hll->Q[j][1], hll->Q[j][2], hll->Q[j][3]);
 
     // compute weights
-    double dq;
+    double dq, qdot;
     double w[hll->n];
     //printf("w = [");
     for (j = 0; j < hll->n; j++) {
-      dq = acos(fabs(dot(Q[i], hll->Q[j], nq)));
+      qdot = fabs(dot(Q[i], hll->Q[j], nq));
+      dq = acos(MIN(qdot, 1.0));
       w[j] = exp(-(dq/r)*(dq/r));
       //printf("%.2f ", w[j]);
     }
@@ -117,6 +128,7 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
 
     // compute posterior covariance matrix
     mult(S[i][0], hll->S0[0], hll->w0, nx*nx);  // S[i] = w0*S0
+
     for (j = 0; j < hll->n; j++) {
       if (w[j] > 0) {
 	double wdx[nx];
@@ -126,6 +138,7 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
 	matrix_add(S[i], S[i], WS, nx, nx);  // S[i] += WS
       }
     }
+
     mult(S[i][0], S[i][0], 1/wtot, nx*nx);  // S[i] /= wtot
   }
 

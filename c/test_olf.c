@@ -39,9 +39,70 @@ void test_load_pcd(int argc, char *argv[])
 }
 
 
+void test_olf_pose_sample(int argc, char *argv[])
+{
+  if (argc < 4) {
+    printf("usage: %s <olf> <pcd> <n>\n", argv[0]);
+    return;
+  }
+
+  double t = get_time_ms();
+
+  olf_t *olf = load_olf(argv[1]);
+  pcd_t *pcd = load_pcd(argv[2]);
+  int n = atof(argv[3]);
+
+  if (olf == NULL) {
+    printf("Error loading olf\n");
+    return;
+  }
+  if (pcd == NULL) {
+    printf("Error loading pcd\n");
+    return;
+  }
+
+  olf_classify_points(pcd, olf);
+  fprintf(stderr, "Loaded olf and pcd in %f ms\n", get_time_ms() - t);
+
+  t = get_time_ms();
+  olf_pose_samples_t *poses = olf_pose_sample(olf, pcd, n);
+  fprintf(stderr, "Sampled %d poses in %f ms\n", n, get_time_ms() - t);
+
+  fprintf(stderr, "W[0] = %f\n", poses->W[0]);
+
+  t = get_time_ms();
+  poses = olf_aggregate_pose_samples(poses, olf);
+  fprintf(stderr, "Aggregated %d->%d poses in %f ms\n", n, poses->n, get_time_ms() - t);
+
+  fprintf(stderr, "W[0] = %f\n", poses->W[0]);
+
+  double **X = poses->X;
+  double **Q = poses->Q;
+  double *W = poses->W;
+  n = poses->n;
+
+  int i;
+  printf("X = [");
+  for (i = 0; i < n-1; i++)
+    printf("%f, %f, %f; ...\n", X[i][0], X[i][1], X[i][2]);
+  printf("%f, %f, %f];\n", X[i][0], X[i][1], X[i][2]);
+
+  printf("Q = [");
+  for (i = 0; i < n-1; i++)
+    printf("%f, %f, %f, %f; ...\n", Q[i][0], Q[i][1], Q[i][2], Q[i][3]);
+  printf("%f, %f, %f, %f];\n", Q[i][0], Q[i][1], Q[i][2], Q[i][3]);
+
+  printf("W = [");
+  for (i = 0; i < n-1; i++)
+    printf("%f; ...\n", W[i]);
+  printf("%f];\n", W[i]);
+}
+
+
 int main(int argc, char *argv[])
 {
-  test_load_pcd(argc, argv);
+  //test_load_pcd(argc, argv);
+  test_olf_pose_sample(argc, argv);
 
   return 0;
 }

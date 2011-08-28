@@ -41,8 +41,22 @@ extern "C" {
     int shape_length;             // local shape descriptor length
     double **mean_shapes;         // cluster means
     double *shape_variances;      // cluster variances
+
+    // params
+    int rot_symm;
+    int num_validators;
+    double lambda;
+    double pose_agg_x;
+    double pose_agg_q;
   } olf_t;
 
+
+  typedef struct {
+    double **X;
+    double **Q;
+    double *W;
+    int n;
+  } olf_pose_samples_t;
 
 
   pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
@@ -50,7 +64,7 @@ extern "C" {
   int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
   int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
 
-  olf_t *load_olf(char *fname);                       // loads an olf from fname.pcd and fname.olf
+  olf_t *load_olf(char *fname);                       // loads an olf from fname.pcd and fname.bmx
   void olf_free(olf_t *olf);                          // frees the contents of an olf_t, but not the pointer itself
   void olf_classify_points(pcd_t *pcd, olf_t *olf);   // classify pcd points (add channel "cluster") using olf shapes
 
@@ -58,7 +72,13 @@ extern "C" {
   double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, int n);
 
   // samples n weighted poses (X,Q,W) using olf model "olf" and point cloud "pcd"
-  void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, int n);
+  olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n);
+
+  // aggregate the weighted pose samples, (X,Q,W)
+  olf_pose_samples_t *olf_aggregate_pose_samples(olf_pose_samples_t *poses, olf_t *olf);
+
+  olf_pose_samples_t *olf_pose_samples_new(int n);          // create a new olf_pose_samples_t
+  void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
 
 
 #ifdef __cplusplus

@@ -708,6 +708,8 @@ void rotation_matrix_to_quaternion(double *q, double **R)
     q[2] = (R[1][2] + R[2][1]) / S;
     q[3] = 0.25 * S;
   }
+
+  normalize(q, q, 4);
 }
 
 
@@ -894,7 +896,12 @@ void mvnrand(double *x, double *mu, double **S, int d)
 {
   double z[d], **V = new_matrix2(d,d);
   eigen_symm(z,V,S,d);
+  int i;
+  for (i = 0; i < d; i++)
+    z[i] = sqrt(z[i]);
+
   mvnrand_pcs(x,mu,z,V,d);
+
   free_matrix2(V);
 }
 
@@ -904,7 +911,12 @@ double mvnpdf(double *x, double *mu, double **S, int d)
 {
   double z[d], **V = new_matrix2(d,d);
   eigen_symm(z,V,S,d);
+  int i;
+  for (i = 0; i < d; i++)
+    z[i] = sqrt(z[i]);
+
   double p = mvnpdf_pcs(x,mu,z,V,d);
+
   free_matrix2(V);
   return p;
 }
@@ -1473,8 +1485,6 @@ void eigen_symm(double z[], double **V, double **X, int n)
     // compute new V (with eigenvectors in the rows)
     matrix_mult(B, Gt, V, n, n, n);  // B = Gt*V
     matrix_copy(V, B, n, n);     // V = B;
-
-    printf("------------------------------\n\n");
   }
 
   //printf("break 2\n");  //dbug
