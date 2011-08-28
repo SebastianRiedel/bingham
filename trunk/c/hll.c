@@ -20,11 +20,12 @@ static void hll_default_prior(hll_t *hll)
   int n = hll->n;
 
   safe_calloc(hll->x0, dx, double);
-  //mean(hll->x0, hll->X, n, dx);  // x0 = mean(X)
+  mean(hll->x0, hll->X, n, dx);  // x0 = mean(X)
 
   hll->S0 = new_matrix2(dx, dx);
-  //cov(hll->S0, hll->X, hll->x0, n, dx);
+  cov(hll->S0, hll->X, hll->x0, n, dx);
 
+  /*
   int i;
   double d2_tot = 0.0;
   for (i = 0; i < n; i++) {
@@ -34,6 +35,7 @@ static void hll_default_prior(hll_t *hll)
   double sigma = d2_tot/(3.0*n);
   for (i = 0; i < dx; i++)
     hll->S0[i][i] = sigma;
+  */
 
   hll->w0 = 2;
 

@@ -57,12 +57,15 @@ void sample_simplex(double x[], double **S, int n, int d);                      
 
 void vnot(int y[], int x[], int n);                                   /* logical not of a binary array */
 int count(int x[], int n);                                            /* count the non-zero elements of x */
-void find(int *k, int x[], int n);                                    /* computes a dense array of the indices of x's non-zero elements */
-void findinv(int *k, int x[], int n);                                 /* computes a sparse array of the indices of x's non-zero elements */
+int find(int *k, int x[], int n);                                     /* computes a dense array of the indices of x's non-zero elements */
+int findinv(int *k, int x[], int n);                                  /* computes a sparse array of the indices of x's non-zero elements */
+int findeq(int *k, int x[], int a, int n);                            /* computes a dense array of the indices of x==a */
 double sum(double x[], int n);                                        /* computes the sum of x's elements */
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double max(double x[], int n);                                        /* computes the max of x */
 double min(double x[], int n) ;                                       /* computes the min of x */
+int imax(int x[], int n);                                             /* computes the max of x */
+int imin(int x[], int n) ;                                            /* computes the min of x */
 double norm(double x[], int n);                                       /* computes the norm of x */
 double dist(double x[], double y[], int n);                           /* computes the norm of x-y */
 double dist2(double x[], double y[], int n);                          /* computes the norm^2 of x-y */
@@ -101,7 +104,7 @@ void outer_prod(double **Z, double x[], double y[], int n, int m);          /* o
 void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
-void reorder_rows(double **X, int *idx, int n, int m);                      /* reorder the rows of X, X = X(idx,:) */
+void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
 
 void print_matrix(double **X, int n, int m);
 

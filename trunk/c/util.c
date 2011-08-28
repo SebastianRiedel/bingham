@@ -348,7 +348,7 @@ void replace_word(char **words, int num_words, const char *from, const char *to)
   int i;
   for (i = 0; i < num_words; i++) {
     if (!strcmp(words[i], from)) {
-      safe_realloc(words[i], strlen(to)+1, char *);
+      safe_realloc(words[i], strlen(to)+1, char);
       strcpy(words[i], to);
     }
   }
@@ -421,24 +421,38 @@ int count(int x[], int n)
 
 
 // returns a dense array of the indices of x's non-zero elements
-void find(int *k, int x[], int n)
+int find(int *k, int x[], int n)
 {
   int i;
   int cnt = 0;
   for (i = 0; i < n; i++)
     if (x[i] != 0)
       k[cnt++] = i;
+  return cnt;
 }
 
 
 // returns a sparse array of the indices of x's non-zero elements
-void findinv(int *k, int x[], int n)
+int findinv(int *k, int x[], int n)
 {
   int i;
   int cnt = 0;
   for (i = 0; i < n; i++)
     if (x[i] != 0)
       k[i] = cnt++;
+  return cnt;
+}
+
+
+// computes a dense array of the indices of x==a
+int findeq(int *k, int x[], int a, int n)
+{
+  int i;
+  int cnt = 0;
+  for (i = 0; i < n; i++)
+    if (x[i] == a)
+      k[cnt++] = i;
+  return cnt;
 }
 
 
@@ -484,6 +498,34 @@ double min(double x[], int n)
   int i;
 
   double y = x[0];
+  for (i = 1; i < n; i++)
+    if (x[i] < y)
+      y = x[i];
+
+  return y;
+}
+
+
+// computes the max of x
+int imax(int x[], int n)
+{
+  int i;
+
+  int y = x[0];
+  for (i = 1; i < n; i++)
+    if (x[i] > y)
+      y = x[i];
+
+  return y;
+}
+
+
+// computes the min of x
+int imin(int x[], int n)
+{
+  int i;
+
+  int y = x[0];
   for (i = 1; i < n; i++)
     if (x[i] < y)
       y = x[i];
@@ -1068,8 +1110,7 @@ double **load_matrix(char *fin, int *n, int *m)
   }
 
   char sbuf[1024], *s = sbuf;
-  fgets(s, 1024, f);
-  if (sscanf(s, "%d %d", n, m) < 2) {
+  if (fgets(s, 1024, f) == NULL || sscanf(s, "%d %d", n, m) < 2) {
     fprintf(stderr, "Corrupt matrix header in file %s\n", fin);
     fclose(f);
     return NULL;
@@ -1445,7 +1486,7 @@ void eigen_symm(double z[], double **V, double **X, int n)
 
     // find largest pivot
     double pivot = 0;
-    int ip, jp;
+    int ip=0, jp=0;
     for (i = 0; i < n; i++) {
       for (j = i+1; j < n; j++) {
 	double p = fabs(A[i][j]);
@@ -1518,13 +1559,13 @@ void eigen_symm(double z[], double **V, double **X, int n)
 }
 
 
-// reorder the rows of X, X = X(idx,:)
-void reorder_rows(double **X, int *idx, int n, int m)
+// reorder the rows of X, Y = X(idx,:)
+void reorder_rows(double **Y, double **X, int *idx, int n, int m)
 {
-  double **X2 = matrix_clone(X, n, m);
   int i;
+  double **X2 = matrix_clone(X, imax(idx,n), m);
   for (i = 0; i < n; i++)
-    memcpy(X[i], X2[idx[i]], m*sizeof(double));
+    memcpy(Y[i], X2[idx[i]], m*sizeof(double));
   free_matrix2(X2);
 }
 
