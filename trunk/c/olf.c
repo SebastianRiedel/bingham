@@ -131,6 +131,23 @@ static void pcd_free_data_pointers(pcd_t *pcd)
  */
 static int pcd_has_olf_channels(pcd_t *pcd)
 {
+  /*
+  printf("x channel = %d\n", pcd_channel(pcd, "x"));
+  printf("y channel = %d\n", pcd_channel(pcd, "y"));
+  printf("z channel = %d\n", pcd_channel(pcd, "z"));
+  printf("nx channel = %d\n", pcd_channel(pcd, "nx"));
+  printf("ny channel = %d\n", pcd_channel(pcd, "ny"));
+  printf("nz channel = %d\n", pcd_channel(pcd, "nz"));
+  printf("pcx channel = %d\n", pcd_channel(pcd, "pcx"));
+  printf("pcy channel = %d\n", pcd_channel(pcd, "pcy"));
+  printf("pcz channel = %d\n", pcd_channel(pcd, "pcz"));
+  printf("pc1 channel = %d\n", pcd_channel(pcd, "pc1"));
+  printf("pc2 channel = %d\n", pcd_channel(pcd, "pc2"));
+  printf("cluster channel = %d\n", pcd_channel(pcd, "cluster"));
+  printf("f1 channel = %d\n", pcd_channel(pcd, "f1"));
+  printf("f33 channel = %d\n", pcd_channel(pcd, "f33"));
+  */
+
   return (pcd_channel(pcd, "x")>=0 && pcd_channel(pcd, "y")>=0 && pcd_channel(pcd, "z")>=0 &&
 	  pcd_channel(pcd, "nx")>=0 && pcd_channel(pcd, "ny")>=0 && pcd_channel(pcd, "nz")>=0 &&
 	  pcd_channel(pcd, "pcx")>=0 && pcd_channel(pcd, "pcy")>=0 && pcd_channel(pcd, "pcz")>=0 &&
@@ -165,11 +182,13 @@ pcd_t *load_pcd(char *f_pcd)
 
   char sbuf[1024], *s = sbuf;
   while (!feof(f)) {
+    s = sbuf;
     if (fgets(s, 1024, f)) {
-    
+
       if (!wordcmp(s, "COLUMNS", " \t\n") || !wordcmp(s, "FIELDS", " \t\n")) {
 	s = sword(s, " \t", 1);
-	pcd->channels = split(s, " \t", &pcd->num_channels);
+	pcd->channels = split(s, " \t\n", &pcd->num_channels);
+
 
 	/* TODO: make a file converter?
 	   replace_word(pcd->channels, pcd->num_channels, "normal_x", "nx");
@@ -195,10 +214,13 @@ pcd_t *load_pcd(char *f_pcd)
 	  free(pcd);
 	  return NULL;
 	}
+
 	safe_calloc(pcd->data, pcd->num_channels, double *);
 	for (i = 0; i < pcd->num_channels; i++)
 	  safe_calloc(pcd->data[i], pcd->num_points, double);
+
 	for (i = 0; i < pcd->num_points; i++) {
+	  s = sbuf;
 	  if (fgets(s, 1024, f) == NULL)
 	    break;
 	  for (j = 0; j < pcd->num_channels; j++) {
@@ -209,6 +231,7 @@ pcd_t *load_pcd(char *f_pcd)
 	  if (j < pcd->num_channels)
 	    break;
 	}
+
 	if (i < pcd->num_points) {
 	  fprintf(stderr, "Error: corrupt pcd data at row %d\n", i);
 	  pcd_free(pcd);
@@ -306,6 +329,7 @@ olf_t *load_olf(char *fname)
   if (pcd == NULL)
     return NULL;
   if (!pcd_has_olf_channels(pcd)) {
+    fprintf(stderr, "Warning: pcd doesn't have olf channels!\n");
     pcd_free(pcd);
     free(pcd);
     return NULL;
@@ -327,9 +351,6 @@ olf_t *load_olf(char *fname)
   olf->pcd = pcd;
   olf->bmx = bmx;
   olf->num_clusters = num_clusters;
-
-  // create hll model
-  safe_calloc(olf->hll, num_clusters, hll_t);
 
   // get shape descriptor length
   olf->shape_length = 33;
@@ -369,6 +390,34 @@ olf_t *load_olf(char *fname)
   }
 
   free_matrix2(S);
+
+  // create hll model
+  safe_calloc(olf->hll, num_clusters, hll_t);
+  int c;
+  for (c = 0; c < num_clusters; c++) {
+    int n = (int)round(olf->cluster_weights[c] * pcd->num_points);
+    double **Q = new_matrix2(2*n, 4);
+    double **X = new_matrix2(2*n, 3);
+    int cnt=0;
+    for (i = 0; i < pcd->num_points; i++) {
+      if (pcd->clusters[i] == c) {
+ 	memcpy(Q[cnt], pcd->quaternions[0][i], 4*sizeof(double));
+	memcpy(Q[cnt+1], pcd->quaternions[1][i], 4*sizeof(double));
+	X[cnt][0] = X[cnt+1][0] = pcd->points[0][i];
+	X[cnt][1] = X[cnt+1][1] = pcd->points[1][i];
+	X[cnt][2] = X[cnt+1][2] = pcd->points[2][i];
+	cnt += 2;
+      }
+    }
+    hll_new(&olf->hll[c], Q, X, 2*n, 4, 3);
+  }
+
+  // set olf params (TODO--load this from a .olf file)
+  olf->rot_symm = 1;
+  olf->num_validators = 5;
+  olf->lambda = .5;
+  olf->pose_agg_x = 50;  // mm
+  olf->pose_agg_q = .2;  // radians
 
   return olf;
 }
@@ -437,7 +486,6 @@ void olf_classify_points(pcd_t *pcd, olf_t *olf)
 double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, int n)
 {
   int i;
-  const double lambda = .5;
 
   // multi-feature likelihood
   if (n > 1) {
@@ -445,7 +493,7 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
     for (i = 0; i < n; i++)
       logp += log(olf_pose_pdf(x, q, olf, pcd, &indices[i], 1));
 
-    return lambda * exp(lambda*logp/(double)n);
+    return olf->lambda * exp(olf->lambda*logp/(double)n);
   }
 
   i = indices[0];
@@ -454,6 +502,8 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
 
   // q2: rotation from model -> feature
   double q2[4];
+  double *q2_ptr[1];
+  q2_ptr[0] = q2;
   if (frand() < .5)
     quaternion_mult(q2, pcd->quaternions[0][i], q_inv);
   else
@@ -478,12 +528,15 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
 
   // p(x2|q2)
   double x_mean[3];
+  double *x_mean_ptr[1];
+  x_mean_ptr[0] = x_mean;
   double **x_cov = new_matrix2(3,3);
-  hll_sample((double **)&x_mean, &x_cov, (double **)&q2, &olf->hll[c], 1);
-  double z[3], **V = new_matrix2(3,3);
-  eigen_symm(z, V, x_cov, 3);
-  p *= mvnpdf_pcs(x2, x_mean, z, V, 3);
-  free_matrix2(V);
+  hll_sample(x_mean_ptr, &x_cov, q2_ptr, &olf->hll[c], 1);
+  p *= mvnpdf(x2, x_mean, x_cov, 3);
+  //double z[3], **V = new_matrix2(3,3);
+  //eigen_symm(z, V, x_cov, 3);
+  //p *= mvnpdf_pcs(x2, x_mean, z, V, 3);
+  //free_matrix2(V);
   free_matrix2(x_cov);
   
   return p;
@@ -493,22 +546,30 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
 /*
  * samples n weighted poses (X,Q,W) using olf model "olf" and point cloud "pcd"
  */
-void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, int n)
+olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
 {
-  int num_samples = 5;  // num validation points
-  double lambda = .5;
+  olf_pose_samples_t *poses = olf_pose_samples_new(n);
 
+  double **X = poses->X;
+  double **Q = poses->Q;
+  double *W = poses->W;
+
+  int num_validators = olf->num_validators;
   int npoints = pcd->num_points;
 
   double *q_feature, q_model_to_feature[4], q_feature_to_model[4];
   double x_mean[3], **x_cov = new_matrix2(3,3);
-  double *x_feature, x_model_to_feature[3], x_model_to_feature_rot[3];
-  double z[3], **V = new_matrix2(3,3);
+  double x_feature[3], x_model_to_feature[3], x_model_to_feature_rot[3];
   double **R = new_matrix2(3,3);
-  int indices[num_samples];
+  int indices[num_validators];
+
+  // pointers
+  double *q_model_to_feature_ptr[1], *x_mean_ptr[1];
+  q_model_to_feature_ptr[0] = q_model_to_feature;
+  x_mean_ptr[0] = x_mean;
+
   int i;
   for (i = 0; i < n; i++) {
-
     // sample a point feature
     int j = irand(npoints);
 
@@ -519,23 +580,26 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
 
     // sample model orientation
     int c = (int)(pcd->clusters[j]);
-    bingham_mixture_sample((double **)&q_model_to_feature, &olf->bmx[c], 1);
+    bingham_mixture_sample(q_model_to_feature_ptr, &olf->bmx[c], 1);
     quaternion_inverse(q_feature_to_model, q_model_to_feature);
     quaternion_mult(Q[i], q_feature_to_model, q_feature);
 
     // sample model position given orientation
-    x_feature = pcd->points[j];
-    hll_sample((double **)&x_mean, &x_cov, (double **)&q_model_to_feature, &olf->hll[c], 1);
+    x_feature[0] = pcd->points[0][j];
+    x_feature[1] = pcd->points[1][j];
+    x_feature[2] = pcd->points[2][j];
+    hll_sample(x_mean_ptr, &x_cov, q_model_to_feature_ptr, &olf->hll[c], 1);
     mvnrand(x_model_to_feature, x_mean, x_cov, 3);
     quaternion_to_rotation_matrix(R, Q[i]);
     matrix_vec_mult(x_model_to_feature_rot, R, x_model_to_feature, 3, 3);
     sub(X[i], x_feature, x_model_to_feature_rot, 3);
 
     // compute target density for the given pose
-    int k;
-    for (k = 0; k < num_samples; k++)
-      indices[k] = irand(npoints);     
-    W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_samples);
+    //int k;
+    //for (k = 0; k < num_validators; k++)
+    //  indices[k] = irand(npoints);
+    randperm(indices, npoints, num_validators);
+    W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
   }
 
   // sort pose samples by weight
@@ -543,6 +607,7 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
   double W2[n];
   mult(W2, W, -1, n);
   sort_indices(W2, I, n);  // sort -W (i.e. descending W)
+
   for (i = 0; i < n; i++)
     W[i] = -W2[I[i]];
   reorder_rows(X, I, n, 3);
@@ -552,6 +617,136 @@ void olf_pose_sample(double **X, double **Q, double *W, olf_t *olf, pcd_t *pcd, 
   mult(W, W, 1.0/sum(W,n), n);
 
   free_matrix2(x_cov);
-  free_matrix2(V);
   free_matrix2(R);
+
+  return poses;
+}
+
+
+/*
+ * aggregate the weighted pose samples, (X,Q,W)
+ */
+olf_pose_samples_t *olf_aggregate_pose_samples(olf_pose_samples_t *poses, olf_t *olf)
+{
+  olf_pose_samples_t *agg_poses = olf_pose_samples_new(poses->n);
+
+  double **R1 = new_matrix2(3,3);
+  double **R2 = new_matrix2(3,3);
+  double z1[3], z2[3], z[3];
+
+  int i, j, cnt=0;
+  for (i = 0; i < poses->n; i++) {
+    
+    if (olf->rot_symm) {
+      quaternion_to_rotation_matrix(R1, poses->Q[i]);
+      z1[0] = R1[0][2];
+      z1[1] = R1[1][2];
+      z1[2] = R1[2][2];
+    }
+
+    for (j = 0; j < cnt; j++) {
+      double dx = dist(poses->X[i], agg_poses->X[j], 3);
+      double dq = 0.0;
+      if (olf->rot_symm) {
+	quaternion_to_rotation_matrix(R2, agg_poses->Q[j]);
+	z2[0] = R2[0][2];
+	z2[1] = R2[1][2];
+	z2[2] = R2[2][2];
+	dq = acos(dot(z1, z2, 3));
+      }
+      else
+	dq = acos(fabs(dot(poses->Q[i], agg_poses->Q[j], 4)));
+      
+      //fprintf(stderr, "dx = %3.0f, dq = %3.0f\n", dx, dq*(180.0/M_PI));
+
+      //if (a*a*dx*dx + b*b*dq*dq < 1.0) {  // add pose i to cluster j
+      if (dx < olf->pose_agg_x && dq < olf->pose_agg_q) {  // add pose i to cluster j
+	double wtot = poses->W[i] + agg_poses->W[j];
+	double w = poses->W[i] / wtot;
+	wavg(agg_poses->X[j], poses->X[i], agg_poses->X[j], w, 3);
+	if (olf->rot_symm) {
+	  wavg(z, z1, z2, w, 3);
+	  normalize(z, z, 3);
+	  if (1 - z[2] < .00000001) {  // close to identity rotation
+	    agg_poses->Q[j][0] = 1;
+	    agg_poses->Q[j][1] = 0;
+	    agg_poses->Q[j][2] = 0;
+	    agg_poses->Q[j][3] = 0;
+	  }
+	  else {
+	    double a = 1.0 / sqrt(1 - z[2]*z[2]);
+	    double c = sqrt((1 + z[2])/2.0);
+	    double s = sqrt((1 - z[2])/2.0);
+	    agg_poses->Q[j][0] = c;
+	    agg_poses->Q[j][1] = -s*a*z[1];
+	    agg_poses->Q[j][2] = s*a*z[0];
+	    agg_poses->Q[j][3] = 0;
+	  }
+	  
+	}
+	else {
+	  wavg(agg_poses->Q[j], poses->Q[i], agg_poses->Q[j], w, 4);
+	  normalize(agg_poses->Q[j], agg_poses->Q[j], 4);
+	}
+	agg_poses->W[j] = wtot;
+	break;
+      }
+    }
+    if (j == cnt) {  // add a new cluster
+      memcpy(agg_poses->X[cnt], poses->X[i], 3*sizeof(double));
+      memcpy(agg_poses->Q[cnt], poses->Q[i], 4*sizeof(double));
+      agg_poses->W[cnt] = poses->W[i];
+      cnt++;
+    }
+  }
+
+  free_matrix2(R1);
+  free_matrix2(R2);
+
+  // sort pose samples by weight
+  int n = cnt;
+  int I[n];
+  double W2[n];
+  mult(W2, agg_poses->W, -1, n);
+  sort_indices(W2, I, n);  // sort -W (i.e. descending W)
+
+  for (i = 0; i < n; i++)
+    agg_poses->W[i] = -W2[I[i]];
+  reorder_rows(agg_poses->X, I, n, 3);
+  reorder_rows(agg_poses->Q, I, n, 4);
+
+  agg_poses->n = n;
+
+  return agg_poses;
+}
+
+
+/*
+ * create a new olf_pose_samples_t
+ */
+olf_pose_samples_t *olf_pose_samples_new(int n)
+{
+  olf_pose_samples_t *poses;
+  safe_calloc(poses, 1, olf_pose_samples_t);
+  poses->X = new_matrix2(n,3);
+  poses->Q = new_matrix2(n,4);
+  safe_calloc(poses->W, n, double);
+  poses->n = n;
+
+  return poses;
+}
+
+
+/*
+ * free pose samples
+ */
+void olf_pose_samples_free(olf_pose_samples_t *poses)
+{
+  if (poses->X)
+    free_matrix2(poses->X);
+  if (poses->Q)
+    free_matrix2(poses->Q);
+  if (poses->W)
+    free(poses->W);
+  free(poses);
 }
