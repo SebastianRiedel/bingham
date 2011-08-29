@@ -437,26 +437,37 @@ olf_t *load_olf(char *fname)
   //fprintf(stderr, "Computed cluster shapes in %f ms\n", get_time_ms() - t);
   //t = get_time_ms();  
 
-  // create hll model
-  safe_calloc(olf->hll, num_clusters, hll_t);
-  int c;
-  for (c = 0; c < num_clusters; c++) {
-    int n = (int)round(olf->cluster_weights[c] * pcd->num_points);
-    double **Q = new_matrix2(2*n, 4);
-    double **X = new_matrix2(2*n, 3);
-    int cnt=0;
-    for (i = 0; i < pcd->num_points; i++) {
-      if (pcd->clusters[i] == c) {
- 	memcpy(Q[cnt], pcd->quaternions[0][i], 4*sizeof(double));
-	memcpy(Q[cnt+1], pcd->quaternions[1][i], 4*sizeof(double));
-	X[cnt][0] = X[cnt+1][0] = pcd->points[0][i];
-	X[cnt][1] = X[cnt+1][1] = pcd->points[1][i];
-	X[cnt][2] = X[cnt+1][2] = pcd->points[2][i];
-	cnt += 2;
+  // load hll models
+  sprintf(f, "%s.hll", fname);
+  int num_hll;
+  olf->hll = load_hlls(f, &num_hll);
+
+  if (olf->hll == NULL) {
+
+    // create hll models
+    safe_calloc(olf->hll, num_clusters, hll_t);
+    int c;
+    for (c = 0; c < num_clusters; c++) {
+      int n = (int)round(olf->cluster_weights[c] * pcd->num_points);
+      double **Q = new_matrix2(2*n, 4);
+      double **X = new_matrix2(2*n, 3);
+      int cnt=0;
+      for (i = 0; i < pcd->num_points; i++) {
+	if (pcd->clusters[i] == c) {
+	  memcpy(Q[cnt], pcd->quaternions[0][i], 4*sizeof(double));
+	  memcpy(Q[cnt+1], pcd->quaternions[1][i], 4*sizeof(double));
+	  X[cnt][0] = X[cnt+1][0] = pcd->points[0][i];
+	  X[cnt][1] = X[cnt+1][1] = pcd->points[1][i];
+	  X[cnt][2] = X[cnt+1][2] = pcd->points[2][i];
+	  cnt += 2;
+	}
       }
+      hll_new(&olf->hll[c], Q, X, 2*n, 4, 3);
+      hll_cache(&olf->hll[c], Q, 2*n);
     }
-    hll_new(&olf->hll[c], Q, X, 2*n, 4, 3);
-    hll_cache(&olf->hll[c], Q, 2*n);
+
+    // save hll models
+    save_hlls(f, olf->hll, num_clusters);
   }
 
   //dbug

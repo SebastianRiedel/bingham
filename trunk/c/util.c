@@ -1477,12 +1477,12 @@ void eigen_symm(double z[], double **V, double **X, int n)
 	d_off = MAX(d_off, fabs(A[i][j]));
     }
     d_diag = sqrt(d_diag / (double)n);
-    if (d_off < tolerance * d_diag)
+    if (d_off < MAX(tolerance * d_diag, tolerance))
       break;
 
     //dbug
     if (cnt++ % 1000 == 0)
-      fprintf(stderr, "d_off / d_diag = %e\n", d_off / d_diag);  //dbug
+      fprintf(stderr, "d_off = %e, d_diag = %e\n", d_off, d_diag);  //dbug
 
     // find largest pivot
     double pivot = 0;
