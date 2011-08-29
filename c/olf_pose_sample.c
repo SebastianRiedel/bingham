@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
     for (n = 1; n < poses->n; n++)
       if (W[n] < .01 * W[0])
 	break;
+    mult(W, W, 1/sum(W,n), n);
 
     int i;
     fprintf(f, "X{%d} = [", j+1);

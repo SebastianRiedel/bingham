@@ -17,6 +17,7 @@ extern "C" {
 
   typedef struct {
     kdtree_t *Q_kdtree;
+    double **Q;
     double **X;
     double ***S;
     int n;
@@ -39,8 +40,11 @@ extern "C" {
 
   void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx);
   void hll_free(hll_t *hll);
+  void hll_free_cache(hll_t *hll);
   void hll_cache(hll_t *hll, double **Q, int n);
   void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n);
+  hll_t *load_hlls(char *fname, int *n);
+  void save_hlls(char *fname, hll_t *hlls, int n);
 
 
 

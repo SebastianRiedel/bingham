@@ -84,16 +84,44 @@ void hll_new(hll_t *hll, double **Q, double **X, int n, int dq, int dx)
 
 
 /*
+ * Free an HLL cache.
+ */
+void hll_free_cache(hll_t *hll)
+{
+  if (hll->cache.n > 0) {
+    if (hll->cache.Q_kdtree)
+      kdtree_free(hll->cache.Q_kdtree);
+    if (hll->cache.Q)
+      free_matrix2(hll->cache.Q);
+    if (hll->cache.X)
+      free_matrix2(hll->cache.X);
+    int i;
+    if (hll->cache.S) {
+      for (i = 0; i < hll->cache.n; i++)
+	if (hll->cache.S[i])
+	  free_matrix2(hll->cache.S[i]);
+      free(hll->cache.S);
+    }
+    hll->cache.n = 0;
+  }
+}
+
+
+/*
  * Free an HLL model.
  */
 void hll_free(hll_t *hll)
 {
-  free_matrix2(hll->Q);
-  free_matrix2(hll->X);
+  if (hll->Q)
+    free_matrix2(hll->Q);
+  if (hll->X)
+    free_matrix2(hll->X);
   if (hll->x0)
     free(hll->x0);
   if (hll->S0)
     free(hll->S0);
+
+  hll_free_cache(hll);
 }
 
 
@@ -117,6 +145,7 @@ void hll_cache(hll_t *hll, double **Q, int n)
 
   // cache in hll
   hll->cache.Q_kdtree = Q_kdtree;
+  hll->cache.Q = matrix_clone(Q, n, hll->dq);
   hll->cache.X = X;
   hll->cache.S = S;
   hll->cache.n = n;
@@ -201,3 +230,181 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
   free_matrix2(WS);
 }
 
+
+/*
+ * Load hlls from a file.
+ *
+ * .HLL format:
+ *
+ *    num_hlls
+ *    <hll> <n> <ncache> <dq> <dx> <r> <w0> <x0> <S0>
+ *      ...
+ *    Q <hll> <i> <q> <x> 
+ *      ...
+ *    C <hll> <i> <q> <n> <x> <S>
+ *      ...
+ */
+hll_t *load_hlls(char *fname, int *n)
+{
+  FILE *f = fopen(fname, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error: Can't open %s for reading\n", fname);
+    return NULL;
+  }
+
+  int i, i2, j, j2, k, l;
+  hll_t *hlls = NULL;
+
+  // read num hlls
+  if (fscanf(f, "%d\n", n) < 1) goto ERROR;
+
+  // create hlls
+  safe_calloc(hlls, *n, hll_t);
+
+  //fprintf(stderr, "break 1\n"); //dbug
+
+  // read hll headers
+  for (i2 = 0; i2 < *n; i2++) {
+    if (fscanf(f, "%d ", &i) < 1) goto ERROR;
+    if (fscanf(f, "%d %d %d %d %lf %lf ", &hlls[i].n, &hlls[i].cache.n, &hlls[i].dq, &hlls[i].dx, &hlls[i].r, &hlls[i].w0) < 6) goto ERROR;
+
+    //fprintf(stderr, "break 1.1\n"); //dbug
+
+    // alloc Q,X,x0,S0
+    hlls[i].Q = new_matrix2(hlls[i].n, hlls[i].dq);
+    hlls[i].X = new_matrix2(hlls[i].n, hlls[i].dx);
+    safe_calloc(hlls[i].x0, hlls[i].dx, double);
+    hlls[i].S0 = new_matrix2(hlls[i].dx, hlls[i].dx);
+
+    // alloc cache
+    if (hlls[i].cache.n > 0) {
+      hlls[i].cache.Q = new_matrix2(hlls[i].cache.n, hlls[i].dq);
+      hlls[i].cache.X = new_matrix2(hlls[i].cache.n, hlls[i].dx);
+      safe_calloc(hlls[i].cache.S, hlls[i].cache.n, double**);
+      for (j = 0; j < hlls[i].cache.n; j++)
+	hlls[i].cache.S[j] = new_matrix2(hlls[i].dx, hlls[i].dx);
+    }
+
+    //fprintf(stderr, "break 1.2\n"); //dbug
+
+    // read x0,S0
+    for (j = 0; j < hlls[i].dx; j++)
+      if (fscanf(f, "%lf ", &hlls[i].x0[j]) < 1) goto ERROR;
+    for (j = 0; j < hlls[i].dx; j++)
+      for (k = 0; k < hlls[i].dx; k++)
+	if (fscanf(f, "%lf ", &hlls[i].S0[j][k]) < 1) goto ERROR;
+    //fscanf(f, "\n");
+
+    //fprintf(stderr, "break 1.3\n"); //dbug
+  }
+
+  //fprintf(stderr, "break 2\n"); //dbug
+
+  // read data
+  for (i2 = 0; i2 < *n; i2++) {
+    for (j2 = 0; j2 < hlls[i2].n; j2++) {
+      if (fscanf(f, "Q %d %d ", &i, &j) < 2) goto ERROR;
+      for (k = 0; k < hlls[i].dq; k++)
+	if (fscanf(f, "%lf ", &hlls[i].Q[j][k]) < 1) goto ERROR;
+      for (k = 0; k < hlls[i].dx; k++)
+	if (fscanf(f, "%lf ", &hlls[i].X[j][k]) < 1) goto ERROR;
+      //fscanf(f, "\n");
+    }
+  }
+
+  //fprintf(stderr, "break 3\n"); //dbug
+
+  // read cache
+  for (i2 = 0; i2 < *n; i2++) {
+    for (j2 = 0; j2 < hlls[i2].cache.n; j2++) {
+      if (fscanf(f, "C %d %d ", &i, &j) < 2) goto ERROR;
+      for (k = 0; k < hlls[i].dq; k++)
+	if (fscanf(f, "%lf ", &hlls[i].cache.Q[j][k]) < 1) goto ERROR;
+      int nx;
+      if (fscanf(f, "%d ", &nx) < 1) goto ERROR;  //dbug: change this for mixtures
+      for (k = 0; k < hlls[i].dx; k++)
+	if (fscanf(f, "%lf ", &hlls[i].cache.X[j][k]) < 1) goto ERROR;
+      for (k = 0; k < hlls[i].dx; k++)
+	for (l = 0; l < hlls[i].dx; l++)
+	  if (fscanf(f, "%lf ", &hlls[i].cache.S[j][k][l]) < 1) goto ERROR;
+      //fscanf(f, "\n");
+    }
+  }
+
+  //fprintf(stderr, "break 4\n"); //dbug
+
+  // create cache kdtrees
+  for (i = 0; i < *n; i++)
+    hlls[i].cache.Q_kdtree = kdtree(hlls[i].cache.Q, hlls[i].cache.n, hlls[i].dq);
+
+  fclose(f);
+
+  //save_hlls("test.hll", hlls, *n); //dbug
+
+  return hlls;
+
+ ERROR:
+  if (hlls) {
+    for (i = 0; i < *n; i++)
+      hll_free(&hlls[i]);
+    free(hlls);
+  }
+  return NULL;
+}
+
+
+/*
+ * Save hlls to a file.
+ */
+void save_hlls(char *fname, hll_t *hlls, int n)
+{
+  FILE *f = fopen(fname, "w");
+  if (f == NULL) {
+    fprintf(stderr, "Error: Can't open %s for writing\n", fname);
+    return;
+  }
+
+  int i, j, k, l;
+
+  // header
+  fprintf(f, "%d\n", n);
+  for (i = 0; i < n; i++) {
+    fprintf(f, "%d %d %d %d %d %f %f ", i, hlls[i].n, hlls[i].cache.n, hlls[i].dq, hlls[i].dx, hlls[i].r, hlls[i].w0);
+    for (j = 0; j < hlls[i].dx; j++)
+      fprintf(f, "%f ", hlls[i].x0[j]);
+    for (j = 0; j < hlls[i].dx; j++)
+      for (k = 0; k < hlls[i].dx; k++)
+	fprintf(f, "%f ", hlls[i].S0[j][k]);
+    fprintf(f, "\n");
+  }
+
+  // data
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < hlls[i].n; j++) {
+      fprintf(f, "Q %d %d ", i, j);
+      for (k = 0; k < hlls[i].dq; k++)
+	fprintf(f, "%f ", hlls[i].Q[j][k]);
+      for (k = 0; k < hlls[i].dx; k++)
+	fprintf(f, "%f ", hlls[i].X[j][k]);
+      fprintf(f, "\n");
+    }
+  }
+
+  // cache
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < hlls[i].cache.n; j++) {
+      fprintf(f, "C %d %d ", i, j);
+      for (k = 0; k < hlls[i].dq; k++)
+	fprintf(f, "%f ", hlls[i].cache.Q[j][k]);
+      fprintf(f, "1 ");  //dbug: change this for mixtures
+      for (k = 0; k < hlls[i].dx; k++)
+	fprintf(f, "%f ", hlls[i].cache.X[j][k]);
+      for (k = 0; k < hlls[i].dx; k++)
+	for (l = 0; l < hlls[i].dx; l++)
+	  fprintf(f, "%f ", hlls[i].cache.S[j][k][l]);
+      fprintf(f, "\n");
+    }
+  }
+
+  fclose(f);
+}
