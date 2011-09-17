@@ -20,13 +20,13 @@ extern "C" {
     double **data;    // e.g. data[0] = {x1,x2,x3}, data[1] = {y1,y2,y3}, etc.
 
     // data pointers
-    double *clusters;
     double **points;
     double **normals;
     double **principal_curvatures;
     double **shapes;
 
     // computed data
+    int *clusters;
     double **quaternions[2];
     kdtree_t *points_kdtree;
 
@@ -49,6 +49,7 @@ extern "C" {
     double lambda;
     double pose_agg_x;
     double pose_agg_q;
+    double *proposal_weights;
   } olf_t;
 
 

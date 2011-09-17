@@ -3,6 +3,8 @@
 #define BINGHAM_UTIL_H
 
 
+#include <stdlib.h>
+
 
 #define MAXFACT 10000
 
@@ -103,6 +105,8 @@ void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* m
 void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
 void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
+void wmean(double *mu, double **X, double *w, int n, int m);                /* weighted row vector mean */
+void wcov(double **S, double **X, double *w, double *mu, int n, int m);     /* compute the weighted covariance of the rows of X, given mean mu */
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
 

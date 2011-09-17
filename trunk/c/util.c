@@ -1299,6 +1299,45 @@ void cov(double **S, double **X, double *mu, int n, int m)
 }
 
 
+// weighted row vector mean
+void wmean(double *mu, double **X, double *w, int n, int m)
+{
+  memset(mu, 0, m*sizeof(double));  // mu = 0
+
+  int i, j;
+  for (i = 0; i < n; i++)
+    for (j = 0; j < m; j++)
+      mu[j] += w[i]*X[i][j];
+
+  mult(mu, mu, 1.0/sum(w,n), m);
+}
+
+
+// compute the weighted covariance of the rows of X, given mean mu
+void wcov(double **S, double **X, double *w, double *mu, int n, int m)
+{
+  int i;
+
+  memset(S[0], 0, m*m*sizeof(double));
+
+  double **Si = new_matrix2(m,m);
+  for (i = 0; i < n; i++) {
+    outer_prod(Si, X[i], X[i], m, m);
+    mult(Si[0], Si[0], w[i], m*m);
+    matrix_add(S, S, Si, m, m);
+  }
+
+  mult(S[0], S[0], 1.0/sum(w,n), m*m);
+
+  if (mu != NULL) {
+    double **S_mu = new_matrix2(m,m);
+    outer_prod(S_mu, mu, mu, m, m);
+    sub(S[0], S[0], S_mu[0], m*m);
+    free_matrix2(S_mu);
+  }
+}
+
+
 // solve the equation Ax = b, where A is a square n-by-n matrix
 void solve(double *x, double **A, double *b, int n)
 {
