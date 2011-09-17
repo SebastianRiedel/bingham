@@ -296,13 +296,15 @@ void test_bingham(int argc, char *argv[])
 
 
 // y = -sqrt(z)
-static double y_range[] = {0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 1.00,
-			   1.10, 1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.80, 1.90, 2.00,
-			   2.20, 2.40, 2.60, 2.80, 3.00, 3.20, 3.40, 3.60, 3.80, 4.00,
-			   4.50, 5.00, 5.50, 6.00, 6.50, 7.00, 7.50, 8.00, 8.50, 9.00,
-			   9.50, 10.00, 10.50, 11.00, 11.50, 12.00, 12.50, 13.00, 13.50,
-			   14.00, 14.50, 15.00, 15.50, 16.00, 16.50, 17.00, 17.50,
-			   18.00, 18.50, 19.00, 19.50, 20.00};
+static double y_range[] = { 0.10,  0.20,  0.30,  0.40,  0.50,  0.60,  0.70,  0.80,  0.90,  1.00,
+			    1.10,  1.20,  1.30,  1.40,  1.50,  1.60,  1.70,  1.80,  1.90,  2.00,
+			    2.20,  2.40,  2.60,  2.80,  3.00,  3.20,  3.40,  3.60,  3.80,  4.00,
+			    4.50,  5.00,  5.50,  6.00,  6.50,  7.00,  7.50,  8.00,  8.50,  9.00,
+			    9.50, 10.00, 10.50, 11.00, 11.50, 12.00, 12.50, 13.00, 13.50, 14.00,
+			   14.50, 15.00, 15.50, 16.00, 16.50, 17.00, 17.50, 18.00, 18.50, 19.00,
+			   19.50, 20.00, 21.00, 22.00, 23.00, 24.00, 25.00, 26.00, 27.00, 28.00,
+			   29.00, 30.00, 32.00, 34.00, 36.00};
+//38.00, 40.00, 45.00, 50.00, 55.00, 60.00, 70.00, 80.00, 100.00};
 static int y_cnt = sizeof(y_range)/sizeof(y_range[0]);
 
 
@@ -1219,7 +1221,7 @@ int main(int argc, char *argv[])
   test_bingham_init();
 
   //test_bingham_compose_multi(argc, argv);
-  test_bingham_compose(argc, argv);
+  //test_bingham_compose(argc, argv);
   //test_bingham_stats(argc, argv);
   //test_bingham_KL_divergence(argc, argv);
 
@@ -1236,7 +1238,7 @@ int main(int argc, char *argv[])
   //test_fit_quaternions(argc, argv);
   //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
-  //compute_bingham_constants(argc, argv);
+  compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
   //test_fit(argc, argv);
 

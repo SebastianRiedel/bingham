@@ -71,7 +71,10 @@ static void pcd_add_data_pointers(pcd_t *pcd)
 
 
   if (ch_cluster>=0) {
-    pcd->clusters = pcd->data[ch_cluster];
+    //pcd->clusters = pcd->data[ch_cluster];
+    safe_malloc(pcd->clusters, pcd->num_points, int);
+    for (i = 0; i < pcd->num_points; i++)
+      pcd->clusters[i] = (int)(pcd->data[ch_cluster][i]);
   }
   if (ch_x>=0 && ch_y>=0 && ch_z>=0) {
     safe_calloc(pcd->points, 3, double *);
@@ -125,6 +128,8 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free(pcd->principal_curvatures);
   if (pcd->shapes)
     free(pcd->shapes);
+  if (pcd->clusters)
+    free(pcd->clusters);
 
   if (pcd->quaternions[0])
     free_matrix2(pcd->quaternions[0]);
@@ -404,7 +409,7 @@ olf_t *load_olf(char *fname)
   // get cluster weights
   safe_calloc(olf->cluster_weights, num_clusters, double);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = (int)(pcd->clusters[i]);
+    int c = pcd->clusters[i];
     olf->cluster_weights[c]++;
   }
   mult(olf->cluster_weights, olf->cluster_weights, 1/(double)pcd->num_points, num_clusters);
@@ -412,7 +417,7 @@ olf_t *load_olf(char *fname)
   // get mean shapes
   olf->mean_shapes = new_matrix2(num_clusters, olf->shape_length);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = (int)(pcd->clusters[i]);
+    int c = pcd->clusters[i];
     add(olf->mean_shapes[c], olf->mean_shapes[c], S[i], olf->shape_length);
   }
   for (i = 0; i < num_clusters; i++) {
@@ -423,7 +428,7 @@ olf_t *load_olf(char *fname)
   // get shape variances
   safe_calloc(olf->shape_variances, num_clusters, double);
   for (i = 0; i < pcd->num_points; i++) {
-    int c = (int)(pcd->clusters[i]);
+    int c = pcd->clusters[i];
     olf->shape_variances[c] += dist2(S[i], olf->mean_shapes[c], olf->shape_length);
   }
   for (i = 0; i < num_clusters; i++) {
@@ -475,10 +480,10 @@ olf_t *load_olf(char *fname)
   //t = get_time_ms();
 
   // set olf params (TODO--load this from a .olf file)
-  olf->rot_symm = 1;
+  olf->rot_symm = 0;
   olf->num_validators = 5;
   olf->lambda = 1; //.5;
-  olf->pose_agg_x = 50;  // mm
+  olf->pose_agg_x = .05;  // meters
   olf->pose_agg_q = .2;  // radians
 
   return olf;
@@ -516,7 +521,7 @@ void olf_classify_points(pcd_t *pcd, olf_t *olf)
   int ch = pcd_channel(pcd, "cluster");
   if (ch < 0) {
     ch = pcd_add_channel(pcd, "cluster");
-    pcd->clusters = pcd->data[ch];
+    safe_malloc(pcd->clusters, pcd->num_points, int);
   }
 
   // create temporary shape matrix
@@ -524,7 +529,7 @@ void olf_classify_points(pcd_t *pcd, olf_t *olf)
   transpose(S, pcd->shapes, olf->shape_length, pcd->num_points);
 
   int i, j;
-  double d, dmin, jmin;
+  double d, dmin, jmin=0;
   for (i = 0; i < pcd->num_points; i++) {
     dmin = DBL_MAX;
     for (j = 0; j < olf->num_clusters; j++) {
@@ -535,6 +540,7 @@ void olf_classify_points(pcd_t *pcd, olf_t *olf)
       }
     }
     pcd->clusters[i] = jmin;
+    pcd->data[ch][i] = (double)jmin;
   }
 
   free_matrix2(S);
@@ -585,7 +591,7 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
   free_matrix2(R_inv);
 
   // p(q2)
-  int c = (int)(pcd->clusters[i]);
+  int c = pcd->clusters[i];
   double p = bingham_mixture_pdf(q2, &olf->bmx[c]);
 
   // p(x2|q2)
@@ -630,14 +636,29 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
   q_model_to_feature_ptr[0] = q_model_to_feature;
   x_mean_ptr[0] = x_mean;
 
+  // proposal weights
   int i;
-  for (i = 0; i < n; i++) {
-    // sample a point feature
-    int j = irand(npoints);
+  int *cluster_indices[olf->num_clusters];
+  int cluster_counts[olf->num_clusters];
+  double proposal_weights[olf->num_clusters];
+  if (olf->proposal_weights) {
+    for (i = 0; i < olf->num_clusters; i++) {
+      safe_malloc(cluster_indices[i], npoints, int);
+      cluster_counts[i] = findeq(cluster_indices[i], pcd->clusters, i, npoints);
+      proposal_weights[i] = cluster_counts[i] * olf->proposal_weights[i];
+    }
+    mult(proposal_weights, proposal_weights, 1.0/sum(proposal_weights, olf->num_clusters), olf->num_clusters);
+  }
 
-    //dbug
-    //while (pcd->clusters[j] != 5)
-    //  j = irand(npoints);
+  for (i = 0; i < n; i++) {
+    // sample a proposal feature
+    int j = 0;
+    if (olf->proposal_weights) {
+      int cluster = pmfrand(proposal_weights, olf->num_clusters);
+      j = cluster_indices[cluster][ irand(cluster_counts[cluster]) ];
+    }
+    else
+      j = irand(npoints);
 
     if (frand() < .5)
       q_feature = pcd->quaternions[0][j];
@@ -645,7 +666,7 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
       q_feature = pcd->quaternions[1][j];
 
     // sample model orientation
-    int c = (int)(pcd->clusters[j]);
+    int c = pcd->clusters[j];
     bingham_mixture_sample(q_model_to_feature_ptr, &olf->bmx[c], 1);
     quaternion_inverse(q_feature_to_model, q_model_to_feature);
     quaternion_mult(Q[i], q_feature_to_model, q_feature);
@@ -674,7 +695,10 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     //for (k = 0; k < num_validators; k++)
     //  indices[k] = indices_walk[10*k];
 
-    W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
+    if (num_validators > 0)
+      W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
+    else
+      W[i] = 1.0;
   }
 
   // sort pose samples by weight
