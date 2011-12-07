@@ -34,6 +34,7 @@ void set_proposal_weights(olf_t *olf, int proposal_cluster)
 
 void load_params(olf_t *olf, int *num_samples, char *param_file)
 {
+  int i;
   FILE *f = fopen(param_file, "r");
   if (f == NULL) {
     fprintf(stderr, "Error loading param file: %s\n", param_file);
@@ -74,6 +75,19 @@ void load_params(olf_t *olf, int *num_samples, char *param_file)
 	int proposal_cluster;
 	sscanf(s, "%d", &proposal_cluster);
 	set_proposal_weights(olf, proposal_cluster);
+      }
+      else if (!wordcmp(s, "cluttered", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &olf->cluttered);
+      }
+      else if (!wordcmp(s, "proposal_segments", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &olf->num_proposal_segments);
+	safe_calloc(olf->proposal_segments, olf->num_proposal_segments, int);
+	for (i = 0; i < olf->num_proposal_segments; i++) {
+	  s = sword(s, " \t", 1);
+	  sscanf(s, "%d", &olf->proposal_segments[i]);
+	}
       }
     }
   }

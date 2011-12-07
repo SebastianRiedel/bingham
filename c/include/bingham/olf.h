@@ -13,6 +13,22 @@ extern "C" {
 #include "hll.h"
 
 
+  // heirarchical segmentation and balls model
+  typedef struct {
+    int num_segments;
+    int *num_balls;
+    int *segment_labels;
+    int *ball_labels;
+    double **segment_centers;
+    double *segment_radii;
+    double ***ball_centers;
+    double **ball_radii;
+    double mean_segment_radius;
+    double mean_ball_radius;
+  } pcd_balls_t;
+
+
+  // point cloud data structure
   typedef struct {
     int num_channels;
     int num_points;
@@ -29,10 +45,12 @@ extern "C" {
     int *clusters;
     double **quaternions[2];
     kdtree_t *points_kdtree;
+    pcd_balls_t *balls;
 
   } pcd_t;
 
 
+  // oriented local feature model
   typedef struct {
     pcd_t *pcd;                   // point cloud
     bingham_mix_t *bmx;           // bingham mixture models (one per cluster)
@@ -50,6 +68,9 @@ extern "C" {
     double pose_agg_x;
     double pose_agg_q;
     double *proposal_weights;
+    int cluttered;
+    int num_proposal_segments;
+    int *proposal_segments;
   } olf_t;
 
 

@@ -41,20 +41,18 @@ void bingham_constants_init()
   double **dY3d = new_matrix2(n*n*n, 3);
   int cnt = 0;
   for (i = 0; i < n; i++) {
-    for (j = 0; j < n; j++) {
-      for (k = 0; k < n; k++) {
-	if (i >= j && j >= k) {
-
-	  dY3d[cnt][0] = bingham_dY1_table[i][j][k];
-	  dY3d[cnt][1] = bingham_dY2_table[i][j][k];
-	  dY3d[cnt][2] = bingham_dY3_table[i][j][k];
-
-	  dY_indices_3d[cnt][0] = i;
-	  dY_indices_3d[cnt][1] = j;
-	  dY_indices_3d[cnt][2] = k;
-
-	  cnt++;
-	}
+    for (j = 0; j <= i; j++) {
+      for (k = 0; k <= j; k++) {
+	//dY3d[cnt][0] = bingham_dY1_table[i][j][k];
+	//dY3d[cnt][1] = bingham_dY2_table[i][j][k];
+	//dY3d[cnt][2] = bingham_dY3_table[i][j][k];
+	dY3d[cnt][0] = bingham_dF1_table_3d[i][j][k] / bingham_F_table_3d[i][j][k];
+	dY3d[cnt][1] = bingham_dF2_table_3d[i][j][k] / bingham_F_table_3d[i][j][k];
+	dY3d[cnt][2] = bingham_dF3_table_3d[i][j][k] / bingham_F_table_3d[i][j][k];
+	dY_indices_3d[cnt][0] = i;
+	dY_indices_3d[cnt][1] = j;
+	dY_indices_3d[cnt][2] = k;
+	cnt++;
       }
     }
   }
@@ -188,7 +186,7 @@ void bingham_dY_params_3d(double *Z, double *F, double *dY)
   Z[1] = -r1*r1;
   Z[2] = -r2*r2;
 
-  *F = bingham_F_table[i][j][k];
+  *F = bingham_F_table_3d[i][j][k];
   */
 }
 
@@ -197,19 +195,19 @@ double bingham_F_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
-      return bingham_F_table[i][j][k];
+      return bingham_F_table_3d[i][j][k];
     else if (i >= k)
-      return bingham_F_table[i][k][j];
+      return bingham_F_table_3d[i][k][j];
     else
-      return bingham_F_table[k][i][j];
+      return bingham_F_table_3d[k][i][j];
   }
   else {
     if (k >= j)
-      return bingham_F_table[k][j][i];
+      return bingham_F_table_3d[k][j][i];
     else if (k >= i)
-      return bingham_F_table[j][k][i];
+      return bingham_F_table_3d[j][k][i];
     else
-      return bingham_F_table[j][i][k];
+      return bingham_F_table_3d[j][i][k];
   }
 
   return 0.0;
@@ -220,19 +218,19 @@ double bingham_dF1_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
-      return bingham_dF1_table[i][j][k];
+      return bingham_dF1_table_3d[i][j][k];
     else if (i >= k)
-      return bingham_dF1_table[i][k][j];
+      return bingham_dF1_table_3d[i][k][j];
     else
-      return bingham_dF1_table[k][i][j];
+      return bingham_dF1_table_3d[k][i][j];
   }
   else {
     if (k >= j)
-      return bingham_dF1_table[k][j][i];
+      return bingham_dF1_table_3d[k][j][i];
     else if (k >= i)
-      return bingham_dF1_table[j][k][i];
+      return bingham_dF1_table_3d[j][k][i];
     else
-      return bingham_dF1_table[j][i][k];
+      return bingham_dF1_table_3d[j][i][k];
   }
 
   return 0.0;
@@ -243,19 +241,19 @@ double bingham_dF2_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
-      return bingham_dF2_table[i][j][k];
+      return bingham_dF2_table_3d[i][j][k];
     else if (i >= k)
-      return bingham_dF2_table[i][k][j];
+      return bingham_dF2_table_3d[i][k][j];
     else
-      return bingham_dF2_table[k][i][j];
+      return bingham_dF2_table_3d[k][i][j];
   }
   else {
     if (k >= j)
-      return bingham_dF2_table[k][j][i];
+      return bingham_dF2_table_3d[k][j][i];
     else if (k >= i)
-      return bingham_dF2_table[j][k][i];
+      return bingham_dF2_table_3d[j][k][i];
     else
-      return bingham_dF2_table[j][i][k];
+      return bingham_dF2_table_3d[j][i][k];
   }
 
   return 0.0;
@@ -266,19 +264,19 @@ double bingham_dF3_table_get(int i, int j, int k)
 {
   if (i >= j) {
     if (j >= k)
-      return bingham_dF3_table[i][j][k];
+      return bingham_dF3_table_3d[i][j][k];
     else if (i >= k)
-      return bingham_dF3_table[i][k][j];
+      return bingham_dF3_table_3d[i][k][j];
     else
-      return bingham_dF3_table[k][i][j];
+      return bingham_dF3_table_3d[k][i][j];
   }
   else {
     if (k >= j)
-      return bingham_dF3_table[k][j][i];
+      return bingham_dF3_table_3d[k][j][i];
     else if (k >= i)
-      return bingham_dF3_table[j][k][i];
+      return bingham_dF3_table_3d[j][k][i];
     else
-      return bingham_dF3_table[j][i][k];
+      return bingham_dF3_table_3d[j][i][k];
   }
 
   return 0.0;

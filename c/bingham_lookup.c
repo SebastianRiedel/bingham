@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
   double dF[3];
   bingham_dF_lookup_3d(dF, Z);
 
-  printf("F = %f, dF = [%f, %f, %f]\n", F, dF[0], dF[1], dF[2]);
+  printf("F = %e, dF = [%e, %e, %e]\n", F, dF[0], dF[1], dF[2]);
 
   return 0;
 }
