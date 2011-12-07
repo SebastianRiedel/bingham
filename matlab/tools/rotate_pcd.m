@@ -31,4 +31,9 @@ if isfield(pcd, 'Q')
     end
 end
 
+if isfield(pcd, 'vp') && ~isempty(pcd.vp)
+   pcd2.vp(1:3) = pcd.vp(1:3)*R';
+   pcd2.vp(4:7) = quaternion_mult(q, pcd.vp(4:7));
+end
+
 pcd2.data = populate_pcd_data(pcd2);

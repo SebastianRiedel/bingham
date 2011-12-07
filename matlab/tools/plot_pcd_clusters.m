@@ -1,10 +1,13 @@
-function plot_pcd_clusters(data, columns, options, B, W)
-% plot_pcd_clusters(data, columns, options) -- where options is a string
+function plot_pcd_clusters(pcd, options, B, W)
+% plot_pcd_clusters(pcd, options) -- where options is a string
 % contains any combination of the following characters:
 %    'n'  --  plot normals
 %    'p'  --  plot principal curvatures
 %    'q'  --  plot quaternions
 
+
+data = pcd.data;
+columns = pcd.columns;
 
 figure(1);
 clf;
@@ -17,7 +20,7 @@ LINE_SKIP_RATE = 5; %10;
 plot_normals = 0;
 plot_pcs = 0;
 plot_quat = 0;
-if nargin >= 3
+if nargin >= 2
    if strfind(options, 'n')
       plot_normals = 1;
    end
@@ -33,98 +36,99 @@ if nargin >= 3
 end
 
 plot_bmx = 0;
-if nargin >= 4
+if nargin >= 3
     plot_bmx = 1;
 end
 
 
-ch_cluster = find(strcmp(columns, 'cluster'));
-ch_x = find(strcmp(columns, 'x'));
-ch_y = find(strcmp(columns, 'y'));
-ch_z = find(strcmp(columns, 'z'));
-ch_pfh = find(strncmp(columns, 'f', 1));
+% ch_cluster = find(strcmp(columns, 'cluster'));
+% ch_x = find(strcmp(columns, 'x'));
+% ch_y = find(strcmp(columns, 'y'));
+% ch_z = find(strcmp(columns, 'z'));
+% ch_pfh = find(strncmp(columns, 'f', 1));
+% 
+% if isempty(ch_cluster)
+%    fprintf('Error: channel "cluster" not found.');
+%    return
+% end
+% if isempty(ch_x)
+%    fprintf('Error: channel "x" not found.');
+%    return
+% end
+% if isempty(ch_y)
+%    fprintf('Error: channel "y" not found.');
+%    return
+% end
+% if isempty(ch_z)
+%    fprintf('Error: channel "z" not found.');
+%    return
+% end
+% if isempty(ch_pfh)
+%    fprintf('Error: channels "f*" not found.');
+%    return
+% end
 
-if isempty(ch_cluster)
-   fprintf('Error: channel "cluster" not found.');
-   return
-end
-if isempty(ch_x)
-   fprintf('Error: channel "x" not found.');
-   return
-end
-if isempty(ch_y)
-   fprintf('Error: channel "y" not found.');
-   return
-end
-if isempty(ch_z)
-   fprintf('Error: channel "z" not found.');
-   return
-end
-if isempty(ch_pfh)
-   fprintf('Error: channels "f*" not found.');
-   return
-end
-
-X = data(:, ch_x);
-Y = data(:, ch_y);
-Z = data(:, ch_z);
-F = data(:, ch_pfh);
-L = data(:, ch_cluster);
+X = pcd.X;  %data(:, ch_x);
+Y = pcd.Y;  %data(:, ch_y);
+Z = pcd.Z;  %data(:, ch_z);
+F = pcd.F;  %data(:, ch_pfh);
+L = pcd.L;  %data(:, ch_cluster);
 k = max(L)+1;
 
 mean_std = mean([std(X) std(Y) std(Z)]);
 line_length = LINE_LENGTH_RATIO * mean_std;
 
 if plot_normals
-   ch_nx = find(strcmp(columns, 'nx'));
-   ch_ny = find(strcmp(columns, 'ny'));
-   ch_nz = find(strcmp(columns, 'nz'));
-   if isempty(ch_nx)
-      fprintf('Error: channel "nx" not found.');
-      return
-   end
-   if isempty(ch_ny)
-      fprintf('Error: channel "ny" not found.');
-      return
-   end
-   if isempty(ch_nz)
-      fprintf('Error: channel "nz" not found.');
-      return
-   end
-   NX = data(:, ch_nx);
-   NY = data(:, ch_ny);
-   NZ = data(:, ch_nz);
+%    ch_nx = find(strcmp(columns, 'nx'));
+%    ch_ny = find(strcmp(columns, 'ny'));
+%    ch_nz = find(strcmp(columns, 'nz'));
+%    if isempty(ch_nx)
+%       fprintf('Error: channel "nx" not found.');
+%       return
+%    end
+%    if isempty(ch_ny)
+%       fprintf('Error: channel "ny" not found.');
+%       return
+%    end
+%    if isempty(ch_nz)
+%       fprintf('Error: channel "nz" not found.');
+%       return
+%    end
+   NX = pcd.NX;  %data(:, ch_nx);
+   NY = pcd.NY;  %data(:, ch_ny);
+   NZ = pcd.NZ;  %data(:, ch_nz);
 end
 
 if plot_pcs
-   ch_pcx = find(strcmp(columns, 'pcx'));
-   ch_pcy = find(strcmp(columns, 'pcy'));
-   ch_pcz = find(strcmp(columns, 'pcz'));
-   if isempty(ch_pcx)
-      fprintf('Error: channel "pcx" not found.');
-      return
-   end
-   if isempty(ch_pcy)
-      fprintf('Error: channel "pcy" not found.');
-      return
-   end
-   if isempty(ch_pcz)
-      fprintf('Error: channel "pcz" not found.');
-      return
-   end
-   PCX = data(:, ch_pcx);
-   PCY = data(:, ch_pcy);
-   PCZ = data(:, ch_pcz);
+%    ch_pcx = find(strcmp(columns, 'pcx'));
+%    ch_pcy = find(strcmp(columns, 'pcy'));
+%    ch_pcz = find(strcmp(columns, 'pcz'));
+%    if isempty(ch_pcx)
+%       fprintf('Error: channel "pcx" not found.');
+%       return
+%    end
+%    if isempty(ch_pcy)
+%       fprintf('Error: channel "pcy" not found.');
+%       return
+%    end
+%    if isempty(ch_pcz)
+%       fprintf('Error: channel "pcz" not found.');
+%       return
+%    end
+   PCX = pcd.PCX;  %data(:, ch_pcx);
+   PCY = pcd.PCY;  %data(:, ch_pcy);
+   PCZ = pcd.PCZ;  %data(:, ch_pcz);
 end
 
 if plot_quat
-   Q = get_pcd_quaternions(data, columns);
+   Q = pcd.Q;  %get_pcd_quaternions(data, columns);
 end
 
 for i=0:max(L)
    Li = find(L==i);
 
    figure(1);
+   clf;
    
    % plot points
    plot3(X, Y, Z, '.', 'Color', [.9 .9 1]);
@@ -145,43 +149,27 @@ for i=0:max(L)
    
    % plot principal curvatures
    if plot_pcs
+      r = line_length;
       for j=1:LINE_SKIP_RATE:length(Li)
-         figure(1);
-         r = line_length;
          x = X(Li(j)); y = Y(Li(j)); z = Z(Li(j));
          pcx = PCX(Li(j)); pcy = PCY(Li(j)); pcz = PCZ(Li(j)); 
          plot3([x x+r*pcx], [y y+r*pcy], [z z+r*pcz], 'g-', 'LineWidth', 2);
+      end
+      for j=1:LINE_SKIP_RATE:length(Li)
+         x = X(Li(j)); y = Y(Li(j)); z = Z(Li(j));
+         pcx = PCX(Li(j)); pcy = PCY(Li(j)); pcz = PCZ(Li(j)); 
          nx = NX(Li(j)); ny = NY(Li(j)); nz = NZ(Li(j)); 
          pcx2 = ny*pcz - nz*pcy;
          pcy2 = nz*pcx - nx*pcz;
          pcz2 = nx*pcy - ny*pcx;
          plot3([x x+r*pcx2], [y y+r*pcy2], [z z+r*pcz2], 'm-', 'LineWidth', 2);
-         
-         %nx = NX(Li(j)); ny = NY(Li(j)); nz = NZ(Li(j)); 
-         %norm_n = norm([nx ny nz]);
-         %norm_pc = norm([pcx pcy pcz]);
-         %norm_pc2 = norm([pcx2 pcy2 pcz2]);
-         %n_dot_pc = dot([nx ny nz], [pcx pcy pcz]);
-         
-         %R = [nx pcx pcx2 ; ny pcy pcy2 ; nz pcz pcz2];
-         %q = rotationMatrixToQuaternion(R);
-
-         %R2 = [nx -pcx -pcx2 ; ny -pcy -pcy2 ; nz -pcz -pcz2];
-         %q2 = rotationMatrixToQuaternion(R2);
-         
-         %figure(3);
-         %nx = NX(Li(j)); ny = NY(Li(j)); nz = NZ(Li(j)); 
-         %plot3([0 nx], [0 ny], [0 nz], 'k-', 'LineWidth', 2);
-         %hold on;
-         %plot3([-pcx pcx], [-pcy pcy], [-pcz pcz], 'g-', 'LineWidth', 2);
-         %plot3([-pcx2 pcx2], [-pcy2 pcy2], [-pcz2 pcz2], 'm-', 'LineWidth', 2);
-         %hold off;
-         %axis([-1 1 -1 1 -1 1]);
-         
-         %input('\n:');
       end
    end
-
+   hold off;
+   axis vis3d;
+   axis equal;
+   %axis off;
+   
    if plot_quat
       Qi = [Q(Li,:,1) ; Q(Li,:,2)];
       %[B_V B_Z B_F] = bingham_fit(Qi')
@@ -240,11 +228,6 @@ for i=0:max(L)
       %plot_quaternions(Q(Li,:,2), C);
    end
 
-   figure(1);
-   hold off;
-   axis vis3d;
-   axis equal;
-   %axis off;
 
    
    figure(2);
