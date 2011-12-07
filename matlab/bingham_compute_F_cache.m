@@ -14,7 +14,6 @@ Y = [ 0.00, 0.10,  0.20,  0.30,  0.40,  0.50,  0.60,  0.70,  0.80,  0.90,  1.00,
 Z = Y.^2;
 F_cache.Z = Z;
 
-%if 0 %dbug
 
 % 1F1(1/2; 1; z) for z<0
 F_cache.table{1} = zeros(1, length(Z));
@@ -189,7 +188,6 @@ for zi1=1:length(Z)
     end
 end
 
-%end %dbug
 
 
 % (d/dZ) 1F1(1/2; 2/2; z) for z < 0
@@ -219,7 +217,6 @@ for zi=2:length(Z)
 end
 %F_cache.dF{1}
 
-%end %dbug
 
 % (d/dZ) 1F1(1/2; 3/2; z1,z2) for z1,z2 < 0
 F_cache.dF{2} = zeros(2, length(Z), length(Z));
@@ -420,28 +417,13 @@ end
 %F_cache.dF{3}
 
 
-%end %dbug
+%bingham_constants = rmfield(F_cache, 'btable');
+%save bingham_constants.mat bingham_constants
 
 
-% fill in the diagonals (2-D)
-%b = 3/2;
-%for zi=1:length(Z)
-%    F_cache.table{2}(zi,zi) = sqrt(pi)*F_cache.table{1}(zi);
-%    
-%    F_cache.dF{2}(1,zi,zi) = sqrt(pi)*F_cache.dF{1}(zi);
-%    F_cache.table{2}(zi,zi) = .5*sqrt(pi)*F_cache.btable{1}(2*(b+1),zi);
-%     = 
-%    
-%end
 
-% fill in the diagonals (3-D)
-%for zi=1:length(Z)
-%    for zi3=1:zi
-%        F_cache.table{3}(zi,zi,zi3) = sqrt(pi)*F_cache.table{2}(zi,zi3);
-%        F_cache.dF{3}
-%    end
-%end
 
-% F(-z1,-z1,-z3) -> F(z1,z1-z3,0) -> sqrt(pi)*F(z1,z1-z3) -> sqrt(pi)*F(-z1,-z3)
+
+
 
 
