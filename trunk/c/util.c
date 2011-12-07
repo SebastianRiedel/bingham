@@ -449,9 +449,16 @@ int findeq(int *k, int x[], int a, int n)
 {
   int i;
   int cnt = 0;
-  for (i = 0; i < n; i++)
-    if (x[i] == a)
-      k[cnt++] = i;
+  if (k != NULL) {
+    for (i = 0; i < n; i++) {
+      if (x[i] == a)
+	k[cnt++] = i;
+    }
+  }
+  else
+    for (i = 0; i < n; i++)
+      if (x[i] == a)
+	cnt++;
   return cnt;
 }
 

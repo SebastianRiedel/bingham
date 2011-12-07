@@ -8,7 +8,7 @@ CC=gcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -pg
+CFLAGS=-Wall -I$(IDIR) -O3 #-pg
 
 #CYGWIN=1
 #WINDOWS=1

@@ -35,7 +35,6 @@ BINGHAM
 
 NOW:
  - Improve dY -> Z lookup via IDW interpolation
- - Recompute normalization constants
  - Check for 0 mixtures in bingham_cluster
 
 
@@ -46,6 +45,7 @@ SOON:
 
 
 DONE:
+ + Recompute normalization constants
  + Remove GSL dependencies (solve, det, inv, eigen_symm)
  + Move bingham_stats_t inside bingham_t and lazy auto compute stats
  + Use bingham_F_lookup_3d() in bingham_new()

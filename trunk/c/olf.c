@@ -51,6 +51,185 @@ void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int 
 
 
 /*
+ * add balls model to a pcd
+ */
+static void pcd_add_balls(pcd_t *pcd)
+{
+  int i, s, b;
+  int ch_balls = pcd_channel(pcd, "balls");
+  int ch_segments = pcd_channel(pcd, "segments");
+
+  if (ch_balls < 0)
+    return;
+
+  // create pcd_balls_t
+  safe_calloc(pcd->balls, 1, pcd_balls_t);
+  pcd_balls_t *B = pcd->balls;
+
+  // get ball labels
+  safe_calloc(B->ball_labels, pcd->num_points, int);
+  for (i = 0; i < pcd->num_points; i++)
+    B->ball_labels[i] = (int)(pcd->data[ch_balls][i]);
+
+  // get segment labels
+  safe_calloc(B->segment_labels, pcd->num_points, int);
+  if (ch_segments >= 0)
+    for (i = 0; i < pcd->num_points; i++)
+      B->segment_labels[i] = (int)(pcd->data[ch_segments][i]);
+
+  // get num segments
+  B->num_segments = imax(B->segment_labels, pcd->num_points) + 1;
+
+  /*
+  // compute segment centers
+  B->segment_centers = new_matrix2(B->num_segments, 3);
+  int segment_cnts[B->num_segments];
+  memset(segment_cnts, 0, B->num_segments * sizeof(int));
+  for (i = 0; i < pcd->num_points; i++) {
+    s = B->segment_labels[i];
+    B->segment_centers[s][0] += pcd->points[0][i];
+    B->segment_centers[s][1] += pcd->points[1][i];
+    B->segment_centers[s][2] += pcd->points[2][i];
+    segment_cnts[s]++;
+  }
+  for (s = 0; s < B->num_segments; s++)
+    mult(B->segment_centers[s], B->segment_centers[s], 1.0/(double)segment_cnts[s], 3);
+
+  // compute segment radii
+  safe_calloc(B->segment_radii, B->num_segments, double);
+  for (i = 0; i < pcd->num_points; i++) {
+    s = B->segment_labels[i];
+    double dx = pcd->points[0][i] - B->segment_centers[s][0];
+    double dy = pcd->points[1][i] - B->segment_centers[s][1];
+    double dz = pcd->points[2][i] - B->segment_centers[s][2];
+    B->segment_radii[s] += dx*dx + dy*dy + dz*dz;
+  }
+  for (s = 0; s < B->num_segments; s++)
+    B->segment_radii[s] = sqrt(B->segment_radii[s] / (double)segment_cnts[s]);
+
+  // compute mean segment radius
+  B->mean_segment_radius = sum(B->segment_radii, B->num_segments);
+  B->mean_segment_radius /= (double)B->num_segments;
+  */
+
+  // get num balls
+  safe_calloc(B->num_balls, B->num_segments, int);
+  for (i = 0; i < pcd->num_points; i++) {
+    s = B->segment_labels[i];
+    b = B->ball_labels[i];
+    if (B->num_balls[s] < b+1)
+      B->num_balls[s] = b+1;
+  }
+
+  // compute ball centers
+  safe_calloc(B->ball_centers, B->num_segments, double**);
+  for (s = 0; s < B->num_segments; s++)
+    B->ball_centers[s] = new_matrix2(B->num_balls[s], 3);
+  int max_balls = imax(B->num_balls, B->num_segments);
+  int ball_cnts[B->num_segments][max_balls];
+  memset(ball_cnts, 0, B->num_segments * max_balls * sizeof(int));
+  for (i = 0; i < pcd->num_points; i++) {
+    s = B->segment_labels[i];
+    b = B->ball_labels[i];
+    B->ball_centers[s][b][0] += pcd->points[0][i];
+    B->ball_centers[s][b][1] += pcd->points[1][i];
+    B->ball_centers[s][b][2] += pcd->points[2][i];
+    ball_cnts[s][b]++;
+  }
+  for (s = 0; s < B->num_segments; s++)
+    for (b = 0; b < B->num_balls[s]; b++)
+      mult(B->ball_centers[s][b], B->ball_centers[s][b], 1.0/(double)ball_cnts[s][b], 3);
+
+  // compute ball radii
+  B->ball_radii = new_matrix2(B->num_segments, max_balls);
+  for (i = 0; i < pcd->num_points; i++) {
+    s = B->segment_labels[i];
+    b = B->ball_labels[i];
+    double dx = B->ball_centers[s][b][0] - pcd->points[0][i];
+    double dy = B->ball_centers[s][b][1] - pcd->points[1][i];
+    double dz = B->ball_centers[s][b][2] - pcd->points[2][i];
+    B->ball_radii[s][b] += dx*dx + dy*dy + dz*dz;
+  }
+  for (s = 0; s < B->num_segments; s++)
+    for (b = 0; b < B->num_balls[s]; b++)
+      B->ball_radii[s][b] = sqrt(B->ball_radii[s][b] / (double)ball_cnts[s][b]);
+
+  // compute mean ball radius
+  int nballs = 0;
+  for (s = 0; s < B->num_segments; s++) {
+    for (b = 0; b < B->num_balls[s]; b++) {
+      if (ball_cnts[s][b] > 0) {
+	B->mean_ball_radius += B->ball_radii[s][b];
+	nballs++;
+      }
+    }
+  }
+  B->mean_ball_radius /= (double)nballs;
+
+  // compute segment centers & radii
+  B->segment_centers = new_matrix2(B->num_segments, 3);
+  safe_calloc(B->segment_radii, B->num_segments, double);
+  for (s = 0; s < B->num_segments; s++) {
+    // compute center
+    nballs = 0;
+    for (b = 0; b < B->num_balls[s]; b++) {
+      if (ball_cnts[s][b] > 0) {
+	nballs++;
+	add(B->segment_centers[s], B->segment_centers[s], B->ball_centers[s][b], 3);
+      }
+    }
+    mult(B->segment_centers[s], B->segment_centers[s], 1/(double)nballs, 3);
+    // compute radius
+    for (b = 0; b < B->num_balls[s]; b++) {
+      if (ball_cnts[s][b] > 0) {
+	double d = dist(B->segment_centers[s], B->ball_centers[s][b], 3);
+	double r = B->ball_radii[s][b];
+	if (B->segment_radii[s] < d + r)
+	  B->segment_radii[s] = d + r;
+      }
+    }
+  }
+
+  // compute mean segment radius
+  B->mean_segment_radius = sum(B->segment_radii, B->num_segments);
+  B->mean_segment_radius /= (double)B->num_segments;
+}
+
+
+/*
+ * free pcd->balls
+ */
+static void pcd_free_balls(pcd_t *pcd)
+{
+  if (pcd->balls == NULL)
+    return;
+
+  pcd_balls_t *B = pcd->balls;
+  int i;
+
+  if (B->num_balls)
+    free(B->num_balls);
+  if (B->segment_labels)
+    free(B->segment_labels);
+  if (B->ball_labels)
+    free(B->ball_labels);
+  if (B->segment_centers)
+    free_matrix2(B->segment_centers);
+  if (B->segment_radii)
+    free(B->segment_radii);
+  if (B->ball_centers) {
+    for (i = 0; i < B->num_segments; i++)
+      free_matrix2(B->ball_centers[i]);
+    free(B->ball_centers);
+  }
+  if (B->ball_radii)
+    free_matrix2(B->ball_radii);
+
+  free(pcd->balls);
+}
+
+
+/*
  * add data pointers to a pcd
  */
 static void pcd_add_data_pointers(pcd_t *pcd)
@@ -68,6 +247,7 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_pcz = pcd_channel(pcd, "pcz");
   int ch_f1 = pcd_channel(pcd, "f1");
   int ch_f33 = pcd_channel(pcd, "f33");
+  int ch_balls = pcd_channel(pcd, "balls");
 
 
   if (ch_cluster>=0) {
@@ -112,6 +292,10 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   transpose(X, pcd->points, 3, pcd->num_points);
   pcd->points_kdtree = kdtree(X, pcd->num_points, 3);
   free_matrix2(X);
+
+  // add balls model
+  if (ch_balls>=0)
+    pcd_add_balls(pcd);
 }
 
 
@@ -138,6 +322,9 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 
   if (pcd->points_kdtree)
     kdtree_free(pcd->points_kdtree);
+
+  if (pcd->balls)
+    pcd_free_balls(pcd);
 }
 
 
@@ -192,6 +379,74 @@ static void pcd_random_walk(int *I, pcd_t *pcd, int i0, int n, double sigma)
   }
 }
 
+
+/*
+ * (fast, randomized) intersection of two pcds with a balls model --
+ * computes a list of point indices that (approximately) intersect with the model balls,
+ * returns the number of intersecting points
+ */
+static int pcd_intersect(int *idx, pcd_t *pcd, pcd_t *model, double *x, double *q)
+{
+  int i, s, b;
+  int num_points = pcd->num_points;
+  int num_model_balls = model->balls->num_balls[0];
+  int num_segments = pcd->balls->num_segments;
+  int *num_segment_balls = pcd->balls->num_balls;
+  double model_radius = model->balls->segment_radii[0];
+  double *model_ball_radii = model->balls->ball_radii[0];
+  double **segment_centers = pcd->balls->segment_centers;
+  double *segment_radii = pcd->balls->segment_radii;
+  double ***segment_ball_centers = pcd->balls->ball_centers;
+  double **segment_ball_radii = pcd->balls->ball_radii;
+
+  // apply transform (x,q) to model
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R,q);
+  double model_center[3];
+  matrix_vec_mult(model_center, R, model->balls->segment_centers[0], 3, 3);
+  add(model_center, model_center, x, 3);
+  double **model_ball_centers = new_matrix2(num_model_balls, 3);
+  for (b = 0; b < num_model_balls; b++) {
+    matrix_vec_mult(model_ball_centers[b], R, model->balls->ball_centers[0][b], 3, 3);
+    add(model_ball_centers[b], model_ball_centers[b], x, 3);
+  }
+  free_matrix2(R);
+
+  // compute close segments
+  int close_segments[num_segments];
+  memset(close_segments, 0, num_segments * sizeof(int));
+  for (s = 0; s < num_segments; s++) {
+    //printf("break 1\n");
+    if (dist(segment_centers[s], model_center, 3) < segment_radii[s] + model_radius) {  // segment intersects model
+      for (b = 0; b < num_model_balls; b++) {
+	//printf("break 2\n");
+	if (dist(segment_centers[s], model_ball_centers[b], 3) < segment_radii[s] + model_ball_radii[b]) {  // segment intersects model ball
+	  double p = 0;
+	  for (i = 0; i < num_segment_balls[s]; i++) {
+	    if (segment_ball_radii[s][i] > 0.0) {
+	      //printf("break 3\n");
+	      if (dist(segment_ball_centers[s][i], model_ball_centers[b], 3) < segment_ball_radii[s][i] + model_ball_radii[b])  // segment ball intersects model ball
+		p += 1/(double)num_segment_balls[s];
+	    }
+	  }
+	  if (frand() < p)
+	    close_segments[s] = 1;
+	}
+      }
+    }
+  }
+  free_matrix2(model_ball_centers);
+
+  // compute point indices
+  int n = 0;
+  for (i = 0; i < num_points; i++) {
+    s = pcd->balls->segment_labels[i];
+    if (close_segments[s])
+      idx[n++] = i;
+  }
+
+  return n;
+}
 
 
 
@@ -529,16 +784,30 @@ void olf_classify_points(pcd_t *pcd, olf_t *olf)
   transpose(S, pcd->shapes, olf->shape_length, pcd->num_points);
 
   int i, j;
+
+  printf("shape stdev = [");
+  double sigma = 0.0;
+  for (i = 0; i < olf->num_clusters; i++) {
+    sigma += sqrt(olf->shape_variances[i]);
+    printf("%f ", sqrt(olf->shape_variances[i]));
+  }
+  printf("]\n");
+  sigma /= (double) olf->num_clusters;
+
   double d, dmin, jmin=0;
+  double p[olf->num_clusters];
   for (i = 0; i < pcd->num_points; i++) {
     dmin = DBL_MAX;
     for (j = 0; j < olf->num_clusters; j++) {
-      d = dist2(S[i], olf->mean_shapes[j], olf->shape_length);
-      if (d < dmin) {
-	dmin = d;
-	jmin = j;
-      }
+      d = dist(S[i], olf->mean_shapes[j], olf->shape_length);
+      p[j] = normpdf(d, 0, sigma/10.0);
+      //if (d < dmin) {
+      //  dmin = d;
+      //  jmin = j;
+      //}
     }
+    mult(p, p, 1/sum(p, olf->num_clusters), olf->num_clusters);
+    jmin = pmfrand(p, olf->num_clusters);
     pcd->clusters[i] = jmin;
     pcd->data[ch][i] = (double)jmin;
   }
@@ -555,6 +824,10 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
 {
   int i;
 
+  //dbug
+  //printf("x = %f, %f, %f\n", x[0], x[1], x[2]);
+  //printf("q = %f, %f, %f, %f\n", q[0], q[1], q[2], q[3]);
+
   // multi-feature likelihood
   if (n > 1) {
     double logp = 0;
@@ -564,49 +837,70 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
     return olf->lambda * exp(olf->lambda*logp/(double)n);
   }
 
-  i = indices[0];
-  double q_inv[4];
-  quaternion_inverse(q_inv, q);
+  i = indices[0];  // validation point index
+
+  double *x_world_to_model = x;
+  double *q_world_to_model = q;
+  double q_model_to_world[4];  //q_inv[4];
+
+  quaternion_inverse(q_model_to_world, q_world_to_model);  //(q_inv, q);
+
+  double x_feature[3] = {pcd->points[0][i], pcd->points[1][i], pcd->points[2][i]};
+  double *q_feature = (frand() < .5 ? pcd->quaternions[0][i] : pcd->quaternions[1][i]);
+  //double *q_feature = pcd->quaternions[0][i]; //dbug
+
+
+  /* dbug
+  double x_dbug[3] = {1000,0,0};    // world to model
+  double q_dbug[4] = {0,1,0,0};  // world to model
+  double q_feature_dbug[4];
+  quaternion_mult(q_feature_dbug, q_feature, q_dbug);
+  q_feature = q_feature_dbug;
+  double **R_dbug = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R_dbug, q_dbug);
+  double x_feature_dbug[3];
+  matrix_vec_mult(x_feature_dbug, R_dbug, x_feature, 3, 3);
+  add(x_feature, x_feature_dbug, x_dbug, 3);
+  free_matrix2(R_dbug);
+  */
 
   // q2: rotation from model -> feature
-  double q2[4];
-  double *q2_ptr[1];
-  q2_ptr[0] = q2;
-  if (frand() < .5)
-    quaternion_mult(q2, pcd->quaternions[0][i], q_inv);
-  else
-    quaternion_mult(q2, pcd->quaternions[1][i], q_inv);
+  double q_model_to_feature[4];  //q2[4];
+  double *q_model_to_feature_ptr[1];  //*q2_ptr[1];
+  q_model_to_feature_ptr[0] = q_model_to_feature;  //q2_ptr[0] = q2;
+  quaternion_mult(q_model_to_feature, q_feature, q_model_to_world);  //(q2, q_feature, q_inv);
 
   // x2: translation from model -> feature
   double xi[3];
-  xi[0] = pcd->points[0][i] - x[0];
-  xi[1] = pcd->points[1][i] - x[1];
-  xi[2] = pcd->points[2][i] - x[2];
-  double **R_inv = new_matrix2(3,3);
-  quaternion_to_rotation_matrix(R_inv, q_inv);
-  double x2[3];   // x2 = R_inv*xi
-  x2[0] = dot(R_inv[0], xi, 3);
-  x2[1] = dot(R_inv[1], xi, 3);
-  x2[2] = dot(R_inv[2], xi, 3);
-  free_matrix2(R_inv);
+  sub(xi, x_feature, x_world_to_model, 3);
+  double **R_model_to_world = new_matrix2(3,3);  //R_inv
+  quaternion_to_rotation_matrix(R_model_to_world, q_model_to_world);  //(R_inv, q_inv);
+  double x_model_to_feature[3];   // x2 = R_inv*xi
+  matrix_vec_mult(x_model_to_feature, R_model_to_world, xi, 3, 3);
+  free_matrix2(R_model_to_world);
 
   // p(q2)
   int c = pcd->clusters[i];
-  double p = bingham_mixture_pdf(q2, &olf->bmx[c]);
+  double p = bingham_mixture_pdf(q_model_to_feature, &olf->bmx[c]);
 
   // p(x2|q2)
   double x_mean[3];
   double *x_mean_ptr[1];
   x_mean_ptr[0] = x_mean;
   double **x_cov = new_matrix2(3,3);
-  hll_sample(x_mean_ptr, &x_cov, q2_ptr, &olf->hll[c], 1);
-  p *= mvnpdf(x2, x_mean, x_cov, 3);
-  //double z[3], **V = new_matrix2(3,3);
-  //eigen_symm(z, V, x_cov, 3);
-  //p *= mvnpdf_pcs(x2, x_mean, z, V, 3);
-  //free_matrix2(V);
+  hll_sample(x_mean_ptr, &x_cov, q_model_to_feature_ptr, &olf->hll[c], 1);
+  p *= mvnpdf(x_model_to_feature, x_mean, x_cov, 3);
   free_matrix2(x_cov);
   
+
+  //dbug
+  //printf("q_feature = (%f, %f, %f, %f)\n", q_feature[0], q_feature[1], q_feature[2], q_feature[3]);
+  //printf("q_model_to_world = (%f, %f, %f, %f)\n", q_model_to_world[0], q_model_to_world[1], q_model_to_world[2], q_model_to_world[3]);
+
+  //dbug
+  //printf("x_model_to_feature = (%f, %f, %f)\n", x_model_to_feature[0], x_model_to_feature[1], x_model_to_feature[2]);
+  //printf("q_model_to_feature = (%f, %f, %f, %f)\n", q_model_to_feature[0], q_model_to_feature[1], q_model_to_feature[2], q_model_to_feature[3]);
+
   return p;
 }
 
@@ -616,6 +910,8 @@ double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, 
  */
 olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
 {
+  double epsilon = 1e-50;
+
   olf_pose_samples_t *poses = olf_pose_samples_new(n);
 
   double **X = poses->X;
@@ -630,6 +926,7 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
   double x_feature[3], x_model_to_feature[3], x_model_to_feature_rot[3];
   double **R = new_matrix2(3,3);
   int indices[num_validators];
+  int close_points[npoints];
 
   // pointers
   double *q_model_to_feature_ptr[1], *x_mean_ptr[1];
@@ -650,6 +947,19 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     mult(proposal_weights, proposal_weights, 1.0/sum(proposal_weights, olf->num_clusters), olf->num_clusters);
   }
 
+  // segment indices (for cluttered pcds)
+  int **segment_indices = NULL;
+  int *segment_cnts = NULL;
+  if (olf->cluttered) {
+    segment_indices = new_matrix2(pcd->balls->num_segments, pcd->num_points);
+    safe_calloc(segment_cnts, pcd->balls->num_segments, int);
+    for (i = 0; i < pcd->num_points; i++) {
+      int s = pcd->balls->segment_labels[i];
+      segment_indices[s][ segment_cnts[s]++ ] = i;
+    }
+  }
+
+
   for (i = 0; i < n; i++) {
     // sample a proposal feature
     int j = 0;
@@ -657,13 +967,37 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
       int cluster = pmfrand(proposal_weights, olf->num_clusters);
       j = cluster_indices[cluster][ irand(cluster_counts[cluster]) ];
     }
+    else if (olf->num_proposal_segments > 0) {
+      //printf("break 1\n");
+      //printf("olf->num_proposal_segments = %d\n", olf->num_proposal_segments);
+      int s = olf->proposal_segments[ irand(olf->num_proposal_segments) ];
+      //printf("s = %d\n", s);
+      j = segment_indices[s][ irand(segment_cnts[s]) ];
+      printf("proposal = %d\n", j);
+    }
     else
       j = irand(npoints);
 
-    if (frand() < .5)
-      q_feature = pcd->quaternions[0][j];
-    else
-      q_feature = pcd->quaternions[1][j];
+    q_feature = (frand() < .5 ? pcd->quaternions[0][j] : pcd->quaternions[1][j]);
+
+    x_feature[0] = pcd->points[0][j];
+    x_feature[1] = pcd->points[1][j];
+    x_feature[2] = pcd->points[2][j];
+
+
+    /* dbug
+    double x_dbug[3] = {1000,0,0};    // world to model
+    double q_dbug[4] = {0,1,0,0};  // world to model
+    double q_feature_dbug[4];
+    quaternion_mult(q_feature_dbug, q_feature, q_dbug);
+    q_feature = q_feature_dbug;
+    double **R_dbug = new_matrix2(3,3);
+    quaternion_to_rotation_matrix(R_dbug, q_dbug);
+    double x_feature_dbug[3];
+    matrix_vec_mult(x_feature_dbug, R_dbug, x_feature, 3, 3);
+    add(x_feature, x_feature_dbug, x_dbug, 3);
+    free_matrix2(R_dbug);
+    */
 
     // sample model orientation
     int c = pcd->clusters[j];
@@ -672,20 +1006,41 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     quaternion_mult(Q[i], q_feature_to_model, q_feature);
 
     // sample model position given orientation
-    x_feature[0] = pcd->points[0][j];
-    x_feature[1] = pcd->points[1][j];
-    x_feature[2] = pcd->points[2][j];
     hll_sample(x_mean_ptr, &x_cov, q_model_to_feature_ptr, &olf->hll[c], 1);
     mvnrand(x_model_to_feature, x_mean, x_cov, 3);
     quaternion_to_rotation_matrix(R, Q[i]);
     matrix_vec_mult(x_model_to_feature_rot, R, x_model_to_feature, 3, 3);
     sub(X[i], x_feature, x_model_to_feature_rot, 3);
 
-    // compute target density for the given pose
-    int k;
-    for (k = 0; k < num_validators; k++)
-      indices[k] = irand(npoints);
-    //randperm(indices, npoints, num_validators);
+    // if cluttered, use smart validation (with segmentation/balls model)
+    int k, valid = 1;
+    if (olf->cluttered) {
+      if (olf->num_proposal_segments > 0) { //dbug
+	// sample validation points
+	for (k = 0; k < num_validators; k++) {
+	  int s = olf->proposal_segments[ irand(olf->num_proposal_segments) ];
+	  indices[k] = segment_indices[s][ irand(segment_cnts[s]) ];
+	  //printf("validation = %d\n", indices[k]);
+	}
+      }
+      else {
+	int num_close_points = pcd_intersect(close_points, pcd, olf->pcd, X[i], Q[i]);
+	if (num_close_points == 0)
+	  valid = 0;
+	else {
+	  printf("num_close_points = %d\n", num_close_points); //dbug
+	  // sample validation points
+	  for (k = 0; k < num_validators; k++)
+	    indices[k] = close_points[ irand(num_close_points) ];
+	}
+      }
+    }
+    else {
+      // sample validation points
+      for (k = 0; k < num_validators; k++)
+	indices[k] = irand(npoints);
+      //randperm(indices, npoints, num_validators);
+    }
 
     //dbug: test random walk
     //double sigma = 30;
@@ -695,10 +1050,36 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     //for (k = 0; k < num_validators; k++)
     //  indices[k] = indices_walk[10*k];
 
-    if (num_validators > 0)
+    /*dbug
+    if (i == 0) {
+      memcpy(X[i], x_dbug, 3*sizeof(double));
+      memcpy(Q[i], q_dbug, 4*sizeof(double));
+      indices[0] = 50;
+      indices[1] = 100;
+      indices[2] = 150;
+      indices[3] = 200;
+      indices[4] = 250;
+      //printf("x = {%f, %f, %f}; q = {%f, %f, %f, %f};\n", X[i][0], X[i][1], X[i][2], Q[i][0], Q[i][1], Q[i][2], Q[i][3]);
+      //printf("indices = {");
+      //for (k = 0; k < num_validators; k++)
+      //  printf("%d ", indices[k]);
+      //printf("};\n");
+    }
+    */
+
+    // compute target density for the given pose
+    if (!valid)
+      W[i] = epsilon;
+    else if (num_validators > 0)
       W[i] = olf_pose_pdf(X[i], Q[i], olf, pcd, indices, num_validators);
     else
       W[i] = 1.0;
+
+    // dbug
+    //if (i == 0) {
+    //  printf("W[0] = %e\n", W[i]);
+    //  exit(1);
+    //}
   }
 
   // sort pose samples by weight
@@ -717,6 +1098,11 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
 
   free_matrix2(x_cov);
   free_matrix2(R);
+
+  if (olf->cluttered) {
+    free_matrix2(segment_indices);
+    free(segment_cnts);
+  }
 
   return poses;
 }

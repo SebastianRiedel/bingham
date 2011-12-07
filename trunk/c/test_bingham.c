@@ -541,6 +541,14 @@ void test_bingham_sample(int argc, char *argv[])
 
   bingham_stats(&B);
 
+  printf("Original scatter matrix:\n");
+  int i, j, d=4;
+  for (i = 0; i < d; i++) {
+    for (j = 0; j < d; j++)
+      printf("%.4f, ", B.stats->scatter[i][j]);
+    printf("\n");
+  }
+
   double t0 = get_time_ms();
   double **X = new_matrix2(nsamples, 4);
   bingham_sample(X, &B, nsamples);
@@ -550,7 +558,6 @@ void test_bingham_sample(int argc, char *argv[])
 
   print_bingham(&B);
 
-  int d = 4;
   int n = nsamples;
   double **Xt = new_matrix2(d, n);
   transpose(Xt, X, n, d);
@@ -558,13 +565,6 @@ void test_bingham_sample(int argc, char *argv[])
   matrix_mult(S, Xt, X, d, n, d);
   mult(S[0], S[0], 1/(double)n, d*d);
 
-  printf("Original scatter matrix:\n");
-  int i, j;
-  for (i = 0; i < d; i++) {
-    for (j = 0; j < d; j++)
-      printf("%.4f, ", B.stats->scatter[i][j]);
-    printf("\n");
-  }
   printf("Sample scatter matrix:\n");
   for (i = 0; i < d; i++) {
     for (j = 0; j < d; j++)
@@ -1231,14 +1231,14 @@ int main(int argc, char *argv[])
   //test_bingham_F_lookup_3d(argc, argv);
 
   //test_bingham_mixture_sample(argc, argv);
-  //test_bingham_sample(argc, argv);
+  test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 
   //test_fit_quaternions(argc, argv);
   //test_bingham_discretize(argc, argv);
   //test_bingham(argc, argv);
-  compute_bingham_constants(argc, argv);
+  //compute_bingham_constants(argc, argv);
   //test_bingham_pdf(argc, argv);
   //test_fit(argc, argv);
 
