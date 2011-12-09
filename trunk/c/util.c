@@ -1627,6 +1627,24 @@ void print_matrix(double **X, int n, int m)
 }
 
 
+// perform linear regression: dot(b,x[i]) = y[i], i=1..n
+void linear_regression(double *b, double **X, double *y, int n, int d)
+{
+  //double **Xt = new_matrix2(
+}
+
+
+// fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d
+void polynomial_regression(double *b, double *x, double *y, int n, int d)
+{
+
+}
+
+
+
+
+
+
 /* create a new graph
 graph_t *graph_new(int num_vertices, int edge_capacity)
 {

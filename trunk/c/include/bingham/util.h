@@ -110,6 +110,9 @@ void wcov(double **S, double **X, double *w, double *mu, int n, int m);     /* c
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
 
+void linear_regression(double *b, double **X, double *y, int n, int d);     /* perform linear regression: dot(b,x[i]) = y[i], i=1..n */
+void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d */
+
 void print_matrix(double **X, int n, int m);
 
 
