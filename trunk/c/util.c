@@ -1630,14 +1630,38 @@ void print_matrix(double **X, int n, int m)
 // perform linear regression: dot(b,x[i]) = y[i], i=1..n
 void linear_regression(double *b, double **X, double *y, int n, int d)
 {
-  //double **Xt = new_matrix2(
+  double **Xt = new_matrix2(d,n);
+  transpose(Xt,X,n,d);
+
+  double **XtX = new_matrix2(d,d);
+  matrix_mult(XtX,Xt,X,d,n,d);
+
+  double Xty[d];
+  matrix_vec_mult(Xty,Xt,y,d,n);
+
+  solve(b, XtX, Xty, d);
+
+  free_matrix2(Xt);
+  free_matrix2(XtX);
 }
 
 
 // fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d
 void polynomial_regression(double *b, double *x, double *y, int n, int d)
 {
+  double **X = new_matrix2(n,d);
 
+  int i, j;
+  for (i = 0; i < n; i++)
+    X[i][0] = 1;
+
+  for (i = 0; i < n; i++)
+    for (j = 1; j < d; j++)
+      X[i][j] = X[i][j-1]*x[i];
+
+  linear_regression(b,X,y,n,d);
+
+  free_matrix2(X);
 }
 
 

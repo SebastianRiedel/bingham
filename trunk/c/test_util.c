@@ -310,13 +310,44 @@ void test_mvnpdf_pcs(int argc, char *argv[])
 }
 
 
+void test_regression(int argc, char *argv[])
+{
+  if (argc < 2) {
+    printf("usage: %s <b0> [b1] [b2] ...\n", argv[0]);
+    return;
+  }
+
+  int i, j, d = argc-1, n = 100;
+  double b[argc-1];
+  for (i = 0; i < d; i++)
+    b[i] = atof(argv[i+1]);
+
+  // y(x) = b[0] + b[1]*x + b[2]*x^2 + ...
+  double x[n], y[n];
+  for (i = 0; i < n; i++) {
+    x[i] = i;
+    y[i] = b[0];
+    for (j = 1; j < d; j++)
+      y[i] += b[j]*pow(x[i],j);
+  }
+
+  polynomial_regression(b, x, y, n, d);
+
+  printf("b = [ ");
+  for (i = 0; i < d; i++)
+    printf("%f ", b[i]);
+  printf("]\n");
+}
+
+
 int main(int argc, char *argv[])
 {
+  test_regression(argc, argv);
   //test_kdtree(argc, argv);
   //test_normrand(argc, argv);
   //test_safe_alloc();
   //test_sort_indices();
-  test_mvnrand_pcs(argc, argv);
+  //test_mvnrand_pcs(argc, argv);
   //test_mvnpdf_pcs(argc, argv);
   //test_pmfrand(argc, argv);
   //test_mink();
