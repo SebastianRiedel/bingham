@@ -2,6 +2,10 @@
 #ifndef BINGHAM_UTIL_H
 #define BINGHAM_UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif 
+
 
 #include <stdlib.h>
 
@@ -211,6 +215,10 @@ kdtree_t *kdtree(double **X, int n, int d);
 void kdtree_free(kdtree_t *tree);
 int kdtree_NN(kdtree_t *tree, double *x);
 
+
+#ifdef __cplusplus
+}
+#endif 
 
 
 #endif
