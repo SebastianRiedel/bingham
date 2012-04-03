@@ -40,7 +40,7 @@ DEPS += eigen/Eigen/Core
 #TARGETS = $(LIBS) test_bingham test_util fit_bingham cluster_bingham
 #endif
 
-TARGETS = merge_pcd downsample_pcd pfh_cluster bingham_fit_clusters tofoo
+TARGETS = merge_pcd downsample_pcd pfh_cluster bingham_fit_clusters #tofoo
 
 
 
