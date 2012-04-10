@@ -1,19 +1,37 @@
-function F = bingham_F(z,iter)
-% F = bingham_F(z,iter) - computes the normalization constant for the bingham
-% distribution with non-zero concentration vector 'z', up to a given number of terms
-% (per dimension) in the infinite series, 'iter'.
+function F = bingham_1F1(z, F_cache)
+%F = bingham_1F1(z, F_cache) -- looks up 2*1F1(1/2; (d+1)/2; z)
 
-if nargin < 2
-   iter = 80;
+
+z = -z;
+
+d = length(z);
+
+zi0 = zeros(1,d);
+zi1 = zeros(1,d);
+alpha = zeros(1,d);
+for i=1:d
+    j = find(F_cache.Z >= z(i), 1);
+    if isempty(j)
+        zi0(i) = length(F_cache.Z);
+        zi1(i) = length(F_cache.Z);
+        alpha(i) = 0;
+    elseif j==1
+        zi0(i) = 1;
+        zi1(i) = 1;
+        alpha(i) = 0;
+    else
+        zi0(i) = j-1;
+        zi1(i) = j;
+        alpha(i) = (z(i) - F_cache.Z(j-1)) / (F_cache.Z(j) - F_cache.Z(j-1));
+    end
 end
 
-if length(z)==1
-   F = bingham_F_1d(z, iter);
-elseif length(z)==2
-   F = bingham_F_2d(z(1), z(2), iter);
-elseif length(z)==3
-   F = bingham_F_3d(z(1), z(2), z(3), iter);
-else
-   fprintf('Error: bingham_F() currently supports only 1-3 dimensions');
-   F = [];
+if d==1
+    X = F_cache.table{d}([zi0(1),zi1(1)]);
+elseif d==2
+    X = F_cache.table{d}([zi0(1),zi1(1)], [zi0(2),zi1(2)]);
+elseif d==3
+    X = F_cache.table{d}([zi0(1),zi1(1)], [zi0(2),zi1(2)], [zi0(3),zi1(3)]);
 end
+
+F = interp_linear(X,alpha);
