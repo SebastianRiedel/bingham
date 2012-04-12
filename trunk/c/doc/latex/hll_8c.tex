@@ -1,0 +1,108 @@
+\hypertarget{hll_8c}{
+\section{hll.c File Reference}
+\label{hll_8c}\index{hll.c@{hll.c}}
+}
+{\ttfamily \#include $<$stdio.h$>$}\par
+{\ttfamily \#include $<$stdlib.h$>$}\par
+{\ttfamily \#include $<$string.h$>$}\par
+{\ttfamily \#include $<$math.h$>$}\par
+{\ttfamily \#include $<$float.h$>$}\par
+{\ttfamily \#include \char`\"{}bingham/util.h\char`\"{}}\par
+{\ttfamily \#include \char`\"{}bingham/hll.h\char`\"{}}\par
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+void \hyperlink{hll_8c_a9677a921505486b0155f786969785fba}{hll\_\-new} (\hyperlink{structhll__t}{hll\_\-t} $\ast$hll, double $\ast$$\ast$Q, double $\ast$$\ast$X, int n, int dq, int dx)
+\item 
+void \hyperlink{hll_8c_a6bf4b3c87a5eed3e0c18cd779659cf36}{hll\_\-free\_\-cache} (\hyperlink{structhll__t}{hll\_\-t} $\ast$hll)
+\item 
+void \hyperlink{hll_8c_a744fc77a5f48791068caf4604369f0c1}{hll\_\-free} (\hyperlink{structhll__t}{hll\_\-t} $\ast$hll)
+\item 
+void \hyperlink{hll_8c_a74e1374384265cb390f10e3bb9b14037}{hll\_\-cache} (\hyperlink{structhll__t}{hll\_\-t} $\ast$hll, double $\ast$$\ast$Q, int n)
+\item 
+void \hyperlink{hll_8c_a0aa357ea9db4d8e45341bfb29fd32105}{hll\_\-sample} (double $\ast$$\ast$X, double $\ast$$\ast$$\ast$S, double $\ast$$\ast$Q, \hyperlink{structhll__t}{hll\_\-t} $\ast$hll, int n)
+\item 
+\hyperlink{structhll__t}{hll\_\-t} $\ast$ \hyperlink{hll_8c_a691877fdd42f659699c654a9bc019509}{load\_\-hlls} (char $\ast$fname, int $\ast$n)
+\item 
+void \hyperlink{hll_8c_a6b29b9bbb1156174b89f2dd8c3f38910}{save\_\-hlls} (char $\ast$fname, \hyperlink{structhll__t}{hll\_\-t} $\ast$hlls, int n)
+\end{DoxyCompactItemize}
+
+
+\subsection{Function Documentation}
+\hypertarget{hll_8c_a74e1374384265cb390f10e3bb9b14037}{
+\index{hll.c@{hll.c}!hll\_\-cache@{hll\_\-cache}}
+\index{hll\_\-cache@{hll\_\-cache}!hll.c@{hll.c}}
+\subsubsection[{hll\_\-cache}]{\setlength{\rightskip}{0pt plus 5cm}void hll\_\-cache (
+\begin{DoxyParamCaption}
+\item[{{\bf hll\_\-t} $\ast$}]{hll, }
+\item[{double $\ast$$\ast$}]{Q, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a74e1374384265cb390f10e3bb9b14037}
+\hypertarget{hll_8c_a744fc77a5f48791068caf4604369f0c1}{
+\index{hll.c@{hll.c}!hll\_\-free@{hll\_\-free}}
+\index{hll\_\-free@{hll\_\-free}!hll.c@{hll.c}}
+\subsubsection[{hll\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void hll\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf hll\_\-t} $\ast$}]{hll}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a744fc77a5f48791068caf4604369f0c1}
+\hypertarget{hll_8c_a6bf4b3c87a5eed3e0c18cd779659cf36}{
+\index{hll.c@{hll.c}!hll\_\-free\_\-cache@{hll\_\-free\_\-cache}}
+\index{hll\_\-free\_\-cache@{hll\_\-free\_\-cache}!hll.c@{hll.c}}
+\subsubsection[{hll\_\-free\_\-cache}]{\setlength{\rightskip}{0pt plus 5cm}void hll\_\-free\_\-cache (
+\begin{DoxyParamCaption}
+\item[{{\bf hll\_\-t} $\ast$}]{hll}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a6bf4b3c87a5eed3e0c18cd779659cf36}
+\hypertarget{hll_8c_a9677a921505486b0155f786969785fba}{
+\index{hll.c@{hll.c}!hll\_\-new@{hll\_\-new}}
+\index{hll\_\-new@{hll\_\-new}!hll.c@{hll.c}}
+\subsubsection[{hll\_\-new}]{\setlength{\rightskip}{0pt plus 5cm}void hll\_\-new (
+\begin{DoxyParamCaption}
+\item[{{\bf hll\_\-t} $\ast$}]{hll, }
+\item[{double $\ast$$\ast$}]{Q, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{dq, }
+\item[{int}]{dx}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a9677a921505486b0155f786969785fba}
+\hypertarget{hll_8c_a0aa357ea9db4d8e45341bfb29fd32105}{
+\index{hll.c@{hll.c}!hll\_\-sample@{hll\_\-sample}}
+\index{hll\_\-sample@{hll\_\-sample}!hll.c@{hll.c}}
+\subsubsection[{hll\_\-sample}]{\setlength{\rightskip}{0pt plus 5cm}void hll\_\-sample (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$$\ast$$\ast$}]{S, }
+\item[{double $\ast$$\ast$}]{Q, }
+\item[{{\bf hll\_\-t} $\ast$}]{hll, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a0aa357ea9db4d8e45341bfb29fd32105}
+\hypertarget{hll_8c_a691877fdd42f659699c654a9bc019509}{
+\index{hll.c@{hll.c}!load\_\-hlls@{load\_\-hlls}}
+\index{load\_\-hlls@{load\_\-hlls}!hll.c@{hll.c}}
+\subsubsection[{load\_\-hlls}]{\setlength{\rightskip}{0pt plus 5cm}{\bf hll\_\-t}$\ast$ load\_\-hlls (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{fname, }
+\item[{int $\ast$}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a691877fdd42f659699c654a9bc019509}
+\hypertarget{hll_8c_a6b29b9bbb1156174b89f2dd8c3f38910}{
+\index{hll.c@{hll.c}!save\_\-hlls@{save\_\-hlls}}
+\index{save\_\-hlls@{save\_\-hlls}!hll.c@{hll.c}}
+\subsubsection[{save\_\-hlls}]{\setlength{\rightskip}{0pt plus 5cm}void save\_\-hlls (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{fname, }
+\item[{{\bf hll\_\-t} $\ast$}]{hlls, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{hll_8c_a6b29b9bbb1156174b89f2dd8c3f38910}

@@ -1,0 +1,1329 @@
+\hypertarget{util_8c}{
+\section{util.c File Reference}
+\label{util_8c}\index{util.c@{util.c}}
+}
+{\ttfamily \#include $<$stdio.h$>$}\par
+{\ttfamily \#include $<$stdlib.h$>$}\par
+{\ttfamily \#include $<$string.h$>$}\par
+{\ttfamily \#include $<$sys/time.h$>$}\par
+{\ttfamily \#include $<$time.h$>$}\par
+{\ttfamily \#include $<$math.h$>$}\par
+{\ttfamily \#include $<$float.h$>$}\par
+{\ttfamily \#include \char`\"{}bingham/util.h\char`\"{}}\par
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+double \hyperlink{util_8c_ae64b984d47187c66c34b646f0e6e1dd5}{get\_\-time\_\-ms} ()
+\item 
+char $\ast$ \hyperlink{util_8c_a751207b5139fb45b8a01e498758678da}{sword} (char $\ast$s, const char $\ast$delim, int n)
+\item 
+char $\ast$$\ast$ \hyperlink{util_8c_a788242d4e7ac802a4a255c5a9f73400a}{split} (char $\ast$s, const char $\ast$delim, int $\ast$k)
+\item 
+int \hyperlink{util_8c_ad656160347d726bebd66ecaa8cc22cc8}{wordcmp} (char $\ast$s1, char $\ast$s2, const char $\ast$delim)
+\item 
+void \hyperlink{util_8c_a19580903544b841b993f6773366315c7}{replace\_\-word} (char $\ast$$\ast$words, int num\_\-words, const char $\ast$from, const char $\ast$to)
+\item 
+double \hyperlink{util_8c_a1acf5817cd874d1f86fb5a7a78ed1e15}{lfact} (int x)
+\item 
+double \hyperlink{util_8c_a083b168e34723ab88be3e309903e637a}{fact} (int x)
+\item 
+double \hyperlink{util_8c_af8af75b31f351f8ebaca2f2a91d0c6a6}{surface\_\-area\_\-sphere} (int d)
+\item 
+void \hyperlink{util_8c_ab6964b2fd61a428dd1b5ec1197a91f13}{vnot} (int y\mbox{[}$\,$\mbox{]}, int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_ad81ab5d81139b5b1baf35f5ddfd13530}{count} (int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_ae1f34ebdda1c7728770a6a9678dbec57}{find} (int $\ast$k, int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_ac781738cd9fbb9e29af5bb8a46d421e7}{findinv} (int $\ast$k, int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_a56aa645635998b5bce70420639ce8681}{findeq} (int $\ast$k, int x\mbox{[}$\,$\mbox{]}, int a, int n)
+\item 
+double \hyperlink{util_8c_a98ab39121caba2ee2e19bdb4bbd59775}{sum} (double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a8e3c9b5767f71ce009b456f2aeedf4d0}{prod} (double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a0463b4cf441b8acde7937b563fb7ddb7}{max} (double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_acc68388e43b943ec6d034029ca1b8d90}{min} (double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_a5953f544bd7bdfdac01a07518e530aa9}{imax} (int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_ac03c6457459d645a16bd2a67cc6320f5}{imin} (int x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_adeb7279c51e4aa27d027de5e61a3cbd3}{norm} (double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a3f11779262c852941ea4aebb14db54c9}{dist} (double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a8510285b32712a32c2e869ed0df10785}{dist2} (double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a34f5bdcb486a0659d5c5dc1288754b17}{dot} (double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_acfbc72621b147455bb22bc7354a46ca2}{add} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a7d371029c4acf69bf618e068b04a259f}{sub} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a86703704246ae548c9b7435913c22521}{mult} (double y\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double c, int n)
+\item 
+void \hyperlink{util_8c_a4866693235120364a34d6db6ded939fd}{normalize} (double y\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a05fe62b647f1a3a368085dcbf1e5ab12}{vmult} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a7cefb6a0786b0a2164c1f4643f168a8b}{avg} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a15f730a2e4f5e08c85b8d86f5742fe6a}{wavg} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, double w, int n)
+\item 
+void \hyperlink{util_8c_a47b421da15f01f152cf41c0085c9cbc4}{avg3} (double y\mbox{[}$\,$\mbox{]}, double x1\mbox{[}$\,$\mbox{]}, double x2\mbox{[}$\,$\mbox{]}, double x3\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_afaaa65091a04aaa598bac08f56e90f05}{proj} (double z\mbox{[}$\,$\mbox{]}, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n)
+\item 
+int \hyperlink{util_8c_a7983dca2a6cd5fd9d3d05accc45dcfa6}{binary\_\-search} (double x, double $\ast$A, int n)
+\item 
+void \hyperlink{util_8c_a5ed35e8326dba8970d9ce653659a77a4}{quaternion\_\-mult} (double z\mbox{[}4\mbox{]}, double x\mbox{[}4\mbox{]}, double y\mbox{[}4\mbox{]})
+\item 
+void \hyperlink{util_8c_a73e0f9e742b953661755ec408d3a1a69}{quaternion\_\-inverse} (double q\_\-inv\mbox{[}4\mbox{]}, double q\mbox{[}4\mbox{]})
+\item 
+void \hyperlink{util_8c_a52638699790900f1767ff7a73272822f}{rotation\_\-matrix\_\-to\_\-quaternion} (double $\ast$q, double $\ast$$\ast$R)
+\item 
+void \hyperlink{util_8c_a98d884f4a09ea7c724214c5e95f1d03f}{quaternion\_\-to\_\-rotation\_\-matrix} (double $\ast$$\ast$R, double $\ast$q)
+\item 
+\hyperlink{structilist}{ilist\_\-t} $\ast$ \hyperlink{util_8c_aaa61e4e4ed0e9a0cb959d26de0103c1b}{ilist\_\-add} (\hyperlink{structilist}{ilist\_\-t} $\ast$x, int a)
+\item 
+int \hyperlink{util_8c_a3bed42a4622ec9b466ab44585c5a62a8}{ilist\_\-contains} (\hyperlink{structilist}{ilist\_\-t} $\ast$x, int a)
+\item 
+int \hyperlink{util_8c_aa6d9aea8f92444901eb01e5e4eabdeb2}{ilist\_\-find} (\hyperlink{structilist}{ilist\_\-t} $\ast$x, int a)
+\item 
+void \hyperlink{util_8c_a44115732bdcd50738f4620e07e57c6de}{ilist\_\-free} (\hyperlink{structilist}{ilist\_\-t} $\ast$x)
+\item 
+int \hyperlink{util_8c_ab08fa6c4eacf29fe7603acd5ec657487}{irand} (int n)
+\item 
+double \hyperlink{util_8c_a052fa0fa8d2e1cda6d929b2939fa555e}{frand} ()
+\item 
+void \hyperlink{util_8c_ac634157f62a78ad37b3b94006a722c58}{randperm} (int $\ast$x, int n, int d)
+\item 
+double \hyperlink{util_8c_a148a1f446ce77498da7c87ff29dec5f1}{erfinv} (double x)
+\item 
+double \hyperlink{util_8c_a0fdaca79bb8c95e06ea90b6d73aff97c}{normrand} (double mu, double sigma)
+\item 
+double \hyperlink{util_8c_a3442360283dd5444696842414812e53d}{normpdf} (double x, double mu, double sigma)
+\item 
+int \hyperlink{util_8c_ad6fb3433c2c1cd4196e72ab0689cc239}{pmfrand} (double $\ast$w, int n)
+\item 
+void \hyperlink{util_8c_a18fe2dc19048d9b32ac78590aaad8aba}{mvnrand} (double $\ast$x, double $\ast$mu, double $\ast$$\ast$S, int d)
+\item 
+double \hyperlink{util_8c_ac2e700b1d64a0fca7445d96cf1392190}{mvnpdf} (double $\ast$x, double $\ast$mu, double $\ast$$\ast$S, int d)
+\item 
+void \hyperlink{util_8c_a17af21dd841f451e169eae0018f3bb40}{mvnrand\_\-pcs} (double $\ast$x, double $\ast$mu, double $\ast$z, double $\ast$$\ast$V, int d)
+\item 
+double \hyperlink{util_8c_a1a5d28a0426e93f4843a4cde6b769809}{mvnpdf\_\-pcs} (double $\ast$x, double $\ast$mu, double $\ast$z, double $\ast$$\ast$V, int d)
+\item 
+void \hyperlink{util_8c_a1c818da99e1e03f76062444e55e92621}{acgrand\_\-pcs} (double $\ast$x, double $\ast$z, double $\ast$$\ast$V, int d)
+\item 
+double \hyperlink{util_8c_a4ede6f2a56b9f176347562e1747a4dd3}{acgpdf\_\-pcs} (double $\ast$x, double $\ast$z, double $\ast$$\ast$V, int d)
+\item 
+double $\ast$$\ast$ \hyperlink{util_8c_a79ccb1294380efed3d0d5c8d2f663c8e}{new\_\-matrix2} (int n, int m)
+\item 
+int $\ast$$\ast$ \hyperlink{util_8c_ad95f52848c2b4eb28b1616872e36939b}{new\_\-matrix2i} (int n, int m)
+\item 
+void \hyperlink{util_8c_a15585dc1b82fd6bcedb5043b0b29d424}{free\_\-matrix2} (double $\ast$$\ast$X)
+\item 
+void \hyperlink{util_8c_a8104c00a450df54d48e3b6467f828447}{free\_\-matrix2i} (int $\ast$$\ast$X)
+\item 
+void \hyperlink{util_8c_aeef7f8241664a41b5b8aa9a1971049c8}{save\_\-matrix} (char $\ast$fout, double $\ast$$\ast$X, int n, int m)
+\item 
+double $\ast$$\ast$ \hyperlink{util_8c_aab60bbf87c07368791db9fa024b0c60b}{load\_\-matrix} (char $\ast$fin, int $\ast$n, int $\ast$m)
+\item 
+double \hyperlink{util_8c_addcf515dca3b345c27050a7b1269184b}{triangle\_\-area} (double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, double z\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a707dd1a6f20644e701a6d5587caf773b}{tetrahedron\_\-volume} (double x1\mbox{[}$\,$\mbox{]}, double x2\mbox{[}$\,$\mbox{]}, double x3\mbox{[}$\,$\mbox{]}, double x4\mbox{[}$\,$\mbox{]}, int n)
+\item 
+double \hyperlink{util_8c_a36eb8a3bc37ae731d8e341f2928e4062}{tetrahedron\_\-volume\_\-old} (double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, double z\mbox{[}$\,$\mbox{]}, double w\mbox{[}$\,$\mbox{]}, int n)
+\item 
+void \hyperlink{util_8c_a286a1465f179e866254b87f7ba4f0945}{transpose} (double $\ast$$\ast$Y, double $\ast$$\ast$X, int n, int m)
+\item 
+void \hyperlink{util_8c_a1ab51591009133ab31e33670fc30ae7c}{matrix\_\-copy} (double $\ast$$\ast$Y, double $\ast$$\ast$X, int n, int m)
+\item 
+double $\ast$$\ast$ \hyperlink{util_8c_a3381b7698baf324b1a49fa311588c1f5}{matrix\_\-clone} (double $\ast$$\ast$X, int n, int m)
+\item 
+void \hyperlink{util_8c_a228edae7d73595d9f96fbb609dc4324d}{matrix\_\-add} (double $\ast$$\ast$Z, double $\ast$$\ast$X, double $\ast$$\ast$Y, int n, int m)
+\item 
+void \hyperlink{util_8c_a8133519cc79502828962d8685ab293f3}{matrix\_\-mult} (double $\ast$$\ast$Z, double $\ast$$\ast$X, double $\ast$$\ast$Y, int n, int p, int m)
+\item 
+void \hyperlink{util_8c_adf011d41b37af6d6ed3b55a3e2578f18}{matrix\_\-vec\_\-mult} (double $\ast$y, double $\ast$$\ast$A, double $\ast$x, int n, int m)
+\item 
+void \hyperlink{util_8c_a01da7086667b68b3824ba9a70a0ddd33}{outer\_\-prod} (double $\ast$$\ast$Z, double x\mbox{[}$\,$\mbox{]}, double y\mbox{[}$\,$\mbox{]}, int n, int m)
+\item 
+void \hyperlink{util_8c_a0908112e847f554e574ee65f934c791d}{mean} (double $\ast$mu, double $\ast$$\ast$X, int n, int m)
+\item 
+void \hyperlink{util_8c_a933323c14a437dbd292f612058fe58ea}{cov} (double $\ast$$\ast$S, double $\ast$$\ast$X, double $\ast$mu, int n, int m)
+\item 
+void \hyperlink{util_8c_a0f46c3ac9af987915878f2476ec8614c}{wmean} (double $\ast$mu, double $\ast$$\ast$X, double $\ast$w, int n, int m)
+\item 
+void \hyperlink{util_8c_af6f3bf7f40378e2ce316a1a93fdba339}{wcov} (double $\ast$$\ast$S, double $\ast$$\ast$X, double $\ast$w, double $\ast$mu, int n, int m)
+\item 
+void \hyperlink{util_8c_aa286f78bd52ae0f4a9861772b592ccf6}{solve} (double $\ast$x, double $\ast$$\ast$A, double $\ast$b, int n)
+\item 
+double \hyperlink{util_8c_a5d383ade2aeac8e8687d12bae7de4915}{det} (double $\ast$$\ast$X, int n)
+\item 
+void \hyperlink{util_8c_a67ac210d9a88a61058bc7d7ea738b903}{inv} (double $\ast$$\ast$Y, double $\ast$$\ast$X, int n)
+\item 
+void \hyperlink{util_8c_a4302c09b8f132f44ae17455a36a69ec0}{eigen\_\-symm} (double z\mbox{[}$\,$\mbox{]}, double $\ast$$\ast$V, double $\ast$$\ast$X, int n)
+\item 
+void \hyperlink{util_8c_a2b5947a005e359ac152b170eea10033c}{reorder\_\-rows} (double $\ast$$\ast$Y, double $\ast$$\ast$X, int $\ast$idx, int n, int m)
+\item 
+void \hyperlink{util_8c_a01693919458eb777d06ea68c8528ef46}{print\_\-matrix} (double $\ast$$\ast$X, int n, int m)
+\item 
+void \hyperlink{util_8c_adb676ec928b887de382dadb7ba817b11}{linear\_\-regression} (double $\ast$b, double $\ast$$\ast$X, double $\ast$y, int n, int d)
+\item 
+void \hyperlink{util_8c_a1613998cc011dea1c8d1a96f7a23d4c2}{polynomial\_\-regression} (double $\ast$b, double $\ast$x, double $\ast$y, int n, int d)
+\item 
+void \hyperlink{util_8c_a100574289c0cc6f2f02a235c1d22c94a}{graph\_\-free} (\hyperlink{structgraph__t}{graph\_\-t} $\ast$g)
+\item 
+int \hyperlink{util_8c_a11177c89bf8ac5b367b9945c162746f7}{graph\_\-find\_\-edge} (\hyperlink{structgraph__t}{graph\_\-t} $\ast$g, int i, int j)
+\item 
+void \hyperlink{util_8c_ad9e613357bcf65cd9950b8c2f87281b6}{graph\_\-smooth} (double $\ast$$\ast$dst, double $\ast$$\ast$src, \hyperlink{structgraph__t}{graph\_\-t} $\ast$g, int d, double w)
+\item 
+void \hyperlink{util_8c_a4f30c63588008393f624c061da4154a9}{sample\_\-simplex} (double x\mbox{[}$\,$\mbox{]}, double $\ast$$\ast$S, int n, int d)
+\item 
+\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$ \hyperlink{util_8c_a068fcc9688a0a6aeb1cc211c7896f48a}{meshgraph\_\-new} (int vcap, int dcap)
+\item 
+void \hyperlink{util_8c_a79ae6bdf696e3d2e2a327c528f314271}{meshgraph\_\-free} (\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$g)
+\item 
+int \hyperlink{util_8c_afda79f7cc1adcd9c944a9368eb880e13}{meshgraph\_\-find\_\-edge} (\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$g, int i, int j)
+\item 
+int \hyperlink{util_8c_ab529b4d4f8d7f08428c07c82db928104}{meshgraph\_\-find\_\-face} (\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$g, int i, int j, int k)
+\item 
+int \hyperlink{util_8c_abdf7db577d1e76fb3dbc7b28f82fbf91}{meshgraph\_\-add\_\-edge} (\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$g, int i, int j)
+\item 
+int \hyperlink{util_8c_ab19af1faf49f8baa571cf88d7763a71d}{meshgraph\_\-add\_\-face} (\hyperlink{structmeshgraph__t}{meshgraph\_\-t} $\ast$g, int i, int j, int k)
+\item 
+void \hyperlink{util_8c_af777b8e7c4af5450ce02dba687044905}{sort\_\-data} (\hyperlink{structsortable__t}{sortable\_\-t} $\ast$x, size\_\-t n)
+\item 
+void \hyperlink{util_8c_ad70871b8901bccd7ab083f93d0005846}{sort\_\-indices} (double $\ast$x, int $\ast$idx, int n)
+\item 
+void \hyperlink{util_8c_abafe0b3a5d1be9d30b32b53b6cea27d0}{mink} (double $\ast$x, int $\ast$idx, int n, int k)
+\item 
+int \hyperlink{util_8c_ae8bf40a970fd185a3710e46e9328f88b}{qselect} (double $\ast$x, int n, int k)
+\item 
+\hyperlink{structkdtree}{kdtree\_\-t} $\ast$ \hyperlink{util_8c_aba8abffb7d4d79e58eeda5c1c5449ba9}{kdtree} (double $\ast$$\ast$X, int n, int d)
+\item 
+int \hyperlink{util_8c_aee2c706342a1bec6df903465e0e6876b}{kdtree\_\-NN} (\hyperlink{structkdtree}{kdtree\_\-t} $\ast$tree, double $\ast$x)
+\item 
+void \hyperlink{util_8c_a59a5c7db37f28ac1ad20fb67ccfc249c}{kdtree\_\-free} (\hyperlink{structkdtree}{kdtree\_\-t} $\ast$tree)
+\end{DoxyCompactItemize}
+\subsection*{Variables}
+\begin{DoxyCompactItemize}
+\item 
+const \hyperlink{structcolor__t}{color\_\-t} \hyperlink{util_8c_a0b0a8402aed1e428981ac0084d7d2cc9}{colormap} \mbox{[}256\mbox{]}
+\end{DoxyCompactItemize}
+
+
+\subsection{Function Documentation}
+\hypertarget{util_8c_a4ede6f2a56b9f176347562e1747a4dd3}{
+\index{util.c@{util.c}!acgpdf\_\-pcs@{acgpdf\_\-pcs}}
+\index{acgpdf\_\-pcs@{acgpdf\_\-pcs}!util.c@{util.c}}
+\subsubsection[{acgpdf\_\-pcs}]{\setlength{\rightskip}{0pt plus 5cm}double acgpdf\_\-pcs (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{z, }
+\item[{double $\ast$$\ast$}]{V, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a4ede6f2a56b9f176347562e1747a4dd3}
+\hypertarget{util_8c_a1c818da99e1e03f76062444e55e92621}{
+\index{util.c@{util.c}!acgrand\_\-pcs@{acgrand\_\-pcs}}
+\index{acgrand\_\-pcs@{acgrand\_\-pcs}!util.c@{util.c}}
+\subsubsection[{acgrand\_\-pcs}]{\setlength{\rightskip}{0pt plus 5cm}void acgrand\_\-pcs (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{z, }
+\item[{double $\ast$$\ast$}]{V, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a1c818da99e1e03f76062444e55e92621}
+\hypertarget{util_8c_acfbc72621b147455bb22bc7354a46ca2}{
+\index{util.c@{util.c}!add@{add}}
+\index{add@{add}!util.c@{util.c}}
+\subsubsection[{add}]{\setlength{\rightskip}{0pt plus 5cm}void add (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_acfbc72621b147455bb22bc7354a46ca2}
+\hypertarget{util_8c_a7cefb6a0786b0a2164c1f4643f168a8b}{
+\index{util.c@{util.c}!avg@{avg}}
+\index{avg@{avg}!util.c@{util.c}}
+\subsubsection[{avg}]{\setlength{\rightskip}{0pt plus 5cm}void avg (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a7cefb6a0786b0a2164c1f4643f168a8b}
+\hypertarget{util_8c_a47b421da15f01f152cf41c0085c9cbc4}{
+\index{util.c@{util.c}!avg3@{avg3}}
+\index{avg3@{avg3}!util.c@{util.c}}
+\subsubsection[{avg3}]{\setlength{\rightskip}{0pt plus 5cm}void avg3 (
+\begin{DoxyParamCaption}
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x1\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x2\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x3\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a47b421da15f01f152cf41c0085c9cbc4}
+\hypertarget{util_8c_a7983dca2a6cd5fd9d3d05accc45dcfa6}{
+\index{util.c@{util.c}!binary\_\-search@{binary\_\-search}}
+\index{binary\_\-search@{binary\_\-search}!util.c@{util.c}}
+\subsubsection[{binary\_\-search}]{\setlength{\rightskip}{0pt plus 5cm}int binary\_\-search (
+\begin{DoxyParamCaption}
+\item[{double}]{x, }
+\item[{double $\ast$}]{A, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a7983dca2a6cd5fd9d3d05accc45dcfa6}
+\hypertarget{util_8c_ad81ab5d81139b5b1baf35f5ddfd13530}{
+\index{util.c@{util.c}!count@{count}}
+\index{count@{count}!util.c@{util.c}}
+\subsubsection[{count}]{\setlength{\rightskip}{0pt plus 5cm}int count (
+\begin{DoxyParamCaption}
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad81ab5d81139b5b1baf35f5ddfd13530}
+\hypertarget{util_8c_a933323c14a437dbd292f612058fe58ea}{
+\index{util.c@{util.c}!cov@{cov}}
+\index{cov@{cov}!util.c@{util.c}}
+\subsubsection[{cov}]{\setlength{\rightskip}{0pt plus 5cm}void cov (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{S, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$}]{mu, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a933323c14a437dbd292f612058fe58ea}
+\hypertarget{util_8c_a5d383ade2aeac8e8687d12bae7de4915}{
+\index{util.c@{util.c}!det@{det}}
+\index{det@{det}!util.c@{util.c}}
+\subsubsection[{det}]{\setlength{\rightskip}{0pt plus 5cm}double det (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a5d383ade2aeac8e8687d12bae7de4915}
+\hypertarget{util_8c_a3f11779262c852941ea4aebb14db54c9}{
+\index{util.c@{util.c}!dist@{dist}}
+\index{dist@{dist}!util.c@{util.c}}
+\subsubsection[{dist}]{\setlength{\rightskip}{0pt plus 5cm}double dist (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a3f11779262c852941ea4aebb14db54c9}
+\hypertarget{util_8c_a8510285b32712a32c2e869ed0df10785}{
+\index{util.c@{util.c}!dist2@{dist2}}
+\index{dist2@{dist2}!util.c@{util.c}}
+\subsubsection[{dist2}]{\setlength{\rightskip}{0pt plus 5cm}double dist2 (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a8510285b32712a32c2e869ed0df10785}
+\hypertarget{util_8c_a34f5bdcb486a0659d5c5dc1288754b17}{
+\index{util.c@{util.c}!dot@{dot}}
+\index{dot@{dot}!util.c@{util.c}}
+\subsubsection[{dot}]{\setlength{\rightskip}{0pt plus 5cm}double dot (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a34f5bdcb486a0659d5c5dc1288754b17}
+\hypertarget{util_8c_a4302c09b8f132f44ae17455a36a69ec0}{
+\index{util.c@{util.c}!eigen\_\-symm@{eigen\_\-symm}}
+\index{eigen\_\-symm@{eigen\_\-symm}!util.c@{util.c}}
+\subsubsection[{eigen\_\-symm}]{\setlength{\rightskip}{0pt plus 5cm}void eigen\_\-symm (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double $\ast$$\ast$}]{V, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a4302c09b8f132f44ae17455a36a69ec0}
+\hypertarget{util_8c_a148a1f446ce77498da7c87ff29dec5f1}{
+\index{util.c@{util.c}!erfinv@{erfinv}}
+\index{erfinv@{erfinv}!util.c@{util.c}}
+\subsubsection[{erfinv}]{\setlength{\rightskip}{0pt plus 5cm}double erfinv (
+\begin{DoxyParamCaption}
+\item[{double}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a148a1f446ce77498da7c87ff29dec5f1}
+\hypertarget{util_8c_a083b168e34723ab88be3e309903e637a}{
+\index{util.c@{util.c}!fact@{fact}}
+\index{fact@{fact}!util.c@{util.c}}
+\subsubsection[{fact}]{\setlength{\rightskip}{0pt plus 5cm}double fact (
+\begin{DoxyParamCaption}
+\item[{int}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a083b168e34723ab88be3e309903e637a}
+\hypertarget{util_8c_ae1f34ebdda1c7728770a6a9678dbec57}{
+\index{util.c@{util.c}!find@{find}}
+\index{find@{find}!util.c@{util.c}}
+\subsubsection[{find}]{\setlength{\rightskip}{0pt plus 5cm}int find (
+\begin{DoxyParamCaption}
+\item[{int $\ast$}]{k, }
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ae1f34ebdda1c7728770a6a9678dbec57}
+\hypertarget{util_8c_a56aa645635998b5bce70420639ce8681}{
+\index{util.c@{util.c}!findeq@{findeq}}
+\index{findeq@{findeq}!util.c@{util.c}}
+\subsubsection[{findeq}]{\setlength{\rightskip}{0pt plus 5cm}int findeq (
+\begin{DoxyParamCaption}
+\item[{int $\ast$}]{k, }
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{a, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a56aa645635998b5bce70420639ce8681}
+\hypertarget{util_8c_ac781738cd9fbb9e29af5bb8a46d421e7}{
+\index{util.c@{util.c}!findinv@{findinv}}
+\index{findinv@{findinv}!util.c@{util.c}}
+\subsubsection[{findinv}]{\setlength{\rightskip}{0pt plus 5cm}int findinv (
+\begin{DoxyParamCaption}
+\item[{int $\ast$}]{k, }
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ac781738cd9fbb9e29af5bb8a46d421e7}
+\hypertarget{util_8c_a052fa0fa8d2e1cda6d929b2939fa555e}{
+\index{util.c@{util.c}!frand@{frand}}
+\index{frand@{frand}!util.c@{util.c}}
+\subsubsection[{frand}]{\setlength{\rightskip}{0pt plus 5cm}double frand (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a052fa0fa8d2e1cda6d929b2939fa555e}
+\hypertarget{util_8c_a15585dc1b82fd6bcedb5043b0b29d424}{
+\index{util.c@{util.c}!free\_\-matrix2@{free\_\-matrix2}}
+\index{free\_\-matrix2@{free\_\-matrix2}!util.c@{util.c}}
+\subsubsection[{free\_\-matrix2}]{\setlength{\rightskip}{0pt plus 5cm}void free\_\-matrix2 (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a15585dc1b82fd6bcedb5043b0b29d424}
+\hypertarget{util_8c_a8104c00a450df54d48e3b6467f828447}{
+\index{util.c@{util.c}!free\_\-matrix2i@{free\_\-matrix2i}}
+\index{free\_\-matrix2i@{free\_\-matrix2i}!util.c@{util.c}}
+\subsubsection[{free\_\-matrix2i}]{\setlength{\rightskip}{0pt plus 5cm}void free\_\-matrix2i (
+\begin{DoxyParamCaption}
+\item[{int $\ast$$\ast$}]{X}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a8104c00a450df54d48e3b6467f828447}
+\hypertarget{util_8c_ae64b984d47187c66c34b646f0e6e1dd5}{
+\index{util.c@{util.c}!get\_\-time\_\-ms@{get\_\-time\_\-ms}}
+\index{get\_\-time\_\-ms@{get\_\-time\_\-ms}!util.c@{util.c}}
+\subsubsection[{get\_\-time\_\-ms}]{\setlength{\rightskip}{0pt plus 5cm}double get\_\-time\_\-ms (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ae64b984d47187c66c34b646f0e6e1dd5}
+\hypertarget{util_8c_a11177c89bf8ac5b367b9945c162746f7}{
+\index{util.c@{util.c}!graph\_\-find\_\-edge@{graph\_\-find\_\-edge}}
+\index{graph\_\-find\_\-edge@{graph\_\-find\_\-edge}!util.c@{util.c}}
+\subsubsection[{graph\_\-find\_\-edge}]{\setlength{\rightskip}{0pt plus 5cm}int graph\_\-find\_\-edge (
+\begin{DoxyParamCaption}
+\item[{{\bf graph\_\-t} $\ast$}]{g, }
+\item[{int}]{i, }
+\item[{int}]{j}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a11177c89bf8ac5b367b9945c162746f7}
+\hypertarget{util_8c_a100574289c0cc6f2f02a235c1d22c94a}{
+\index{util.c@{util.c}!graph\_\-free@{graph\_\-free}}
+\index{graph\_\-free@{graph\_\-free}!util.c@{util.c}}
+\subsubsection[{graph\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void graph\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf graph\_\-t} $\ast$}]{g}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a100574289c0cc6f2f02a235c1d22c94a}
+\hypertarget{util_8c_ad9e613357bcf65cd9950b8c2f87281b6}{
+\index{util.c@{util.c}!graph\_\-smooth@{graph\_\-smooth}}
+\index{graph\_\-smooth@{graph\_\-smooth}!util.c@{util.c}}
+\subsubsection[{graph\_\-smooth}]{\setlength{\rightskip}{0pt plus 5cm}void graph\_\-smooth (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{dst, }
+\item[{double $\ast$$\ast$}]{src, }
+\item[{{\bf graph\_\-t} $\ast$}]{g, }
+\item[{int}]{d, }
+\item[{double}]{w}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad9e613357bcf65cd9950b8c2f87281b6}
+\hypertarget{util_8c_aaa61e4e4ed0e9a0cb959d26de0103c1b}{
+\index{util.c@{util.c}!ilist\_\-add@{ilist\_\-add}}
+\index{ilist\_\-add@{ilist\_\-add}!util.c@{util.c}}
+\subsubsection[{ilist\_\-add}]{\setlength{\rightskip}{0pt plus 5cm}{\bf ilist\_\-t}$\ast$ ilist\_\-add (
+\begin{DoxyParamCaption}
+\item[{{\bf ilist\_\-t} $\ast$}]{x, }
+\item[{int}]{a}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aaa61e4e4ed0e9a0cb959d26de0103c1b}
+\hypertarget{util_8c_a3bed42a4622ec9b466ab44585c5a62a8}{
+\index{util.c@{util.c}!ilist\_\-contains@{ilist\_\-contains}}
+\index{ilist\_\-contains@{ilist\_\-contains}!util.c@{util.c}}
+\subsubsection[{ilist\_\-contains}]{\setlength{\rightskip}{0pt plus 5cm}int ilist\_\-contains (
+\begin{DoxyParamCaption}
+\item[{{\bf ilist\_\-t} $\ast$}]{x, }
+\item[{int}]{a}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a3bed42a4622ec9b466ab44585c5a62a8}
+\hypertarget{util_8c_aa6d9aea8f92444901eb01e5e4eabdeb2}{
+\index{util.c@{util.c}!ilist\_\-find@{ilist\_\-find}}
+\index{ilist\_\-find@{ilist\_\-find}!util.c@{util.c}}
+\subsubsection[{ilist\_\-find}]{\setlength{\rightskip}{0pt plus 5cm}int ilist\_\-find (
+\begin{DoxyParamCaption}
+\item[{{\bf ilist\_\-t} $\ast$}]{x, }
+\item[{int}]{a}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aa6d9aea8f92444901eb01e5e4eabdeb2}
+\hypertarget{util_8c_a44115732bdcd50738f4620e07e57c6de}{
+\index{util.c@{util.c}!ilist\_\-free@{ilist\_\-free}}
+\index{ilist\_\-free@{ilist\_\-free}!util.c@{util.c}}
+\subsubsection[{ilist\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void ilist\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf ilist\_\-t} $\ast$}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a44115732bdcd50738f4620e07e57c6de}
+\hypertarget{util_8c_a5953f544bd7bdfdac01a07518e530aa9}{
+\index{util.c@{util.c}!imax@{imax}}
+\index{imax@{imax}!util.c@{util.c}}
+\subsubsection[{imax}]{\setlength{\rightskip}{0pt plus 5cm}int imax (
+\begin{DoxyParamCaption}
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a5953f544bd7bdfdac01a07518e530aa9}
+\hypertarget{util_8c_ac03c6457459d645a16bd2a67cc6320f5}{
+\index{util.c@{util.c}!imin@{imin}}
+\index{imin@{imin}!util.c@{util.c}}
+\subsubsection[{imin}]{\setlength{\rightskip}{0pt plus 5cm}int imin (
+\begin{DoxyParamCaption}
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ac03c6457459d645a16bd2a67cc6320f5}
+\hypertarget{util_8c_a67ac210d9a88a61058bc7d7ea738b903}{
+\index{util.c@{util.c}!inv@{inv}}
+\index{inv@{inv}!util.c@{util.c}}
+\subsubsection[{inv}]{\setlength{\rightskip}{0pt plus 5cm}void inv (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a67ac210d9a88a61058bc7d7ea738b903}
+\hypertarget{util_8c_ab08fa6c4eacf29fe7603acd5ec657487}{
+\index{util.c@{util.c}!irand@{irand}}
+\index{irand@{irand}!util.c@{util.c}}
+\subsubsection[{irand}]{\setlength{\rightskip}{0pt plus 5cm}int irand (
+\begin{DoxyParamCaption}
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ab08fa6c4eacf29fe7603acd5ec657487}
+\hypertarget{util_8c_aba8abffb7d4d79e58eeda5c1c5449ba9}{
+\index{util.c@{util.c}!kdtree@{kdtree}}
+\index{kdtree@{kdtree}!util.c@{util.c}}
+\subsubsection[{kdtree}]{\setlength{\rightskip}{0pt plus 5cm}{\bf kdtree\_\-t}$\ast$ {\bf kdtree} (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aba8abffb7d4d79e58eeda5c1c5449ba9}
+\hypertarget{util_8c_a59a5c7db37f28ac1ad20fb67ccfc249c}{
+\index{util.c@{util.c}!kdtree\_\-free@{kdtree\_\-free}}
+\index{kdtree\_\-free@{kdtree\_\-free}!util.c@{util.c}}
+\subsubsection[{kdtree\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void kdtree\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf kdtree\_\-t} $\ast$}]{tree}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a59a5c7db37f28ac1ad20fb67ccfc249c}
+\hypertarget{util_8c_aee2c706342a1bec6df903465e0e6876b}{
+\index{util.c@{util.c}!kdtree\_\-NN@{kdtree\_\-NN}}
+\index{kdtree\_\-NN@{kdtree\_\-NN}!util.c@{util.c}}
+\subsubsection[{kdtree\_\-NN}]{\setlength{\rightskip}{0pt plus 5cm}int kdtree\_\-NN (
+\begin{DoxyParamCaption}
+\item[{{\bf kdtree\_\-t} $\ast$}]{tree, }
+\item[{double $\ast$}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aee2c706342a1bec6df903465e0e6876b}
+\hypertarget{util_8c_a1acf5817cd874d1f86fb5a7a78ed1e15}{
+\index{util.c@{util.c}!lfact@{lfact}}
+\index{lfact@{lfact}!util.c@{util.c}}
+\subsubsection[{lfact}]{\setlength{\rightskip}{0pt plus 5cm}double lfact (
+\begin{DoxyParamCaption}
+\item[{int}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a1acf5817cd874d1f86fb5a7a78ed1e15}
+\hypertarget{util_8c_adb676ec928b887de382dadb7ba817b11}{
+\index{util.c@{util.c}!linear\_\-regression@{linear\_\-regression}}
+\index{linear\_\-regression@{linear\_\-regression}!util.c@{util.c}}
+\subsubsection[{linear\_\-regression}]{\setlength{\rightskip}{0pt plus 5cm}void linear\_\-regression (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{b, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$}]{y, }
+\item[{int}]{n, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_adb676ec928b887de382dadb7ba817b11}
+\hypertarget{util_8c_aab60bbf87c07368791db9fa024b0c60b}{
+\index{util.c@{util.c}!load\_\-matrix@{load\_\-matrix}}
+\index{load\_\-matrix@{load\_\-matrix}!util.c@{util.c}}
+\subsubsection[{load\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$$\ast$ load\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{fin, }
+\item[{int $\ast$}]{n, }
+\item[{int $\ast$}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aab60bbf87c07368791db9fa024b0c60b}
+\hypertarget{util_8c_a228edae7d73595d9f96fbb609dc4324d}{
+\index{util.c@{util.c}!matrix\_\-add@{matrix\_\-add}}
+\index{matrix\_\-add@{matrix\_\-add}!util.c@{util.c}}
+\subsubsection[{matrix\_\-add}]{\setlength{\rightskip}{0pt plus 5cm}void matrix\_\-add (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Z, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a228edae7d73595d9f96fbb609dc4324d}
+\hypertarget{util_8c_a3381b7698baf324b1a49fa311588c1f5}{
+\index{util.c@{util.c}!matrix\_\-clone@{matrix\_\-clone}}
+\index{matrix\_\-clone@{matrix\_\-clone}!util.c@{util.c}}
+\subsubsection[{matrix\_\-clone}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$$\ast$ matrix\_\-clone (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a3381b7698baf324b1a49fa311588c1f5}
+\hypertarget{util_8c_a1ab51591009133ab31e33670fc30ae7c}{
+\index{util.c@{util.c}!matrix\_\-copy@{matrix\_\-copy}}
+\index{matrix\_\-copy@{matrix\_\-copy}!util.c@{util.c}}
+\subsubsection[{matrix\_\-copy}]{\setlength{\rightskip}{0pt plus 5cm}void matrix\_\-copy (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a1ab51591009133ab31e33670fc30ae7c}
+\hypertarget{util_8c_a8133519cc79502828962d8685ab293f3}{
+\index{util.c@{util.c}!matrix\_\-mult@{matrix\_\-mult}}
+\index{matrix\_\-mult@{matrix\_\-mult}!util.c@{util.c}}
+\subsubsection[{matrix\_\-mult}]{\setlength{\rightskip}{0pt plus 5cm}void matrix\_\-mult (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Z, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{int}]{n, }
+\item[{int}]{p, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a8133519cc79502828962d8685ab293f3}
+\hypertarget{util_8c_adf011d41b37af6d6ed3b55a3e2578f18}{
+\index{util.c@{util.c}!matrix\_\-vec\_\-mult@{matrix\_\-vec\_\-mult}}
+\index{matrix\_\-vec\_\-mult@{matrix\_\-vec\_\-mult}!util.c@{util.c}}
+\subsubsection[{matrix\_\-vec\_\-mult}]{\setlength{\rightskip}{0pt plus 5cm}void matrix\_\-vec\_\-mult (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{y, }
+\item[{double $\ast$$\ast$}]{A, }
+\item[{double $\ast$}]{x, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_adf011d41b37af6d6ed3b55a3e2578f18}
+\hypertarget{util_8c_a0463b4cf441b8acde7937b563fb7ddb7}{
+\index{util.c@{util.c}!max@{max}}
+\index{max@{max}!util.c@{util.c}}
+\subsubsection[{max}]{\setlength{\rightskip}{0pt plus 5cm}double max (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a0463b4cf441b8acde7937b563fb7ddb7}
+\hypertarget{util_8c_a0908112e847f554e574ee65f934c791d}{
+\index{util.c@{util.c}!mean@{mean}}
+\index{mean@{mean}!util.c@{util.c}}
+\subsubsection[{mean}]{\setlength{\rightskip}{0pt plus 5cm}void mean (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a0908112e847f554e574ee65f934c791d}
+\hypertarget{util_8c_abdf7db577d1e76fb3dbc7b28f82fbf91}{
+\index{util.c@{util.c}!meshgraph\_\-add\_\-edge@{meshgraph\_\-add\_\-edge}}
+\index{meshgraph\_\-add\_\-edge@{meshgraph\_\-add\_\-edge}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-add\_\-edge}]{\setlength{\rightskip}{0pt plus 5cm}int meshgraph\_\-add\_\-edge (
+\begin{DoxyParamCaption}
+\item[{{\bf meshgraph\_\-t} $\ast$}]{g, }
+\item[{int}]{i, }
+\item[{int}]{j}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_abdf7db577d1e76fb3dbc7b28f82fbf91}
+\hypertarget{util_8c_ab19af1faf49f8baa571cf88d7763a71d}{
+\index{util.c@{util.c}!meshgraph\_\-add\_\-face@{meshgraph\_\-add\_\-face}}
+\index{meshgraph\_\-add\_\-face@{meshgraph\_\-add\_\-face}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-add\_\-face}]{\setlength{\rightskip}{0pt plus 5cm}int meshgraph\_\-add\_\-face (
+\begin{DoxyParamCaption}
+\item[{{\bf meshgraph\_\-t} $\ast$}]{g, }
+\item[{int}]{i, }
+\item[{int}]{j, }
+\item[{int}]{k}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ab19af1faf49f8baa571cf88d7763a71d}
+\hypertarget{util_8c_afda79f7cc1adcd9c944a9368eb880e13}{
+\index{util.c@{util.c}!meshgraph\_\-find\_\-edge@{meshgraph\_\-find\_\-edge}}
+\index{meshgraph\_\-find\_\-edge@{meshgraph\_\-find\_\-edge}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-find\_\-edge}]{\setlength{\rightskip}{0pt plus 5cm}int meshgraph\_\-find\_\-edge (
+\begin{DoxyParamCaption}
+\item[{{\bf meshgraph\_\-t} $\ast$}]{g, }
+\item[{int}]{i, }
+\item[{int}]{j}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_afda79f7cc1adcd9c944a9368eb880e13}
+\hypertarget{util_8c_ab529b4d4f8d7f08428c07c82db928104}{
+\index{util.c@{util.c}!meshgraph\_\-find\_\-face@{meshgraph\_\-find\_\-face}}
+\index{meshgraph\_\-find\_\-face@{meshgraph\_\-find\_\-face}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-find\_\-face}]{\setlength{\rightskip}{0pt plus 5cm}int meshgraph\_\-find\_\-face (
+\begin{DoxyParamCaption}
+\item[{{\bf meshgraph\_\-t} $\ast$}]{g, }
+\item[{int}]{i, }
+\item[{int}]{j, }
+\item[{int}]{k}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ab529b4d4f8d7f08428c07c82db928104}
+\hypertarget{util_8c_a79ae6bdf696e3d2e2a327c528f314271}{
+\index{util.c@{util.c}!meshgraph\_\-free@{meshgraph\_\-free}}
+\index{meshgraph\_\-free@{meshgraph\_\-free}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void meshgraph\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf meshgraph\_\-t} $\ast$}]{g}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a79ae6bdf696e3d2e2a327c528f314271}
+\hypertarget{util_8c_a068fcc9688a0a6aeb1cc211c7896f48a}{
+\index{util.c@{util.c}!meshgraph\_\-new@{meshgraph\_\-new}}
+\index{meshgraph\_\-new@{meshgraph\_\-new}!util.c@{util.c}}
+\subsubsection[{meshgraph\_\-new}]{\setlength{\rightskip}{0pt plus 5cm}{\bf meshgraph\_\-t}$\ast$ meshgraph\_\-new (
+\begin{DoxyParamCaption}
+\item[{int}]{vcap, }
+\item[{int}]{dcap}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a068fcc9688a0a6aeb1cc211c7896f48a}
+\hypertarget{util_8c_acc68388e43b943ec6d034029ca1b8d90}{
+\index{util.c@{util.c}!min@{min}}
+\index{min@{min}!util.c@{util.c}}
+\subsubsection[{min}]{\setlength{\rightskip}{0pt plus 5cm}double min (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_acc68388e43b943ec6d034029ca1b8d90}
+\hypertarget{util_8c_abafe0b3a5d1be9d30b32b53b6cea27d0}{
+\index{util.c@{util.c}!mink@{mink}}
+\index{mink@{mink}!util.c@{util.c}}
+\subsubsection[{mink}]{\setlength{\rightskip}{0pt plus 5cm}void mink (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{int $\ast$}]{idx, }
+\item[{int}]{n, }
+\item[{int}]{k}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_abafe0b3a5d1be9d30b32b53b6cea27d0}
+\hypertarget{util_8c_a86703704246ae548c9b7435913c22521}{
+\index{util.c@{util.c}!mult@{mult}}
+\index{mult@{mult}!util.c@{util.c}}
+\subsubsection[{mult}]{\setlength{\rightskip}{0pt plus 5cm}void mult (
+\begin{DoxyParamCaption}
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{c, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a86703704246ae548c9b7435913c22521}
+\hypertarget{util_8c_ac2e700b1d64a0fca7445d96cf1392190}{
+\index{util.c@{util.c}!mvnpdf@{mvnpdf}}
+\index{mvnpdf@{mvnpdf}!util.c@{util.c}}
+\subsubsection[{mvnpdf}]{\setlength{\rightskip}{0pt plus 5cm}double mvnpdf (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$$\ast$}]{S, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ac2e700b1d64a0fca7445d96cf1392190}
+\hypertarget{util_8c_a1a5d28a0426e93f4843a4cde6b769809}{
+\index{util.c@{util.c}!mvnpdf\_\-pcs@{mvnpdf\_\-pcs}}
+\index{mvnpdf\_\-pcs@{mvnpdf\_\-pcs}!util.c@{util.c}}
+\subsubsection[{mvnpdf\_\-pcs}]{\setlength{\rightskip}{0pt plus 5cm}double mvnpdf\_\-pcs (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$}]{z, }
+\item[{double $\ast$$\ast$}]{V, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a1a5d28a0426e93f4843a4cde6b769809}
+\hypertarget{util_8c_a18fe2dc19048d9b32ac78590aaad8aba}{
+\index{util.c@{util.c}!mvnrand@{mvnrand}}
+\index{mvnrand@{mvnrand}!util.c@{util.c}}
+\subsubsection[{mvnrand}]{\setlength{\rightskip}{0pt plus 5cm}void mvnrand (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$$\ast$}]{S, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a18fe2dc19048d9b32ac78590aaad8aba}
+\hypertarget{util_8c_a17af21dd841f451e169eae0018f3bb40}{
+\index{util.c@{util.c}!mvnrand\_\-pcs@{mvnrand\_\-pcs}}
+\index{mvnrand\_\-pcs@{mvnrand\_\-pcs}!util.c@{util.c}}
+\subsubsection[{mvnrand\_\-pcs}]{\setlength{\rightskip}{0pt plus 5cm}void mvnrand\_\-pcs (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$}]{z, }
+\item[{double $\ast$$\ast$}]{V, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a17af21dd841f451e169eae0018f3bb40}
+\hypertarget{util_8c_a79ccb1294380efed3d0d5c8d2f663c8e}{
+\index{util.c@{util.c}!new\_\-matrix2@{new\_\-matrix2}}
+\index{new\_\-matrix2@{new\_\-matrix2}!util.c@{util.c}}
+\subsubsection[{new\_\-matrix2}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$$\ast$ new\_\-matrix2 (
+\begin{DoxyParamCaption}
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a79ccb1294380efed3d0d5c8d2f663c8e}
+\hypertarget{util_8c_ad95f52848c2b4eb28b1616872e36939b}{
+\index{util.c@{util.c}!new\_\-matrix2i@{new\_\-matrix2i}}
+\index{new\_\-matrix2i@{new\_\-matrix2i}!util.c@{util.c}}
+\subsubsection[{new\_\-matrix2i}]{\setlength{\rightskip}{0pt plus 5cm}int$\ast$$\ast$ new\_\-matrix2i (
+\begin{DoxyParamCaption}
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad95f52848c2b4eb28b1616872e36939b}
+\hypertarget{util_8c_adeb7279c51e4aa27d027de5e61a3cbd3}{
+\index{util.c@{util.c}!norm@{norm}}
+\index{norm@{norm}!util.c@{util.c}}
+\subsubsection[{norm}]{\setlength{\rightskip}{0pt plus 5cm}double norm (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_adeb7279c51e4aa27d027de5e61a3cbd3}
+\hypertarget{util_8c_a4866693235120364a34d6db6ded939fd}{
+\index{util.c@{util.c}!normalize@{normalize}}
+\index{normalize@{normalize}!util.c@{util.c}}
+\subsubsection[{normalize}]{\setlength{\rightskip}{0pt plus 5cm}void normalize (
+\begin{DoxyParamCaption}
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a4866693235120364a34d6db6ded939fd}
+\hypertarget{util_8c_a3442360283dd5444696842414812e53d}{
+\index{util.c@{util.c}!normpdf@{normpdf}}
+\index{normpdf@{normpdf}!util.c@{util.c}}
+\subsubsection[{normpdf}]{\setlength{\rightskip}{0pt plus 5cm}double normpdf (
+\begin{DoxyParamCaption}
+\item[{double}]{x, }
+\item[{double}]{mu, }
+\item[{double}]{sigma}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a3442360283dd5444696842414812e53d}
+\hypertarget{util_8c_a0fdaca79bb8c95e06ea90b6d73aff97c}{
+\index{util.c@{util.c}!normrand@{normrand}}
+\index{normrand@{normrand}!util.c@{util.c}}
+\subsubsection[{normrand}]{\setlength{\rightskip}{0pt plus 5cm}double normrand (
+\begin{DoxyParamCaption}
+\item[{double}]{mu, }
+\item[{double}]{sigma}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a0fdaca79bb8c95e06ea90b6d73aff97c}
+\hypertarget{util_8c_a01da7086667b68b3824ba9a70a0ddd33}{
+\index{util.c@{util.c}!outer\_\-prod@{outer\_\-prod}}
+\index{outer\_\-prod@{outer\_\-prod}!util.c@{util.c}}
+\subsubsection[{outer\_\-prod}]{\setlength{\rightskip}{0pt plus 5cm}void outer\_\-prod (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Z, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a01da7086667b68b3824ba9a70a0ddd33}
+\hypertarget{util_8c_ad6fb3433c2c1cd4196e72ab0689cc239}{
+\index{util.c@{util.c}!pmfrand@{pmfrand}}
+\index{pmfrand@{pmfrand}!util.c@{util.c}}
+\subsubsection[{pmfrand}]{\setlength{\rightskip}{0pt plus 5cm}int pmfrand (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{w, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad6fb3433c2c1cd4196e72ab0689cc239}
+\hypertarget{util_8c_a1613998cc011dea1c8d1a96f7a23d4c2}{
+\index{util.c@{util.c}!polynomial\_\-regression@{polynomial\_\-regression}}
+\index{polynomial\_\-regression@{polynomial\_\-regression}!util.c@{util.c}}
+\subsubsection[{polynomial\_\-regression}]{\setlength{\rightskip}{0pt plus 5cm}void polynomial\_\-regression (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{b, }
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{y, }
+\item[{int}]{n, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a1613998cc011dea1c8d1a96f7a23d4c2}
+\hypertarget{util_8c_a01693919458eb777d06ea68c8528ef46}{
+\index{util.c@{util.c}!print\_\-matrix@{print\_\-matrix}}
+\index{print\_\-matrix@{print\_\-matrix}!util.c@{util.c}}
+\subsubsection[{print\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}void print\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a01693919458eb777d06ea68c8528ef46}
+\hypertarget{util_8c_a8e3c9b5767f71ce009b456f2aeedf4d0}{
+\index{util.c@{util.c}!prod@{prod}}
+\index{prod@{prod}!util.c@{util.c}}
+\subsubsection[{prod}]{\setlength{\rightskip}{0pt plus 5cm}double prod (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a8e3c9b5767f71ce009b456f2aeedf4d0}
+\hypertarget{util_8c_afaaa65091a04aaa598bac08f56e90f05}{
+\index{util.c@{util.c}!proj@{proj}}
+\index{proj@{proj}!util.c@{util.c}}
+\subsubsection[{proj}]{\setlength{\rightskip}{0pt plus 5cm}void proj (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_afaaa65091a04aaa598bac08f56e90f05}
+\hypertarget{util_8c_ae8bf40a970fd185a3710e46e9328f88b}{
+\index{util.c@{util.c}!qselect@{qselect}}
+\index{qselect@{qselect}!util.c@{util.c}}
+\subsubsection[{qselect}]{\setlength{\rightskip}{0pt plus 5cm}int qselect (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{int}]{n, }
+\item[{int}]{k}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ae8bf40a970fd185a3710e46e9328f88b}
+\hypertarget{util_8c_a73e0f9e742b953661755ec408d3a1a69}{
+\index{util.c@{util.c}!quaternion\_\-inverse@{quaternion\_\-inverse}}
+\index{quaternion\_\-inverse@{quaternion\_\-inverse}!util.c@{util.c}}
+\subsubsection[{quaternion\_\-inverse}]{\setlength{\rightskip}{0pt plus 5cm}void quaternion\_\-inverse (
+\begin{DoxyParamCaption}
+\item[{double}]{q\_\-inv\mbox{[}4\mbox{]}, }
+\item[{double}]{q\mbox{[}4\mbox{]}}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a73e0f9e742b953661755ec408d3a1a69}
+\hypertarget{util_8c_a5ed35e8326dba8970d9ce653659a77a4}{
+\index{util.c@{util.c}!quaternion\_\-mult@{quaternion\_\-mult}}
+\index{quaternion\_\-mult@{quaternion\_\-mult}!util.c@{util.c}}
+\subsubsection[{quaternion\_\-mult}]{\setlength{\rightskip}{0pt plus 5cm}void quaternion\_\-mult (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}4\mbox{]}, }
+\item[{double}]{x\mbox{[}4\mbox{]}, }
+\item[{double}]{y\mbox{[}4\mbox{]}}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a5ed35e8326dba8970d9ce653659a77a4}
+\hypertarget{util_8c_a98d884f4a09ea7c724214c5e95f1d03f}{
+\index{util.c@{util.c}!quaternion\_\-to\_\-rotation\_\-matrix@{quaternion\_\-to\_\-rotation\_\-matrix}}
+\index{quaternion\_\-to\_\-rotation\_\-matrix@{quaternion\_\-to\_\-rotation\_\-matrix}!util.c@{util.c}}
+\subsubsection[{quaternion\_\-to\_\-rotation\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}void quaternion\_\-to\_\-rotation\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{R, }
+\item[{double $\ast$}]{q}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a98d884f4a09ea7c724214c5e95f1d03f}
+\hypertarget{util_8c_ac634157f62a78ad37b3b94006a722c58}{
+\index{util.c@{util.c}!randperm@{randperm}}
+\index{randperm@{randperm}!util.c@{util.c}}
+\subsubsection[{randperm}]{\setlength{\rightskip}{0pt plus 5cm}void randperm (
+\begin{DoxyParamCaption}
+\item[{int $\ast$}]{x, }
+\item[{int}]{n, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ac634157f62a78ad37b3b94006a722c58}
+\hypertarget{util_8c_a2b5947a005e359ac152b170eea10033c}{
+\index{util.c@{util.c}!reorder\_\-rows@{reorder\_\-rows}}
+\index{reorder\_\-rows@{reorder\_\-rows}!util.c@{util.c}}
+\subsubsection[{reorder\_\-rows}]{\setlength{\rightskip}{0pt plus 5cm}void reorder\_\-rows (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int $\ast$}]{idx, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a2b5947a005e359ac152b170eea10033c}
+\hypertarget{util_8c_a19580903544b841b993f6773366315c7}{
+\index{util.c@{util.c}!replace\_\-word@{replace\_\-word}}
+\index{replace\_\-word@{replace\_\-word}!util.c@{util.c}}
+\subsubsection[{replace\_\-word}]{\setlength{\rightskip}{0pt plus 5cm}void replace\_\-word (
+\begin{DoxyParamCaption}
+\item[{char $\ast$$\ast$}]{words, }
+\item[{int}]{num\_\-words, }
+\item[{const char $\ast$}]{from, }
+\item[{const char $\ast$}]{to}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a19580903544b841b993f6773366315c7}
+\hypertarget{util_8c_a52638699790900f1767ff7a73272822f}{
+\index{util.c@{util.c}!rotation\_\-matrix\_\-to\_\-quaternion@{rotation\_\-matrix\_\-to\_\-quaternion}}
+\index{rotation\_\-matrix\_\-to\_\-quaternion@{rotation\_\-matrix\_\-to\_\-quaternion}!util.c@{util.c}}
+\subsubsection[{rotation\_\-matrix\_\-to\_\-quaternion}]{\setlength{\rightskip}{0pt plus 5cm}void rotation\_\-matrix\_\-to\_\-quaternion (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{q, }
+\item[{double $\ast$$\ast$}]{R}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a52638699790900f1767ff7a73272822f}
+\hypertarget{util_8c_a4f30c63588008393f624c061da4154a9}{
+\index{util.c@{util.c}!sample\_\-simplex@{sample\_\-simplex}}
+\index{sample\_\-simplex@{sample\_\-simplex}!util.c@{util.c}}
+\subsubsection[{sample\_\-simplex}]{\setlength{\rightskip}{0pt plus 5cm}void sample\_\-simplex (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double $\ast$$\ast$}]{S, }
+\item[{int}]{n, }
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a4f30c63588008393f624c061da4154a9}
+\hypertarget{util_8c_aeef7f8241664a41b5b8aa9a1971049c8}{
+\index{util.c@{util.c}!save\_\-matrix@{save\_\-matrix}}
+\index{save\_\-matrix@{save\_\-matrix}!util.c@{util.c}}
+\subsubsection[{save\_\-matrix}]{\setlength{\rightskip}{0pt plus 5cm}void save\_\-matrix (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{fout, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aeef7f8241664a41b5b8aa9a1971049c8}
+\hypertarget{util_8c_aa286f78bd52ae0f4a9861772b592ccf6}{
+\index{util.c@{util.c}!solve@{solve}}
+\index{solve@{solve}!util.c@{util.c}}
+\subsubsection[{solve}]{\setlength{\rightskip}{0pt plus 5cm}void solve (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$$\ast$}]{A, }
+\item[{double $\ast$}]{b, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_aa286f78bd52ae0f4a9861772b592ccf6}
+\hypertarget{util_8c_af777b8e7c4af5450ce02dba687044905}{
+\index{util.c@{util.c}!sort\_\-data@{sort\_\-data}}
+\index{sort\_\-data@{sort\_\-data}!util.c@{util.c}}
+\subsubsection[{sort\_\-data}]{\setlength{\rightskip}{0pt plus 5cm}void sort\_\-data (
+\begin{DoxyParamCaption}
+\item[{{\bf sortable\_\-t} $\ast$}]{x, }
+\item[{size\_\-t}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_af777b8e7c4af5450ce02dba687044905}
+\hypertarget{util_8c_ad70871b8901bccd7ab083f93d0005846}{
+\index{util.c@{util.c}!sort\_\-indices@{sort\_\-indices}}
+\index{sort\_\-indices@{sort\_\-indices}!util.c@{util.c}}
+\subsubsection[{sort\_\-indices}]{\setlength{\rightskip}{0pt plus 5cm}void sort\_\-indices (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{int $\ast$}]{idx, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad70871b8901bccd7ab083f93d0005846}
+\hypertarget{util_8c_a788242d4e7ac802a4a255c5a9f73400a}{
+\index{util.c@{util.c}!split@{split}}
+\index{split@{split}!util.c@{util.c}}
+\subsubsection[{split}]{\setlength{\rightskip}{0pt plus 5cm}char$\ast$$\ast$ split (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{s, }
+\item[{const char $\ast$}]{delim, }
+\item[{int $\ast$}]{k}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a788242d4e7ac802a4a255c5a9f73400a}
+\hypertarget{util_8c_a7d371029c4acf69bf618e068b04a259f}{
+\index{util.c@{util.c}!sub@{sub}}
+\index{sub@{sub}!util.c@{util.c}}
+\subsubsection[{sub}]{\setlength{\rightskip}{0pt plus 5cm}void sub (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a7d371029c4acf69bf618e068b04a259f}
+\hypertarget{util_8c_a98ab39121caba2ee2e19bdb4bbd59775}{
+\index{util.c@{util.c}!sum@{sum}}
+\index{sum@{sum}!util.c@{util.c}}
+\subsubsection[{sum}]{\setlength{\rightskip}{0pt plus 5cm}double sum (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a98ab39121caba2ee2e19bdb4bbd59775}
+\hypertarget{util_8c_af8af75b31f351f8ebaca2f2a91d0c6a6}{
+\index{util.c@{util.c}!surface\_\-area\_\-sphere@{surface\_\-area\_\-sphere}}
+\index{surface\_\-area\_\-sphere@{surface\_\-area\_\-sphere}!util.c@{util.c}}
+\subsubsection[{surface\_\-area\_\-sphere}]{\setlength{\rightskip}{0pt plus 5cm}double surface\_\-area\_\-sphere (
+\begin{DoxyParamCaption}
+\item[{int}]{d}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_af8af75b31f351f8ebaca2f2a91d0c6a6}
+\hypertarget{util_8c_a751207b5139fb45b8a01e498758678da}{
+\index{util.c@{util.c}!sword@{sword}}
+\index{sword@{sword}!util.c@{util.c}}
+\subsubsection[{sword}]{\setlength{\rightskip}{0pt plus 5cm}char$\ast$ sword (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{s, }
+\item[{const char $\ast$}]{delim, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a751207b5139fb45b8a01e498758678da}
+\hypertarget{util_8c_a707dd1a6f20644e701a6d5587caf773b}{
+\index{util.c@{util.c}!tetrahedron\_\-volume@{tetrahedron\_\-volume}}
+\index{tetrahedron\_\-volume@{tetrahedron\_\-volume}!util.c@{util.c}}
+\subsubsection[{tetrahedron\_\-volume}]{\setlength{\rightskip}{0pt plus 5cm}double tetrahedron\_\-volume (
+\begin{DoxyParamCaption}
+\item[{double}]{x1\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x2\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x3\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x4\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a707dd1a6f20644e701a6d5587caf773b}
+\hypertarget{util_8c_a36eb8a3bc37ae731d8e341f2928e4062}{
+\index{util.c@{util.c}!tetrahedron\_\-volume\_\-old@{tetrahedron\_\-volume\_\-old}}
+\index{tetrahedron\_\-volume\_\-old@{tetrahedron\_\-volume\_\-old}!util.c@{util.c}}
+\subsubsection[{tetrahedron\_\-volume\_\-old}]{\setlength{\rightskip}{0pt plus 5cm}double tetrahedron\_\-volume\_\-old (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{w\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)\hspace{0.3cm}{\ttfamily  \mbox{[}inline\mbox{]}}}}
+\label{util_8c_a36eb8a3bc37ae731d8e341f2928e4062}
+\hypertarget{util_8c_a286a1465f179e866254b87f7ba4f0945}{
+\index{util.c@{util.c}!transpose@{transpose}}
+\index{transpose@{transpose}!util.c@{util.c}}
+\subsubsection[{transpose}]{\setlength{\rightskip}{0pt plus 5cm}void transpose (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{Y, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a286a1465f179e866254b87f7ba4f0945}
+\hypertarget{util_8c_addcf515dca3b345c27050a7b1269184b}{
+\index{util.c@{util.c}!triangle\_\-area@{triangle\_\-area}}
+\index{triangle\_\-area@{triangle\_\-area}!util.c@{util.c}}
+\subsubsection[{triangle\_\-area}]{\setlength{\rightskip}{0pt plus 5cm}double triangle\_\-area (
+\begin{DoxyParamCaption}
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_addcf515dca3b345c27050a7b1269184b}
+\hypertarget{util_8c_a05fe62b647f1a3a368085dcbf1e5ab12}{
+\index{util.c@{util.c}!vmult@{vmult}}
+\index{vmult@{vmult}!util.c@{util.c}}
+\subsubsection[{vmult}]{\setlength{\rightskip}{0pt plus 5cm}void vmult (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a05fe62b647f1a3a368085dcbf1e5ab12}
+\hypertarget{util_8c_ab6964b2fd61a428dd1b5ec1197a91f13}{
+\index{util.c@{util.c}!vnot@{vnot}}
+\index{vnot@{vnot}!util.c@{util.c}}
+\subsubsection[{vnot}]{\setlength{\rightskip}{0pt plus 5cm}void vnot (
+\begin{DoxyParamCaption}
+\item[{int}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ab6964b2fd61a428dd1b5ec1197a91f13}
+\hypertarget{util_8c_a15f730a2e4f5e08c85b8d86f5742fe6a}{
+\index{util.c@{util.c}!wavg@{wavg}}
+\index{wavg@{wavg}!util.c@{util.c}}
+\subsubsection[{wavg}]{\setlength{\rightskip}{0pt plus 5cm}void wavg (
+\begin{DoxyParamCaption}
+\item[{double}]{z\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{x\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{y\mbox{[}$\,$\mbox{]}, }
+\item[{double}]{w, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a15f730a2e4f5e08c85b8d86f5742fe6a}
+\hypertarget{util_8c_af6f3bf7f40378e2ce316a1a93fdba339}{
+\index{util.c@{util.c}!wcov@{wcov}}
+\index{wcov@{wcov}!util.c@{util.c}}
+\subsubsection[{wcov}]{\setlength{\rightskip}{0pt plus 5cm}void wcov (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$}]{S, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$}]{w, }
+\item[{double $\ast$}]{mu, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_af6f3bf7f40378e2ce316a1a93fdba339}
+\hypertarget{util_8c_a0f46c3ac9af987915878f2476ec8614c}{
+\index{util.c@{util.c}!wmean@{wmean}}
+\index{wmean@{wmean}!util.c@{util.c}}
+\subsubsection[{wmean}]{\setlength{\rightskip}{0pt plus 5cm}void wmean (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{mu, }
+\item[{double $\ast$$\ast$}]{X, }
+\item[{double $\ast$}]{w, }
+\item[{int}]{n, }
+\item[{int}]{m}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_a0f46c3ac9af987915878f2476ec8614c}
+\hypertarget{util_8c_ad656160347d726bebd66ecaa8cc22cc8}{
+\index{util.c@{util.c}!wordcmp@{wordcmp}}
+\index{wordcmp@{wordcmp}!util.c@{util.c}}
+\subsubsection[{wordcmp}]{\setlength{\rightskip}{0pt plus 5cm}int wordcmp (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{s1, }
+\item[{char $\ast$}]{s2, }
+\item[{const char $\ast$}]{delim}
+\end{DoxyParamCaption}
+)}}
+\label{util_8c_ad656160347d726bebd66ecaa8cc22cc8}
+
+
+\subsection{Variable Documentation}
+\hypertarget{util_8c_a0b0a8402aed1e428981ac0084d7d2cc9}{
+\index{util.c@{util.c}!colormap@{colormap}}
+\index{colormap@{colormap}!util.c@{util.c}}
+\subsubsection[{colormap}]{\setlength{\rightskip}{0pt plus 5cm}const {\bf color\_\-t} {\bf colormap}\mbox{[}256\mbox{]}}}
+\label{util_8c_a0b0a8402aed1e428981ac0084d7d2cc9}

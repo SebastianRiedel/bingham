@@ -1,0 +1,291 @@
+\hypertarget{hqnum_8c}{
+\section{old/hqnum.c File Reference}
+\label{hqnum_8c}\index{old/hqnum.c@{old/hqnum.c}}
+}
+{\ttfamily \#include $<$stdio.h$>$}\par
+{\ttfamily \#include $<$stdlib.h$>$}\par
+{\ttfamily \#include $<$mpfr.h$>$}\par
+\subsection*{Defines}
+\begin{DoxyCompactItemize}
+\item 
+\#define \hyperlink{hqnum_8c_a9c7b069fee3c8184e14a7de8e5da2dc6}{PRECISION}~100
+\item 
+\#define \hyperlink{hqnum_8c_a784eca967c39e32b3fa60a2180c427ee}{ROUNDING}~GMP\_\-RNDN
+\item 
+\#define \hyperlink{hqnum_8c_a2de0f6ce647d6c23bd816eecf3d9921d}{hqinit}(x)~mpfr\_\-init2(x, PRECISION)
+\item 
+\#define \hyperlink{hqnum_8c_adc184655bc8444401ac08799cc560d5c}{hqget}(x)~mpfr\_\-get\_\-d(x, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_ad48c332d6f558e5814ea68c704335b2c}{hqset}(x, y)~mpfr\_\-set\_\-d(x, y, ROUNDING);
+\item 
+\#define \hyperlink{hqnum_8c_a1e0a200990d911e82cfa0b73573b2979}{hqfree}(x)~mpfr\_\-clear(x)
+\item 
+\#define \hyperlink{hqnum_8c_a92d90ff152c1feb9284942617bc380d3}{hqlog}(x, y)~mpfr\_\-log(x, y, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_abeb32c84612de05a56b29fd954124066}{hqadd}(x, y, z)~mpfr\_\-add(x, y, z, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_a7e56356825573da3f22e347949cb0714}{hqsub}(x, y, z)~mpfr\_\-sub(x, y, z, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_a7fb29350eb596309f68a755c97eb9969}{hqmult}(x, y, z)~mpfr\_\-mul(x, y, z, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_a3061afef774467a88f740a93300f5164}{hqmultsi}(x, y, z)~mpfr\_\-mul\_\-si(x, y, z, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_ac5954ec28860b8d0ce5448cd32b5cde6}{hqmultui}(x, y, z)~mpfr\_\-mul\_\-ui(x, y, z, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_af63c212a52ee653de67fb17614494a4f}{hqexp}(x, y)~mpfr\_\-exp(x, y, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_af54f4332d83a8d2ff7c63754a065f6e8}{hqlgamma}(x, y)~mpfr\_\-lngamma(x, y, ROUNDING)
+\item 
+\#define \hyperlink{hqnum_8c_a6ea4ed94ad756413654626b718508ffd}{MAXFACT}~10000
+\end{DoxyCompactItemize}
+\subsection*{Typedefs}
+\begin{DoxyCompactItemize}
+\item 
+typedef mpfr\_\-t \hyperlink{hqnum_8c_a2ad5c619c547dff2a50ecb7289406570}{hqnum}
+\item 
+typedef mpfr\_\-ptr \hyperlink{hqnum_8c_aaac1d6eaf51551cc1e1b6a4913f8a0ea}{hqnum\_\-ptr}
+\end{DoxyCompactItemize}
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+int \hyperlink{hqnum_8c_aa5f744c782cd30b94f0472f52de10c4e}{hqlogd} (\hyperlink{hqnum_8c_a2ad5c619c547dff2a50ecb7289406570}{hqnum} x, double y)
+\item 
+int \hyperlink{hqnum_8c_a97487e7bbbb174a15af4e0687ad0ca16}{hqlgammad} (\hyperlink{hqnum_8c_a2ad5c619c547dff2a50ecb7289406570}{hqnum} x, double y)
+\item 
+\hyperlink{hqnum_8c_aaac1d6eaf51551cc1e1b6a4913f8a0ea}{hqnum\_\-ptr} \hyperlink{hqnum_8c_a38811b41fd71d1d7b0a54362b3b8533d}{hqalloc} ()
+\item 
+\hyperlink{hqnum_8c_aaac1d6eaf51551cc1e1b6a4913f8a0ea}{hqnum\_\-ptr} \hyperlink{hqnum_8c_a1ef2b1e0a9cec54b3504372925184f20}{hqlfact} (unsigned int x)
+\item 
+double \hyperlink{hqnum_8c_aaca713f42b2dd23ef09b968c6a1d1a3e}{bingham\_\-F\_\-2d} (double z1, double z2, int iter)
+\item 
+double \hyperlink{hqnum_8c_a2d410fab48c3d01b9066395e7c2ec20f}{bingham\_\-dF1\_\-2d} (double z1, double z2, int iter)
+\item 
+double \hyperlink{hqnum_8c_a43c6394b84645e554e062d72bb13772c}{bingham\_\-dF2\_\-2d} (double z1, double z2, int iter)
+\end{DoxyCompactItemize}
+
+
+\subsection{Define Documentation}
+\hypertarget{hqnum_8c_abeb32c84612de05a56b29fd954124066}{
+\index{hqnum.c@{hqnum.c}!hqadd@{hqadd}}
+\index{hqadd@{hqadd}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqadd}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqadd(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y, }
+\item[{}]{z}
+\end{DoxyParamCaption}
+)~mpfr\_\-add(x, y, z, ROUNDING)}}
+\label{hqnum_8c_abeb32c84612de05a56b29fd954124066}
+\hypertarget{hqnum_8c_af63c212a52ee653de67fb17614494a4f}{
+\index{hqnum.c@{hqnum.c}!hqexp@{hqexp}}
+\index{hqexp@{hqexp}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqexp}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqexp(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y}
+\end{DoxyParamCaption}
+)~mpfr\_\-exp(x, y, ROUNDING)}}
+\label{hqnum_8c_af63c212a52ee653de67fb17614494a4f}
+\hypertarget{hqnum_8c_a1e0a200990d911e82cfa0b73573b2979}{
+\index{hqnum.c@{hqnum.c}!hqfree@{hqfree}}
+\index{hqfree@{hqfree}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqfree}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqfree(
+\begin{DoxyParamCaption}
+\item[{}]{x}
+\end{DoxyParamCaption}
+)~mpfr\_\-clear(x)}}
+\label{hqnum_8c_a1e0a200990d911e82cfa0b73573b2979}
+\hypertarget{hqnum_8c_adc184655bc8444401ac08799cc560d5c}{
+\index{hqnum.c@{hqnum.c}!hqget@{hqget}}
+\index{hqget@{hqget}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqget}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqget(
+\begin{DoxyParamCaption}
+\item[{}]{x}
+\end{DoxyParamCaption}
+)~mpfr\_\-get\_\-d(x, ROUNDING)}}
+\label{hqnum_8c_adc184655bc8444401ac08799cc560d5c}
+\hypertarget{hqnum_8c_a2de0f6ce647d6c23bd816eecf3d9921d}{
+\index{hqnum.c@{hqnum.c}!hqinit@{hqinit}}
+\index{hqinit@{hqinit}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqinit}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqinit(
+\begin{DoxyParamCaption}
+\item[{}]{x}
+\end{DoxyParamCaption}
+)~mpfr\_\-init2(x, PRECISION)}}
+\label{hqnum_8c_a2de0f6ce647d6c23bd816eecf3d9921d}
+\hypertarget{hqnum_8c_af54f4332d83a8d2ff7c63754a065f6e8}{
+\index{hqnum.c@{hqnum.c}!hqlgamma@{hqlgamma}}
+\index{hqlgamma@{hqlgamma}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqlgamma}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqlgamma(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y}
+\end{DoxyParamCaption}
+)~mpfr\_\-lngamma(x, y, ROUNDING)}}
+\label{hqnum_8c_af54f4332d83a8d2ff7c63754a065f6e8}
+\hypertarget{hqnum_8c_a92d90ff152c1feb9284942617bc380d3}{
+\index{hqnum.c@{hqnum.c}!hqlog@{hqlog}}
+\index{hqlog@{hqlog}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqlog}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqlog(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y}
+\end{DoxyParamCaption}
+)~mpfr\_\-log(x, y, ROUNDING)}}
+\label{hqnum_8c_a92d90ff152c1feb9284942617bc380d3}
+\hypertarget{hqnum_8c_a7fb29350eb596309f68a755c97eb9969}{
+\index{hqnum.c@{hqnum.c}!hqmult@{hqmult}}
+\index{hqmult@{hqmult}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqmult}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqmult(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y, }
+\item[{}]{z}
+\end{DoxyParamCaption}
+)~mpfr\_\-mul(x, y, z, ROUNDING)}}
+\label{hqnum_8c_a7fb29350eb596309f68a755c97eb9969}
+\hypertarget{hqnum_8c_a3061afef774467a88f740a93300f5164}{
+\index{hqnum.c@{hqnum.c}!hqmultsi@{hqmultsi}}
+\index{hqmultsi@{hqmultsi}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqmultsi}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqmultsi(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y, }
+\item[{}]{z}
+\end{DoxyParamCaption}
+)~mpfr\_\-mul\_\-si(x, y, z, ROUNDING)}}
+\label{hqnum_8c_a3061afef774467a88f740a93300f5164}
+\hypertarget{hqnum_8c_ac5954ec28860b8d0ce5448cd32b5cde6}{
+\index{hqnum.c@{hqnum.c}!hqmultui@{hqmultui}}
+\index{hqmultui@{hqmultui}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqmultui}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqmultui(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y, }
+\item[{}]{z}
+\end{DoxyParamCaption}
+)~mpfr\_\-mul\_\-ui(x, y, z, ROUNDING)}}
+\label{hqnum_8c_ac5954ec28860b8d0ce5448cd32b5cde6}
+\hypertarget{hqnum_8c_ad48c332d6f558e5814ea68c704335b2c}{
+\index{hqnum.c@{hqnum.c}!hqset@{hqset}}
+\index{hqset@{hqset}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqset}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqset(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y}
+\end{DoxyParamCaption}
+)~mpfr\_\-set\_\-d(x, y, ROUNDING);}}
+\label{hqnum_8c_ad48c332d6f558e5814ea68c704335b2c}
+\hypertarget{hqnum_8c_a7e56356825573da3f22e347949cb0714}{
+\index{hqnum.c@{hqnum.c}!hqsub@{hqsub}}
+\index{hqsub@{hqsub}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqsub}]{\setlength{\rightskip}{0pt plus 5cm}\#define hqsub(
+\begin{DoxyParamCaption}
+\item[{}]{x, }
+\item[{}]{y, }
+\item[{}]{z}
+\end{DoxyParamCaption}
+)~mpfr\_\-sub(x, y, z, ROUNDING)}}
+\label{hqnum_8c_a7e56356825573da3f22e347949cb0714}
+\hypertarget{hqnum_8c_a6ea4ed94ad756413654626b718508ffd}{
+\index{hqnum.c@{hqnum.c}!MAXFACT@{MAXFACT}}
+\index{MAXFACT@{MAXFACT}!hqnum.c@{hqnum.c}}
+\subsubsection[{MAXFACT}]{\setlength{\rightskip}{0pt plus 5cm}\#define MAXFACT~10000}}
+\label{hqnum_8c_a6ea4ed94ad756413654626b718508ffd}
+\hypertarget{hqnum_8c_a9c7b069fee3c8184e14a7de8e5da2dc6}{
+\index{hqnum.c@{hqnum.c}!PRECISION@{PRECISION}}
+\index{PRECISION@{PRECISION}!hqnum.c@{hqnum.c}}
+\subsubsection[{PRECISION}]{\setlength{\rightskip}{0pt plus 5cm}\#define PRECISION~100}}
+\label{hqnum_8c_a9c7b069fee3c8184e14a7de8e5da2dc6}
+\hypertarget{hqnum_8c_a784eca967c39e32b3fa60a2180c427ee}{
+\index{hqnum.c@{hqnum.c}!ROUNDING@{ROUNDING}}
+\index{ROUNDING@{ROUNDING}!hqnum.c@{hqnum.c}}
+\subsubsection[{ROUNDING}]{\setlength{\rightskip}{0pt plus 5cm}\#define ROUNDING~GMP\_\-RNDN}}
+\label{hqnum_8c_a784eca967c39e32b3fa60a2180c427ee}
+
+
+\subsection{Typedef Documentation}
+\hypertarget{hqnum_8c_a2ad5c619c547dff2a50ecb7289406570}{
+\index{hqnum.c@{hqnum.c}!hqnum@{hqnum}}
+\index{hqnum@{hqnum}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqnum}]{\setlength{\rightskip}{0pt plus 5cm}typedef mpfr\_\-t {\bf hqnum}}}
+\label{hqnum_8c_a2ad5c619c547dff2a50ecb7289406570}
+\hypertarget{hqnum_8c_aaac1d6eaf51551cc1e1b6a4913f8a0ea}{
+\index{hqnum.c@{hqnum.c}!hqnum\_\-ptr@{hqnum\_\-ptr}}
+\index{hqnum\_\-ptr@{hqnum\_\-ptr}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqnum\_\-ptr}]{\setlength{\rightskip}{0pt plus 5cm}typedef mpfr\_\-ptr {\bf hqnum\_\-ptr}}}
+\label{hqnum_8c_aaac1d6eaf51551cc1e1b6a4913f8a0ea}
+
+
+\subsection{Function Documentation}
+\hypertarget{hqnum_8c_a2d410fab48c3d01b9066395e7c2ec20f}{
+\index{hqnum.c@{hqnum.c}!bingham\_\-dF1\_\-2d@{bingham\_\-dF1\_\-2d}}
+\index{bingham\_\-dF1\_\-2d@{bingham\_\-dF1\_\-2d}!hqnum.c@{hqnum.c}}
+\subsubsection[{bingham\_\-dF1\_\-2d}]{\setlength{\rightskip}{0pt plus 5cm}double bingham\_\-dF1\_\-2d (
+\begin{DoxyParamCaption}
+\item[{double}]{z1, }
+\item[{double}]{z2, }
+\item[{int}]{iter}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_a2d410fab48c3d01b9066395e7c2ec20f}
+\hypertarget{hqnum_8c_a43c6394b84645e554e062d72bb13772c}{
+\index{hqnum.c@{hqnum.c}!bingham\_\-dF2\_\-2d@{bingham\_\-dF2\_\-2d}}
+\index{bingham\_\-dF2\_\-2d@{bingham\_\-dF2\_\-2d}!hqnum.c@{hqnum.c}}
+\subsubsection[{bingham\_\-dF2\_\-2d}]{\setlength{\rightskip}{0pt plus 5cm}double bingham\_\-dF2\_\-2d (
+\begin{DoxyParamCaption}
+\item[{double}]{z1, }
+\item[{double}]{z2, }
+\item[{int}]{iter}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_a43c6394b84645e554e062d72bb13772c}
+\hypertarget{hqnum_8c_aaca713f42b2dd23ef09b968c6a1d1a3e}{
+\index{hqnum.c@{hqnum.c}!bingham\_\-F\_\-2d@{bingham\_\-F\_\-2d}}
+\index{bingham\_\-F\_\-2d@{bingham\_\-F\_\-2d}!hqnum.c@{hqnum.c}}
+\subsubsection[{bingham\_\-F\_\-2d}]{\setlength{\rightskip}{0pt plus 5cm}double bingham\_\-F\_\-2d (
+\begin{DoxyParamCaption}
+\item[{double}]{z1, }
+\item[{double}]{z2, }
+\item[{int}]{iter}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_aaca713f42b2dd23ef09b968c6a1d1a3e}
+\hypertarget{hqnum_8c_a38811b41fd71d1d7b0a54362b3b8533d}{
+\index{hqnum.c@{hqnum.c}!hqalloc@{hqalloc}}
+\index{hqalloc@{hqalloc}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqalloc}]{\setlength{\rightskip}{0pt plus 5cm}{\bf hqnum\_\-ptr} hqalloc (
+\begin{DoxyParamCaption}
+{}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_a38811b41fd71d1d7b0a54362b3b8533d}
+\hypertarget{hqnum_8c_a1ef2b1e0a9cec54b3504372925184f20}{
+\index{hqnum.c@{hqnum.c}!hqlfact@{hqlfact}}
+\index{hqlfact@{hqlfact}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqlfact}]{\setlength{\rightskip}{0pt plus 5cm}{\bf hqnum\_\-ptr} hqlfact (
+\begin{DoxyParamCaption}
+\item[{unsigned int}]{x}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_a1ef2b1e0a9cec54b3504372925184f20}
+\hypertarget{hqnum_8c_a97487e7bbbb174a15af4e0687ad0ca16}{
+\index{hqnum.c@{hqnum.c}!hqlgammad@{hqlgammad}}
+\index{hqlgammad@{hqlgammad}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqlgammad}]{\setlength{\rightskip}{0pt plus 5cm}int hqlgammad (
+\begin{DoxyParamCaption}
+\item[{{\bf hqnum}}]{x, }
+\item[{double}]{y}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_a97487e7bbbb174a15af4e0687ad0ca16}
+\hypertarget{hqnum_8c_aa5f744c782cd30b94f0472f52de10c4e}{
+\index{hqnum.c@{hqnum.c}!hqlogd@{hqlogd}}
+\index{hqlogd@{hqlogd}!hqnum.c@{hqnum.c}}
+\subsubsection[{hqlogd}]{\setlength{\rightskip}{0pt plus 5cm}int hqlogd (
+\begin{DoxyParamCaption}
+\item[{{\bf hqnum}}]{x, }
+\item[{double}]{y}
+\end{DoxyParamCaption}
+)}}
+\label{hqnum_8c_aa5f744c782cd30b94f0472f52de10c4e}
