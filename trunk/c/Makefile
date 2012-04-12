@@ -91,7 +91,6 @@ gauss_mix: gauss_mix.o libbingham.a
 
 clean:
 	rm -f $(TARGETS) $(ODIR)/*.o *.a *~ core *.exe $(IDIR)/*~ $(IDIR)/*/*~
-	rm -Rf doc
 
 install:
 	if [ ! -d $(INSTALL_DIR)/include/bingham ] ; then mkdir $(INSTALL_DIR)/include/bingham ; fi

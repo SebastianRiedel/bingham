@@ -1,4 +1,4 @@
-function F = bingham_1F1(z, F_cache)
+function F = bingham_F(z, F_cache)
 %F = bingham_1F1(z, F_cache) -- looks up 2*1F1(1/2; (d+1)/2; z)
 
 
