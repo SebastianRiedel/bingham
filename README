@@ -10,10 +10,8 @@ The library contains both C and Matlab code, but only the C code is currently su
 
 In bingham/c, run:
 
-\code
 make
 make install
-\endcode
 
 This will install the C library, libbingham.a, on your machine. To use the library in your own project, simply add "-lbingham" to your linker flags and include the appropriate headers as you would with any other C library.
 
