@@ -87,7 +87,7 @@ olf_pose_sample: olf_pose_sample.o libbingham.a
 gauss_mix: gauss_mix.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-.PHONY: clean install
+.PHONY: clean install doc
 
 clean:
 	rm -f $(TARGETS) $(ODIR)/*.o *.a *~ core *.exe $(IDIR)/*~ $(IDIR)/*/*~
@@ -97,3 +97,6 @@ install:
 	cp $(DEPS) $(INSTALL_DIR)/include/bingham/
 	mv $(INSTALL_DIR)/include/bingham/bingham.h $(INSTALL_DIR)/include/
 	cp $(LIBS) $(INSTALL_DIR)/lib/
+
+doc:
+	doxygen Doxyfile

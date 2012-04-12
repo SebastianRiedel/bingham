@@ -1,0 +1,93 @@
+\hypertarget{structhypersphere__tessellation__t}{
+\section{hypersphere\_\-tessellation\_\-t Struct Reference}
+\label{structhypersphere__tessellation__t}\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}}
+}
+
+
+{\ttfamily \#include $<$hypersphere.h$>$}
+
+\subsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+int \hyperlink{structhypersphere__tessellation__t_aba8398c682a35ef1a8834f2023f86569}{n}
+\item 
+int \hyperlink{structhypersphere__tessellation__t_a32d3e8a25880ee139ced3ec658c41b89}{d}
+\item 
+\begin{tabbing}
+xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=\kill
+union \{\\
+\>\hyperlink{structtetramesh__t}{tetramesh\_t} $\ast$ \hyperlink{structhypersphere__tessellation__t_a0d6d3953f9e958a2f78df65dc2b3b4ee}{tetramesh}\\
+\}; \\
+
+\end{tabbing}\item 
+double $\ast$$\ast$ \hyperlink{structhypersphere__tessellation__t_a6cedeba23c0a5c74622e38195418f73d}{centroids}
+\item 
+double $\ast$ \hyperlink{structhypersphere__tessellation__t_a5cbab443a7da8fb4a0b836b6ae613c23}{volumes}
+\item 
+double $\ast$ \hyperlink{structhypersphere__tessellation__t_a5963abed3c6d469bae3fd16301ed0f5b}{radii}
+\item 
+int $\ast$$\ast$ \hyperlink{structhypersphere__tessellation__t_a5c048480704e641e48eeb911335f5033}{proximity\_\-queues}
+\item 
+double $\ast$$\ast$ \hyperlink{structhypersphere__tessellation__t_a82dfe3762cc181b9ab4cb37b8a570bff}{proximity\_\-queue\_\-dists}
+\item 
+int \hyperlink{structhypersphere__tessellation__t_acf2c565f1225caa258e1930821a90fcc}{proximity\_\-queue\_\-size}
+\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Tools for creating a finite element representation of a hypersphere 
+
+\subsection{Member Data Documentation}
+\hypertarget{structhypersphere__tessellation__t_a1597a5b73d7b389fb1d646fee34ee509}{
+\subsubsection[{"@1}]{\setlength{\rightskip}{0pt plus 5cm}union \{ ... \} }}
+\label{structhypersphere__tessellation__t_a1597a5b73d7b389fb1d646fee34ee509}
+\hypertarget{structhypersphere__tessellation__t_a6cedeba23c0a5c74622e38195418f73d}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!centroids@{centroids}}
+\index{centroids@{centroids}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{centroids}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$$\ast$ {\bf hypersphere\_\-tessellation\_\-t::centroids}}}
+\label{structhypersphere__tessellation__t_a6cedeba23c0a5c74622e38195418f73d}
+\hypertarget{structhypersphere__tessellation__t_a32d3e8a25880ee139ced3ec658c41b89}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!d@{d}}
+\index{d@{d}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{d}]{\setlength{\rightskip}{0pt plus 5cm}int {\bf hypersphere\_\-tessellation\_\-t::d}}}
+\label{structhypersphere__tessellation__t_a32d3e8a25880ee139ced3ec658c41b89}
+\hypertarget{structhypersphere__tessellation__t_aba8398c682a35ef1a8834f2023f86569}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!n@{n}}
+\index{n@{n}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{n}]{\setlength{\rightskip}{0pt plus 5cm}int {\bf hypersphere\_\-tessellation\_\-t::n}}}
+\label{structhypersphere__tessellation__t_aba8398c682a35ef1a8834f2023f86569}
+\hypertarget{structhypersphere__tessellation__t_a82dfe3762cc181b9ab4cb37b8a570bff}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!proximity\_\-queue\_\-dists@{proximity\_\-queue\_\-dists}}
+\index{proximity\_\-queue\_\-dists@{proximity\_\-queue\_\-dists}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{proximity\_\-queue\_\-dists}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$$\ast$ {\bf hypersphere\_\-tessellation\_\-t::proximity\_\-queue\_\-dists}}}
+\label{structhypersphere__tessellation__t_a82dfe3762cc181b9ab4cb37b8a570bff}
+\hypertarget{structhypersphere__tessellation__t_acf2c565f1225caa258e1930821a90fcc}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!proximity\_\-queue\_\-size@{proximity\_\-queue\_\-size}}
+\index{proximity\_\-queue\_\-size@{proximity\_\-queue\_\-size}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{proximity\_\-queue\_\-size}]{\setlength{\rightskip}{0pt plus 5cm}int {\bf hypersphere\_\-tessellation\_\-t::proximity\_\-queue\_\-size}}}
+\label{structhypersphere__tessellation__t_acf2c565f1225caa258e1930821a90fcc}
+\hypertarget{structhypersphere__tessellation__t_a5c048480704e641e48eeb911335f5033}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!proximity\_\-queues@{proximity\_\-queues}}
+\index{proximity\_\-queues@{proximity\_\-queues}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{proximity\_\-queues}]{\setlength{\rightskip}{0pt plus 5cm}int$\ast$$\ast$ {\bf hypersphere\_\-tessellation\_\-t::proximity\_\-queues}}}
+\label{structhypersphere__tessellation__t_a5c048480704e641e48eeb911335f5033}
+\hypertarget{structhypersphere__tessellation__t_a5963abed3c6d469bae3fd16301ed0f5b}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!radii@{radii}}
+\index{radii@{radii}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{radii}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$ {\bf hypersphere\_\-tessellation\_\-t::radii}}}
+\label{structhypersphere__tessellation__t_a5963abed3c6d469bae3fd16301ed0f5b}
+\hypertarget{structhypersphere__tessellation__t_a0d6d3953f9e958a2f78df65dc2b3b4ee}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!tetramesh@{tetramesh}}
+\index{tetramesh@{tetramesh}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{tetramesh}]{\setlength{\rightskip}{0pt plus 5cm}{\bf tetramesh\_\-t}$\ast$ {\bf hypersphere\_\-tessellation\_\-t::tetramesh}}}
+\label{structhypersphere__tessellation__t_a0d6d3953f9e958a2f78df65dc2b3b4ee}
+\hypertarget{structhypersphere__tessellation__t_a5cbab443a7da8fb4a0b836b6ae613c23}{
+\index{hypersphere\_\-tessellation\_\-t@{hypersphere\_\-tessellation\_\-t}!volumes@{volumes}}
+\index{volumes@{volumes}!hypersphere_tessellation_t@{hypersphere\_\-tessellation\_\-t}}
+\subsubsection[{volumes}]{\setlength{\rightskip}{0pt plus 5cm}double$\ast$ {\bf hypersphere\_\-tessellation\_\-t::volumes}}}
+\label{structhypersphere__tessellation__t_a5cbab443a7da8fb4a0b836b6ae613c23}
+
+
+The documentation for this struct was generated from the following file:\begin{DoxyCompactItemize}
+\item 
+include/bingham/\hyperlink{hypersphere_8h}{hypersphere.h}\end{DoxyCompactItemize}
