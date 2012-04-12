@@ -1,0 +1,174 @@
+\hypertarget{olf_8c}{
+\section{olf.c File Reference}
+\label{olf_8c}\index{olf.c@{olf.c}}
+}
+{\ttfamily \#include $<$stdio.h$>$}\par
+{\ttfamily \#include $<$stdlib.h$>$}\par
+{\ttfamily \#include $<$string.h$>$}\par
+{\ttfamily \#include $<$math.h$>$}\par
+{\ttfamily \#include $<$float.h$>$}\par
+{\ttfamily \#include \char`\"{}bingham/util.h\char`\"{}}\par
+{\ttfamily \#include \char`\"{}bingham/olf.h\char`\"{}}\par
+\subsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+void \hyperlink{olf_8c_a931c5034fd3009332529576adcaf5cce}{compute\_\-orientation\_\-quaternions} (double $\ast$$\ast$$\ast$Q, double $\ast$$\ast$N, double $\ast$$\ast$PCS, int num\_\-points)
+\item 
+\hyperlink{structpcd__t}{pcd\_\-t} $\ast$ \hyperlink{olf_8c_a6b8231cfe8c4d41f1f77e230263fe759}{load\_\-pcd} (char $\ast$f\_\-pcd)
+\item 
+void \hyperlink{olf_8c_aad075a102ac413cdbe69802a010097bb}{pcd\_\-free} (\hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd)
+\item 
+int \hyperlink{olf_8c_aaf166354a76c1a9464fc7498c3bbb22c}{pcd\_\-channel} (\hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd, char $\ast$channel\_\-name)
+\item 
+int \hyperlink{olf_8c_a92d4b37dd24a410aa8db09bad0df4683}{pcd\_\-add\_\-channel} (\hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd, char $\ast$channel)
+\item 
+\hyperlink{structolf__t}{olf\_\-t} $\ast$ \hyperlink{olf_8c_a02cd98b1a15d44175934e2b1009bfa6d}{load\_\-olf} (char $\ast$fname)
+\item 
+void \hyperlink{olf_8c_a7e95363d1392b811f34e11e48db9bbd0}{olf\_\-free} (\hyperlink{structolf__t}{olf\_\-t} $\ast$olf)
+\item 
+void \hyperlink{olf_8c_aa52b5399a2ecdfaf271895407b08ec3c}{olf\_\-classify\_\-points} (\hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd, \hyperlink{structolf__t}{olf\_\-t} $\ast$olf)
+\item 
+double \hyperlink{olf_8c_ae7b31e5e29c145b9f1d5d3cfe91b4af5}{olf\_\-pose\_\-pdf} (double $\ast$x, double $\ast$q, \hyperlink{structolf__t}{olf\_\-t} $\ast$olf, \hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd, int $\ast$indices, int n)
+\item 
+\hyperlink{structolf__pose__samples__t}{olf\_\-pose\_\-samples\_\-t} $\ast$ \hyperlink{olf_8c_aeece370922130c95f0b7f6eb636c8d5a}{olf\_\-pose\_\-sample} (\hyperlink{structolf__t}{olf\_\-t} $\ast$olf, \hyperlink{structpcd__t}{pcd\_\-t} $\ast$pcd, int n)
+\item 
+\hyperlink{structolf__pose__samples__t}{olf\_\-pose\_\-samples\_\-t} $\ast$ \hyperlink{olf_8c_a070b36aef6b452e5b0381ec37ecd6a3d}{olf\_\-aggregate\_\-pose\_\-samples} (\hyperlink{structolf__pose__samples__t}{olf\_\-pose\_\-samples\_\-t} $\ast$poses, \hyperlink{structolf__t}{olf\_\-t} $\ast$olf)
+\item 
+\hyperlink{structolf__pose__samples__t}{olf\_\-pose\_\-samples\_\-t} $\ast$ \hyperlink{olf_8c_aea37202bfd319af61f1b80b5fe57bb60}{olf\_\-pose\_\-samples\_\-new} (int n)
+\item 
+void \hyperlink{olf_8c_acf9c025fa6b6730e3a0b108617439fb8}{olf\_\-pose\_\-samples\_\-free} (\hyperlink{structolf__pose__samples__t}{olf\_\-pose\_\-samples\_\-t} $\ast$poses)
+\end{DoxyCompactItemize}
+
+
+\subsection{Function Documentation}
+\hypertarget{olf_8c_a931c5034fd3009332529576adcaf5cce}{
+\index{olf.c@{olf.c}!compute\_\-orientation\_\-quaternions@{compute\_\-orientation\_\-quaternions}}
+\index{compute\_\-orientation\_\-quaternions@{compute\_\-orientation\_\-quaternions}!olf.c@{olf.c}}
+\subsubsection[{compute\_\-orientation\_\-quaternions}]{\setlength{\rightskip}{0pt plus 5cm}void compute\_\-orientation\_\-quaternions (
+\begin{DoxyParamCaption}
+\item[{double $\ast$$\ast$$\ast$}]{Q, }
+\item[{double $\ast$$\ast$}]{N, }
+\item[{double $\ast$$\ast$}]{PCS, }
+\item[{int}]{num\_\-points}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a931c5034fd3009332529576adcaf5cce}
+\hypertarget{olf_8c_a02cd98b1a15d44175934e2b1009bfa6d}{
+\index{olf.c@{olf.c}!load\_\-olf@{load\_\-olf}}
+\index{load\_\-olf@{load\_\-olf}!olf.c@{olf.c}}
+\subsubsection[{load\_\-olf}]{\setlength{\rightskip}{0pt plus 5cm}{\bf olf\_\-t}$\ast$ load\_\-olf (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{fname}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a02cd98b1a15d44175934e2b1009bfa6d}
+\hypertarget{olf_8c_a6b8231cfe8c4d41f1f77e230263fe759}{
+\index{olf.c@{olf.c}!load\_\-pcd@{load\_\-pcd}}
+\index{load\_\-pcd@{load\_\-pcd}!olf.c@{olf.c}}
+\subsubsection[{load\_\-pcd}]{\setlength{\rightskip}{0pt plus 5cm}{\bf pcd\_\-t}$\ast$ load\_\-pcd (
+\begin{DoxyParamCaption}
+\item[{char $\ast$}]{f\_\-pcd}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a6b8231cfe8c4d41f1f77e230263fe759}
+\hypertarget{olf_8c_a070b36aef6b452e5b0381ec37ecd6a3d}{
+\index{olf.c@{olf.c}!olf\_\-aggregate\_\-pose\_\-samples@{olf\_\-aggregate\_\-pose\_\-samples}}
+\index{olf\_\-aggregate\_\-pose\_\-samples@{olf\_\-aggregate\_\-pose\_\-samples}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-aggregate\_\-pose\_\-samples}]{\setlength{\rightskip}{0pt plus 5cm}{\bf olf\_\-pose\_\-samples\_\-t}$\ast$ olf\_\-aggregate\_\-pose\_\-samples (
+\begin{DoxyParamCaption}
+\item[{{\bf olf\_\-pose\_\-samples\_\-t} $\ast$}]{poses, }
+\item[{{\bf olf\_\-t} $\ast$}]{olf}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a070b36aef6b452e5b0381ec37ecd6a3d}
+\hypertarget{olf_8c_aa52b5399a2ecdfaf271895407b08ec3c}{
+\index{olf.c@{olf.c}!olf\_\-classify\_\-points@{olf\_\-classify\_\-points}}
+\index{olf\_\-classify\_\-points@{olf\_\-classify\_\-points}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-classify\_\-points}]{\setlength{\rightskip}{0pt plus 5cm}void olf\_\-classify\_\-points (
+\begin{DoxyParamCaption}
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd, }
+\item[{{\bf olf\_\-t} $\ast$}]{olf}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_aa52b5399a2ecdfaf271895407b08ec3c}
+\hypertarget{olf_8c_a7e95363d1392b811f34e11e48db9bbd0}{
+\index{olf.c@{olf.c}!olf\_\-free@{olf\_\-free}}
+\index{olf\_\-free@{olf\_\-free}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void olf\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf olf\_\-t} $\ast$}]{olf}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a7e95363d1392b811f34e11e48db9bbd0}
+\hypertarget{olf_8c_ae7b31e5e29c145b9f1d5d3cfe91b4af5}{
+\index{olf.c@{olf.c}!olf\_\-pose\_\-pdf@{olf\_\-pose\_\-pdf}}
+\index{olf\_\-pose\_\-pdf@{olf\_\-pose\_\-pdf}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-pose\_\-pdf}]{\setlength{\rightskip}{0pt plus 5cm}double olf\_\-pose\_\-pdf (
+\begin{DoxyParamCaption}
+\item[{double $\ast$}]{x, }
+\item[{double $\ast$}]{q, }
+\item[{{\bf olf\_\-t} $\ast$}]{olf, }
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd, }
+\item[{int $\ast$}]{indices, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_ae7b31e5e29c145b9f1d5d3cfe91b4af5}
+\hypertarget{olf_8c_aeece370922130c95f0b7f6eb636c8d5a}{
+\index{olf.c@{olf.c}!olf\_\-pose\_\-sample@{olf\_\-pose\_\-sample}}
+\index{olf\_\-pose\_\-sample@{olf\_\-pose\_\-sample}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-pose\_\-sample}]{\setlength{\rightskip}{0pt plus 5cm}{\bf olf\_\-pose\_\-samples\_\-t}$\ast$ olf\_\-pose\_\-sample (
+\begin{DoxyParamCaption}
+\item[{{\bf olf\_\-t} $\ast$}]{olf, }
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd, }
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_aeece370922130c95f0b7f6eb636c8d5a}
+\hypertarget{olf_8c_acf9c025fa6b6730e3a0b108617439fb8}{
+\index{olf.c@{olf.c}!olf\_\-pose\_\-samples\_\-free@{olf\_\-pose\_\-samples\_\-free}}
+\index{olf\_\-pose\_\-samples\_\-free@{olf\_\-pose\_\-samples\_\-free}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-pose\_\-samples\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void olf\_\-pose\_\-samples\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf olf\_\-pose\_\-samples\_\-t} $\ast$}]{poses}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_acf9c025fa6b6730e3a0b108617439fb8}
+\hypertarget{olf_8c_aea37202bfd319af61f1b80b5fe57bb60}{
+\index{olf.c@{olf.c}!olf\_\-pose\_\-samples\_\-new@{olf\_\-pose\_\-samples\_\-new}}
+\index{olf\_\-pose\_\-samples\_\-new@{olf\_\-pose\_\-samples\_\-new}!olf.c@{olf.c}}
+\subsubsection[{olf\_\-pose\_\-samples\_\-new}]{\setlength{\rightskip}{0pt plus 5cm}{\bf olf\_\-pose\_\-samples\_\-t}$\ast$ olf\_\-pose\_\-samples\_\-new (
+\begin{DoxyParamCaption}
+\item[{int}]{n}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_aea37202bfd319af61f1b80b5fe57bb60}
+\hypertarget{olf_8c_a92d4b37dd24a410aa8db09bad0df4683}{
+\index{olf.c@{olf.c}!pcd\_\-add\_\-channel@{pcd\_\-add\_\-channel}}
+\index{pcd\_\-add\_\-channel@{pcd\_\-add\_\-channel}!olf.c@{olf.c}}
+\subsubsection[{pcd\_\-add\_\-channel}]{\setlength{\rightskip}{0pt plus 5cm}int pcd\_\-add\_\-channel (
+\begin{DoxyParamCaption}
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd, }
+\item[{char $\ast$}]{channel}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_a92d4b37dd24a410aa8db09bad0df4683}
+\hypertarget{olf_8c_aaf166354a76c1a9464fc7498c3bbb22c}{
+\index{olf.c@{olf.c}!pcd\_\-channel@{pcd\_\-channel}}
+\index{pcd\_\-channel@{pcd\_\-channel}!olf.c@{olf.c}}
+\subsubsection[{pcd\_\-channel}]{\setlength{\rightskip}{0pt plus 5cm}int pcd\_\-channel (
+\begin{DoxyParamCaption}
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd, }
+\item[{char $\ast$}]{channel\_\-name}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_aaf166354a76c1a9464fc7498c3bbb22c}
+\hypertarget{olf_8c_aad075a102ac413cdbe69802a010097bb}{
+\index{olf.c@{olf.c}!pcd\_\-free@{pcd\_\-free}}
+\index{pcd\_\-free@{pcd\_\-free}!olf.c@{olf.c}}
+\subsubsection[{pcd\_\-free}]{\setlength{\rightskip}{0pt plus 5cm}void pcd\_\-free (
+\begin{DoxyParamCaption}
+\item[{{\bf pcd\_\-t} $\ast$}]{pcd}
+\end{DoxyParamCaption}
+)}}
+\label{olf_8c_aad075a102ac413cdbe69802a010097bb}
