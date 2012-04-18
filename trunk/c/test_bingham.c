@@ -828,9 +828,9 @@ void test_bingham_mult(int argc, char *argv[])
 
   printf("B.F = %f\n", B.F);
   printf("B.Z = [%f %f %f]\n", B.Z[0], B.Z[1], B.Z[2]);
-  //printf("B.V[0] = [%f %f %f %f]\n", B.V[0][0], B.V[0][1], B.V[0][2], B.V[0][3]);
-  //printf("B.V[1] = [%f %f %f %f]\n", B.V[1][0], B.V[1][1], B.V[1][2], B.V[1][3]);
-  //printf("B.V[2] = [%f %f %f %f]\n", B.V[2][0], B.V[2][1], B.V[2][2], B.V[2][3]);
+  printf("B.V[0] = [%f %f %f %f]\n", B.V[0][0], B.V[0][1], B.V[0][2], B.V[0][3]);
+  printf("B.V[1] = [%f %f %f %f]\n", B.V[1][0], B.V[1][1], B.V[1][2], B.V[1][3]);
+  printf("B.V[2] = [%f %f %f %f]\n", B.V[2][0], B.V[2][1], B.V[2][2], B.V[2][3]);
 }
 
 
