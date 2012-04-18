@@ -16,6 +16,8 @@ ch_curv = find(strcmp(columns, 'curvature'));
 ch_pcx = find(strcmp(columns, 'pcx'));
 ch_pcy = find(strcmp(columns, 'pcy'));
 ch_pcz = find(strcmp(columns, 'pcz'));
+ch_pc1 = find(strcmp(columns, 'pc1'));
+ch_pc2 = find(strcmp(columns, 'pc2'));
 
 if ~isempty(ch_cluster)
    pcd.L = data(:, ch_cluster);
@@ -53,6 +55,12 @@ if ~isempty(ch_pcy)
 end
 if ~isempty(ch_pcz)
    pcd.PCZ = data(:, ch_pcz);
+end
+if ~isempty(ch_pc1)
+   pcd.PC1 = data(:, ch_pc1);
+end
+if ~isempty(ch_pc2)
+   pcd.PC2 = data(:, ch_pc2);
 end
 if ~isempty(ch_nx) && ~isempty(ch_pcx)
    pcd.Q = get_pcd_quaternions(pcd.data, pcd.columns);
