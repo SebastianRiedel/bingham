@@ -2,7 +2,12 @@ function y = interp_linear(X,alpha)
 %y = interp_linear(X,alpha) -- interpolate between the 2x2x...x2 N-D matrix X
 %with mixing coefficients alpha.
 
-d = length(size(X));
+s = size(X);
+if s(end)==1
+    s = s(1:end-1);
+end
+d = length(s);
+
 Z = reshape(X, [1,2^d]);
 for i=d:-1:1
     k = length(Z)/2;
