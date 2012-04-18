@@ -8,6 +8,7 @@
 #include "bingham/util.h"
 #include "bingham/hypersphere.h"
 #include "bingham/bingham_constants.h"
+//#include "bingham/bingham_constant_tables.h"
 
 
 #define EPSILON 1e-8
@@ -1723,11 +1724,11 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
   //printf("V[0] = [%f %f %f %f]\n", V[0][0], V[0][1], V[0][2], V[0][3]);
   //printf("V[1] = [%f %f %f %f]\n", V[1][0], V[1][1], V[1][2], V[1][3]);
   //printf("V[2] = [%f %f %f %f]\n", V[2][0], V[2][1], V[2][2], V[2][3]);
-  //printf("V[2] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
+  //printf("V[3] = [%f %f %f %f]\n", V[3][0], V[3][1], V[3][2], V[3][3]);
 
   // set the smallest z[i] (in magnitude) to zero
   for (i = 0; i < d-1; i++)
-    B->Z[i] = MAX(z[d-1-i] - z[0], -400);  //dbug
+    B->Z[i] = MAX(z[d-1-i] - z[0], BINGHAM_MIN_CONCENTRATION);
 
   // lookup F
   if (d == 4)

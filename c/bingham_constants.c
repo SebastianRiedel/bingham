@@ -8,6 +8,8 @@
 #include "bingham/bingham_constants.h"
 #include "bingham/bingham_constant_tables.h"
 
+const double BINGHAM_MIN_CONCENTRATION = -900;
+
 
 /** Note: It is assumed that z1 < z2 < z3 < 0 for all the bingham functions. **/
 

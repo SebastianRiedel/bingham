@@ -1486,7 +1486,15 @@ void inv(double **Y, double **X, int n)
 }
 
 
-// compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
+/**
+ * Compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
+ * The eigenvalues, z, will be sorted from smallest to largest in magnitude, and the
+ * eigenvectors will be stored in the rows of V.
+ * @param X (input) Symmetric n-by-n matrix
+ * @param n (input) Dimensionality of X
+ * @param z (output) Eigenvalues of X, from smallest to largest in magnitude
+ * @param V (output) Eigenvectors of X, in the rows
+ */
 void eigen_symm(double z[], double **V, double **X, int n)
 {
   // naive Jacobi method
@@ -1589,6 +1597,13 @@ void eigen_symm(double z[], double **V, double **X, int n)
   for (i = 0; i < n; i++)
     z[i] = A[i][i];
   sort_indices(z, idx, n);
+  if (z[idx[0]] < 0) {  // negative eigenvalues --> sort in reverse order
+    for (i = 0; i < n/2; i++) {
+      int tmp = idx[i];
+      idx[i] = idx[n-i-1];
+      idx[n-i-1] = tmp;
+    }
+  }
   for (i = 0; i < n; i++)
     z2[i] = z[idx[i]];
   for (i = 0; i < n; i++)
