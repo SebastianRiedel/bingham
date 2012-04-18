@@ -2,6 +2,7 @@
 #ifndef BINGHAM_CONSTANTS_H
 #define BINGHAM_CONSTANTS_H
 
+extern const double BINGHAM_MIN_CONCENTRATION;
 
 
 void bingham_constants_init();

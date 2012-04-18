@@ -826,8 +826,8 @@ void test_bingham_mult(int argc, char *argv[])
   double t1 = get_time_ms();
   printf("Performed %d same Bingham multiplications in %.0f ms\n", n, t1-t0);
 
-  //printf("B.F = %f\n", B.F);
-  //printf("B.Z = [%f %f %f]\n", B.Z[0], B.Z[1], B.Z[2]);
+  printf("B.F = %f\n", B.F);
+  printf("B.Z = [%f %f %f]\n", B.Z[0], B.Z[1], B.Z[2]);
   //printf("B.V[0] = [%f %f %f %f]\n", B.V[0][0], B.V[0][1], B.V[0][2], B.V[0][3]);
   //printf("B.V[1] = [%f %f %f %f]\n", B.V[1][0], B.V[1][1], B.V[1][2], B.V[1][3]);
   //printf("B.V[2] = [%f %f %f %f]\n", B.V[2][0], B.V[2][1], B.V[2][2], B.V[2][3]);
@@ -1227,11 +1227,11 @@ int main(int argc, char *argv[])
 
   //test_bingham_mixture_mult(argc, argv);
   //test_bingham_mixture_thresh_peaks(argc, argv);
-  //test_bingham_mult(argc, argv);
+  test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
   //test_bingham_mixture_sample(argc, argv);
-  test_bingham_sample(argc, argv);
+  //test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 
