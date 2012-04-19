@@ -25,10 +25,10 @@ v3 = v3/norm(v3);
 v4 = cross4d(v1,v2,v3);  % orthogonal v1,v2,v3
 B.V = [v3,v4,v2];
 
-fprintf('pc1 = %f, pc2 = %f, pc1/pc2 = %f\n', pc1, pc2, pc1/pc2);
+%fprintf('pc1 = %f, pc2 = %f, pc1/pc2 = %f\n', pc1, pc2, pc1/pc2);
 
-z3 = min(20*pc1/pc2, 400);
-B.Z = [-400, -400, -z3];
+z3 = min(10*(pc1/pc2 - 1), 100);
+B.Z = [-100, -100, -z3];
 
 [F dF] = bingham_F(B.Z);
 B.F = F;

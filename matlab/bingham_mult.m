@@ -9,18 +9,18 @@ if B1.d ~= B2.d
 end
 B.d = B1.d;
 
-C1 = B1.V * diag(B1.z) * B1.V';
-C2 = B2.V * diag(B2.z) * B2.V';
+C1 = B1.V * diag(B1.Z) * B1.V';
+C2 = B2.V * diag(B2.Z) * B2.V';
 
-% eigenvalues will be sorted from lowest to highest (e.g. [-10 -5 -2 -1])
-[V D] = eig(C1+C2);
-z = diag(D);
+% eigenvalues will be sorted from largest to smallest in magnitude
+[V D] = eigs(C1+C2);
+z = diag(D)';
 
 % set the smallest z (in magnitude) to zero
 B.V = V(:,1:3);
-B.z = max(z(1:3) - z(4), bingham_min_concentration);
+B.Z = max(z(1:3) - z(4), bingham_min_concentration);
 
 % lookup constants
-[F dF] = bingham_F(B.z);
+[F dF] = bingham_F(B.Z);
 B.F = F;
 B.dF = dF;

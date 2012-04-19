@@ -20,4 +20,8 @@ end
 n = size(cloud,1);
 D2 = sum((repmat(p, [1,n]) - cloud').^2);
 
-[xxx,i] = min(D2);
+[~,i] = min(D2);
+
+if ~isempty(I)
+    i = I(i);
+end
