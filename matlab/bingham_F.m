@@ -3,7 +3,7 @@ function [F dF] = bingham_F(z)
 %derivatives w.r.t. z
 
 global bingham_constants_
-if ~exist('bingham_constants_')
+if ~exist('bingham_constants_') || isempty(bingham_constants_)
     fprintf('Loading bingham constants...');
     bingham_constants_ = load_bingham_constants();
     fprintf('done\n');

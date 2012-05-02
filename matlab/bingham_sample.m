@@ -43,6 +43,6 @@ for i=1:n*sample_rate+burn_in
     X(i,:) = x;
 end
 
-%accept_rate = num_accepts / (n*sample_rate + burn_in)
+accept_rate = num_accepts / (n*sample_rate + burn_in)
 
 X = X(burn_in+1:sample_rate:end,:);
