@@ -1,19 +1,23 @@
 function B = bingham_mult(B1, B2)
 %B = bingham_mult(B1, B2) -- Multiply two Bingham PDFs.
+%B = bingham_mult(Bs) -- Multiply a vector of Bingham PDFs.
 
 bingham_min_concentration = -900;  % TODO: move this somewhere else
 
-if B1.d ~= B2.d
-    fprintf('Error: B1.d != B2.d in bingham_mult()!\n');
-    return;
+if nargin < 2
+    n = length(B1);
+    B.d = B1(1).d;
+    C = zeros(B.d);
+    for i=1:n
+        C = C + B1(i).V * diag(B1(i).Z) * B1(i).V';
+    end
+else
+    B.d = B1.d;
+    C = B1.V * diag(B1.Z) * B1.V' + B2.V * diag(B2.Z) * B2.V';
 end
-B.d = B1.d;
-
-C1 = B1.V * diag(B1.Z) * B1.V';
-C2 = B2.V * diag(B2.Z) * B2.V';
 
 % eigenvalues will be sorted from largest to smallest in magnitude
-[V D] = eigs(C1+C2);
+[V D] = eigs(C);
 z = diag(D)';
 
 % set the smallest z (in magnitude) to zero
