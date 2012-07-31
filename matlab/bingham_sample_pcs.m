@@ -6,6 +6,10 @@ V = B.V;
 F = B.F;
 d = length(Z);
 
+if max(Z) == 0  %dbug--fix this case!
+    X = [];
+    return
+end
 
 if nargin < 3
    prob_thresh = 1/surface_area_hypersphere(d);
