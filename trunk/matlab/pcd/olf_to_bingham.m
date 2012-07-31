@@ -1,5 +1,9 @@
-function B = olf_to_bingham(nx, ny, nz, pcx, pcy, pcz, pc1, pc2)
+function B = olf_to_bingham(nx, ny, nz, pcx, pcy, pcz, pc1, pc2, lookup_constants)
 %B = olf_to_bingham(nx, ny, nz, pcx, pcy, pcz, pc1, pc2)
+
+if nargin < 9
+    lookup_constants = 1;
+end
 
 B.d = 4;
 
@@ -30,6 +34,8 @@ B.V = [v3,v4,v2];
 z3 = min(10*(pc1/pc2 - 1), 100);
 B.Z = [-100, -100, -z3];
 
-[F dF] = bingham_F(B.Z);
-B.F = F;
-B.dF = dF;
+if lookup_constants
+    [F dF] = bingham_F(B.Z);
+    B.F = F;
+    B.dF = dF;
+end

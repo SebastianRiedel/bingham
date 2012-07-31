@@ -5,14 +5,15 @@ function X = bingham_sample_nd(B,n)
 
 
 burn_in = 10;
-sample_rate = 1; %10;
+sample_rate = 5; %10;
 %sigma = .1;
 
 x = bingham_mode(B);
 
 %S = bingham_scatter(B);
 V = [B.V, x];
-Z = [B.Z - 1, -1];
+Z = B.Z - 1;
+Z(end+1) = -1;
 S = V*diag(-1./Z)*V';
 
 d = length(x);
