@@ -16,6 +16,11 @@ ch_curv = find(strcmp(columns, 'curvature'));
 ch_pcx = find(strcmp(columns, 'pcx'));
 ch_pcy = find(strcmp(columns, 'pcy'));
 ch_pcz = find(strcmp(columns, 'pcz'));
+ch_red = find(strcmp(columns, 'red'));
+ch_green = find(strcmp(columns, 'green'));
+ch_blue = find(strcmp(columns, 'blue'));
+ch_balls = find(strcmp(columns, 'balls'));
+ch_segments = find(strcmp(columns, 'segments'));
 
 if ~isempty(ch_cluster)
    data(:, ch_cluster) = pcd.L;
@@ -52,5 +57,20 @@ if ~isempty(ch_pcy)
 end
 if ~isempty(ch_pcz)
    data(:, ch_pcz) = pcd.PCZ;
+end
+if ~isempty(ch_red)
+   data(:, ch_red) = pcd.R;
+end
+if ~isempty(ch_green)
+   data(:, ch_green) = pcd.G;
+end
+if ~isempty(ch_blue)
+   data(:, ch_blue) = pcd.B;
+end
+if ~isempty(ch_balls)
+   data(:, ch_balls) = pcd.balls;
+end
+if ~isempty(ch_segments)
+   data(:, ch_segments) = pcd.segments;
 end
 
