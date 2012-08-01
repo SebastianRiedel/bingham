@@ -18,6 +18,11 @@ ch_pcy = find(strcmp(columns, 'pcy'));
 ch_pcz = find(strcmp(columns, 'pcz'));
 ch_pc1 = find(strcmp(columns, 'pc1'));
 ch_pc2 = find(strcmp(columns, 'pc2'));
+ch_red = find(strcmp(columns, 'red'));
+ch_green = find(strcmp(columns, 'green'));
+ch_blue = find(strcmp(columns, 'blue'));
+ch_balls = find(strcmp(columns, 'balls'));
+ch_segments = find(strcmp(columns, 'segments'));
 
 if ~isempty(ch_cluster)
    pcd.L = data(:, ch_cluster);
@@ -67,9 +72,26 @@ if ~isempty(ch_nx) && ~isempty(ch_pcx)
 end
 if ~isempty(ch_pfh) && ~isempty(ch_cluster)
     pcd.M = zeros(pcd.k, size(pcd.F,2));
+    pcd.V = zeros(1, pcd.k);
     for i=1:pcd.k
         pcd.M(i,:) = mean(pcd.F(pcd.L==i-1,:));
+        pcd.V(i) = sum(var(pcd.F(pcd.L==i-1,:)));
     end
+end
+if ~isempty(ch_red)
+   pcd.R = data(:, ch_red);
+end
+if ~isempty(ch_green)
+   pcd.G = data(:, ch_green);
+end
+if ~isempty(ch_blue)
+   pcd.B = data(:, ch_blue);
+end
+if ~isempty(ch_balls)
+   pcd.balls = data(:, ch_balls);
+end
+if ~isempty(ch_segments)
+   pcd.segments = data(:, ch_segments);
 end
 
 
