@@ -1,11 +1,12 @@
 function pcd = load_pcd(filename)
 % pcd = load_pcd(filename)
 
-
 f = fopen(filename);
 
 columns = {};
 vp = [];
+width = [];
+height = [];
 
 % read header
 while 1
@@ -32,6 +33,10 @@ while 1
       end
    elseif strcmp(t, 'VIEWPOINT')
        vp = sscanf(s, '%f', [1 inf]);
+   elseif strcmp(t, 'WIDTH')
+       width = sscanf(s, '%f');
+   elseif strcmp(t, 'HEIGHT')
+       height = sscanf(s, '%f');
    elseif strcmp(t, 'DATA')
       [t s] = strtok(s);
       if ~strcmp(t, 'ascii')
@@ -50,4 +55,11 @@ fclose(f);
 
 pcd = populate_pcd_fields(columns, data);
 pcd.vp = vp;
+if ~isempty(width) && ~isempty(height)
+    pcd.width = width;
+    pcd.height = height;
+else
+    pcd.width = size(data,1);
+    pcd.height = 1;
+end
 
