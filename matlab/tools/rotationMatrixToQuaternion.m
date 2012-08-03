@@ -29,4 +29,4 @@ else
 end
 
 q = [qw qx qy qz];
-
+q = q/norm(q);

@@ -17,6 +17,7 @@ else
 end
 
 % eigenvalues will be sorted from largest to smallest in magnitude
+C = (C+C')/2;  % fix numerical asymmetries
 [V D] = eigs(C);
 z = diag(D)';
 
