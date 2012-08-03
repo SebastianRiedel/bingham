@@ -5,4 +5,4 @@ F = B.F;
 dF = B.dF;
 Z = B.Z;
 
-h = log(F) - Z'*dF/F;
+h = log(F) - dot(Z, dF/F);
