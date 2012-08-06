@@ -1227,11 +1227,11 @@ int main(int argc, char *argv[])
 
   //test_bingham_mixture_mult(argc, argv);
   //test_bingham_mixture_thresh_peaks(argc, argv);
-  test_bingham_mult(argc, argv);
+  //test_bingham_mult(argc, argv);
   //test_bingham_F_lookup_3d(argc, argv);
 
   //test_bingham_mixture_sample(argc, argv);
-  //test_bingham_sample(argc, argv);
+  test_bingham_sample(argc, argv);
   //test_bingham_sample_pmf(argc, argv);
   //test_bingham_sample_ridge(argc, argv);
 
