@@ -16,16 +16,20 @@ else
     C = B1.V * diag(B1.Z) * B1.V' + B2.V * diag(B2.Z) * B2.V';
 end
 
-% eigenvalues will be sorted from largest to smallest in magnitude
-C = (C+C')/2;  % fix numerical asymmetries
-[V D] = eigs(C);
-z = diag(D)';
+%if isfinite(C)
+    % eigenvalues will be sorted from largest to smallest in magnitude
+    C = (C+C')/2;  % fix numerical asymmetries
+    [V D] = eigs(C);
+    z = diag(D)';
 
-% set the smallest z (in magnitude) to zero
-B.V = V(:,1:3);
-B.Z = max(z(1:3) - z(4), bingham_min_concentration);
+    % set the smallest z (in magnitude) to zero
+    B.V = V(:,1:3);
+    B.Z = max(z(1:3) - z(4), bingham_min_concentration);
 
-% lookup constants
-[F dF] = bingham_F(B.Z);
-B.F = F;
-B.dF = dF;
+    % lookup constants
+    [F dF] = bingham_F(B.Z);
+    B.F = F;
+    B.dF = dF;
+%else
+%    fprintf('Error (bingham_mult): C is not finite!\n');
+%end

@@ -10,8 +10,8 @@ B.d = 4;
 r1 = [nx; ny; nz];
 r2 = [pcx; pcy; pcz];
 r3 = cross(r1,r2);
-v1 = rotation_matrix_to_quaternion([r1,r2,r3])';  % mode
-v2 = rotation_matrix_to_quaternion([r1,-r2,-r3])';  % rotation about the normal vector
+v1 = rotationMatrixToQuaternion([r1,r2,r3])';  % mode
+v2 = rotationMatrixToQuaternion([r1,-r2,-r3])';  % rotation about the normal vector
 
 % find v3 orthogonal to v1,v2
 iv1 = find(v1,1);
