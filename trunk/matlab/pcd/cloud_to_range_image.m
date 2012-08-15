@@ -7,13 +7,19 @@ end
 
 origin = viewpoint(1:3);
 P = cloud - repmat(origin, [size(cloud,1) 1]);
+if length(viewpoint)==7
+    rot_mat = quaternionToRotationMatrix(qinv(viewpoint(4:7)));
+    P = P*rot_mat';
+end
 D = sqrt(sum(P.^2,2));
 X = atan2(P(:,1), P(:,3));
 Y = asin(P(:,2)./D);
 
 R.res = res;
 R.min = [min(X) min(Y)] - R.res/2;
-R.image = -ones(ceil(.1*2*pi/R.res));
+%R.image = -ones(ceil(.2*2*pi/R.res));
+R.image = -ones(ceil(2*pi/R.res));
+R.vp = viewpoint;
 
 w = 0;
 h = 0;
@@ -31,5 +37,5 @@ end
 %max2 = max(R.image,[],2);
 %w = find(max1>0, 1, 'last');
 %h = find(max2>0, 1, 'last');
-R.image = R.image(1:h, 1:w);
+R.image = R.image(1:w, 1:h);
 

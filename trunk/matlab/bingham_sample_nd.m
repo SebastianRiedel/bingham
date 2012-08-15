@@ -14,24 +14,23 @@ x = bingham_mode(B);
 V = [B.V, x];
 Z = B.Z - 1;
 Z(end+1) = -1;
-S = V*diag(-1./Z)*V';
+%S = V*diag(-1./Z)*V';
+z = sqrt(-1./Z);
 
 d = length(x);
 z = zeros(1,d);
 t = bingham_pdf_unnormalized(x,B);  % target
-p = acgpdf(x,S);  % proposal
+p = acgpdf_pcs(x,z,V);  % proposal
+
+X2 = acgrnd_pcs(z, V, n*sample_rate+burn_in);
 
 num_accepts = 0;
 for i=1:n*sample_rate+burn_in
-    %input(':')
-    %f = bingham_pdf(x,B)
-    %x2 = normrnd(x, sigma);
-    x2 = acgrnd(S);
+    x2 = X2(i,:);
     
-    %if norm(x2) > .9 && norm(x2) < 1.1
     x2 = x2/norm(x2);
     t2 = bingham_pdf_unnormalized(x2,B);
-    p2 = acgpdf(x2,S);
+    p2 = acgpdf_pcs(x2,z,V);
     a1 = t2 / t;
     a2 = p / p2;
     a = a1*a2;
@@ -48,7 +47,7 @@ for i=1:n*sample_rate+burn_in
     X(i,:) = x;
 end
 
-accept_rate = num_accepts / (n*sample_rate + burn_in)
+%accept_rate = num_accepts / (n*sample_rate + burn_in)
 
 X = X(burn_in+1:sample_rate:end,:);
 
