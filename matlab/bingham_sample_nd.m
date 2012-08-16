@@ -4,8 +4,8 @@ function X = bingham_sample_nd(B,n)
 %TODO: test for B uniform!
 
 
-burn_in = 10;
-sample_rate = 5; %10;
+burn_in = 5;
+sample_rate = 1; %10;
 %sigma = .1;
 
 x = bingham_mode(B);
@@ -18,19 +18,20 @@ Z(end+1) = -1;
 z = sqrt(-1./Z);
 
 d = length(x);
-z = zeros(1,d);
-t = bingham_pdf_unnormalized(x,B);  % target
-p = acgpdf_pcs(x,z,V);  % proposal
+t = bingham_pdf_unnormalized(x',B);  % target
+p = acgpdf_pcs(x',z,V);  % proposal
 
 X2 = acgrnd_pcs(z, V, n*sample_rate+burn_in);
+T2 = bingham_pdf_unnormalized(X2,B);
+P2 = acgpdf_pcs(X2,z,V);
 
 num_accepts = 0;
 for i=1:n*sample_rate+burn_in
     x2 = X2(i,:);
     
     x2 = x2/norm(x2);
-    t2 = bingham_pdf_unnormalized(x2,B);
-    p2 = acgpdf_pcs(x2,z,V);
+    t2 = T2(i); %bingham_pdf_unnormalized(x2,B);
+    p2 = P2(i); %acgpdf_pcs(x2,z,V);
     a1 = t2 / t;
     a2 = p / p2;
     a = a1*a2;
