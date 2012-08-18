@@ -18,8 +18,10 @@ Y = asin(P(:,2)./D);
 R.res = res;
 R.min = [min(X) min(Y)] - R.res/2;
 %R.image = -ones(ceil(.2*2*pi/R.res));
-R.image = -ones(ceil(2*pi/R.res));
+w0 = ceil(2*pi/R.res);
+R.image = -ones(w0);
 R.vp = viewpoint;
+R.idx = zeros(w0);
 
 w = 0;
 h = 0;
@@ -27,6 +29,7 @@ for i=1:length(X)
     c = ceil(([X(i) Y(i)] - R.min)/R.res);
     if c(1) > size(R.image,1) || c(2) > size(R.image,2) || R.image(c(1),c(2)) > D(i) || R.image(c(1),c(2)) < 0
         R.image(c(1),c(2)) = D(i);
+        R.idx(c(1),c(2)) = i;
         w = max(w,c(1));
         h = max(h,c(2));
     end
@@ -38,4 +41,5 @@ end
 %w = find(max1>0, 1, 'last');
 %h = find(max2>0, 1, 'last');
 R.image = R.image(1:w, 1:h);
+R.idx = R.idx(1:w, 1:h);
 
