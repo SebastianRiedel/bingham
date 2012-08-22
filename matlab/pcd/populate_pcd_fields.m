@@ -9,6 +9,7 @@ ch_x = find(strcmp(columns, 'x'));
 ch_y = find(strcmp(columns, 'y'));
 ch_z = find(strcmp(columns, 'z'));
 ch_pfh = find(strncmp(columns, 'f', 1));
+ch_pfh_small = find(strncmp(columns, 'sf', 2));
 ch_nx = find(strcmp(columns, 'nx'));
 ch_ny = find(strcmp(columns, 'ny'));
 ch_nz = find(strcmp(columns, 'nz'));
@@ -39,6 +40,9 @@ if ~isempty(ch_z)
 end
 if ~isempty(ch_pfh)
    pcd.F = data(:, ch_pfh);
+end
+if ~isempty(ch_pfh_small)
+   pcd.F_small = data(:, ch_pfh_small);
 end
 if ~isempty(ch_nx)
    pcd.NX = data(:, ch_nx);

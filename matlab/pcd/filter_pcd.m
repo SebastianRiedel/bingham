@@ -7,3 +7,7 @@ data = pcd.data;
 data = data(sum(~isfinite(data),2)==0, :);
 
 pcd2 = populate_pcd_fields(columns, data);
+
+if isfield(pcd, 'vp')
+    pcd2.vp = pcd.vp;
+end
