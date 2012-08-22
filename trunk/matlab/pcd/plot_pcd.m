@@ -76,7 +76,7 @@ if plot_vp
     hold on;
     r = 10*line_length;
     vp = pcd.vp;
-    R = quaternion_to_rotation_matrix(vp(4:7));
+    R = quaternionToRotationMatrix(vp(4:7));
     [SX, SY, SZ] = sphere();
     surf(r/2*SX + vp(1), r/2*SY + vp(2), r/2*SZ + vp(3));
     plot3(vp(1)+[0,r]*R(1,1), vp(2)+[0,r]*R(2,1), vp(3)+[0,r]*R(3,1), 'k-', 'LineWidth', 3);

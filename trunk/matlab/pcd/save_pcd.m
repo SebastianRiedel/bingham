@@ -30,8 +30,15 @@ for i=1:length(pcd.columns)
 end
 fprintf(f, '\n');
 
-fprintf(f, 'WIDTH %d\n', size(pcd.data, 1));
-fprintf(f, 'HEIGHT 1\n');
+if isfield(pcd, 'width') && isfield(pcd, 'height')
+    width = pcd.width;
+    height = pcd.height;
+else
+    width = size(pcd.data, 1);
+    height = 1;
+end
+fprintf(f, 'WIDTH %d\n', width);
+fprintf(f, 'HEIGHT %d\n', height);
 if isfield(pcd, 'vp') && ~isempty(pcd.vp)
     fprintf(f, 'VIEWPOINT ');
     fprintf(f, '%f ', pcd.vp);
