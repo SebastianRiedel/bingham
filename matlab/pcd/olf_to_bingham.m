@@ -5,6 +5,8 @@ if nargin < 9
     lookup_constants = 1;
 end
 
+pc2 = max(eps, pc2);  %dbug: some pc2's are negative
+
 B.d = 4;
 
 r1 = [nx; ny; nz];

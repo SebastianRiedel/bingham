@@ -1,8 +1,14 @@
-function R = cloud_to_range_image(cloud, viewpoint, res)
-% R = cloud_to_range_image(cloud, viewpoint) -- returns (R.image, R.min, R.res)
+function R = cloud_to_range_image(cloud, viewpoint, res, padding)
+% R = cloud_to_range_image(cloud, viewpoint, res, padding) -- returns (R.image, R.idx, R.min, R.res)
 
+if nargin < 2 || isempty(viewpoint)
+    viewpoint = [0,0,0];
+end
 if nargin < 3
     res = pi/360;
+end
+if nargin < 4
+    padding = 0;
 end
 
 origin = viewpoint(1:3);
@@ -16,7 +22,7 @@ X = atan2(P(:,1), P(:,3));
 Y = asin(P(:,2)./D);
 
 R.res = res;
-R.min = [min(X) min(Y)] - R.res/2;
+R.min = [min(X) min(Y)] - R.res/2 - R.res*padding;
 %R.image = -ones(ceil(.2*2*pi/R.res));
 w0 = ceil(2*pi/R.res);
 R.image = -ones(w0);
@@ -34,6 +40,8 @@ for i=1:length(X)
         h = max(h,c(2));
     end
 end
+w = w + padding;
+h = h + padding;
 
 %R
 %max1 = max(R.image);
