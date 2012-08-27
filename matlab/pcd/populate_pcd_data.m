@@ -22,6 +22,8 @@ ch_green = find(strcmp(columns, 'green'));
 ch_blue = find(strcmp(columns, 'blue'));
 ch_balls = find(strcmp(columns, 'balls'));
 ch_segments = find(strcmp(columns, 'segments'));
+ch_surfdist = find(strcmp(columns, 'surfdist'));
+ch_surfwidth = find(strcmp(columns, 'surfwidth'));
 
 if ~isempty(ch_cluster)
    data(:, ch_cluster) = pcd.L;
@@ -76,5 +78,11 @@ if ~isempty(ch_balls)
 end
 if ~isempty(ch_segments)
    data(:, ch_segments) = pcd.segments;
+end
+if ~isempty(ch_surfdist)
+   data(:, ch_surfdist) = pcd.surfdist;
+end
+if ~isempty(ch_surfwidth)
+   data(:, ch_surfwidth) = pcd.surfwidth;
 end
 
