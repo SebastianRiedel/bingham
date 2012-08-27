@@ -470,10 +470,10 @@ pcd_t *load_pcd(char *f_pcd)
   pcd_t *pcd;
   safe_calloc(pcd, 1, pcd_t);
 
-  char sbuf[1024], *s = sbuf;
+  char sbuf[10000], *s = sbuf;
   while (!feof(f)) {
     s = sbuf;
-    if (fgets(s, 1024, f)) {
+    if (fgets(s, 10000, f)) {
 
       if (!wordcmp(s, "COLUMNS", " \t\n") || !wordcmp(s, "FIELDS", " \t\n")) {
 	s = sword(s, " \t", 1);
@@ -511,7 +511,7 @@ pcd_t *load_pcd(char *f_pcd)
 
 	for (i = 0; i < pcd->num_points; i++) {
 	  s = sbuf;
-	  if (fgets(s, 1024, f) == NULL)
+	  if (fgets(s, 10000, f) == NULL)
 	    break;
 	  for (j = 0; j < pcd->num_channels; j++) {
 	    if (sscanf(s, "%lf", &pcd->data[j][i]) < 1)
@@ -951,7 +951,7 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
   int **segment_indices = NULL;
   int *segment_cnts = NULL;
   if (olf->cluttered) {
-    segment_indices = new_matrix2(pcd->balls->num_segments, pcd->num_points);
+    segment_indices = new_matrix2i(pcd->balls->num_segments, pcd->num_points);
     safe_calloc(segment_cnts, pcd->balls->num_segments, int);
     for (i = 0; i < pcd->num_points; i++) {
       int s = pcd->balls->segment_labels[i];
@@ -1100,7 +1100,7 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
   free_matrix2(R);
 
   if (olf->cluttered) {
-    free_matrix2(segment_indices);
+    free_matrix2i(segment_indices);
     free(segment_cnts);
   }
 
@@ -1235,3 +1235,100 @@ void olf_pose_samples_free(olf_pose_samples_t *poses)
     free(poses->W);
   free(poses);
 }
+
+
+
+//------------------------------- ICRA -------------------------------//
+
+range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res)
+{
+  int i, j, n = pcd->num_points;
+  double **Q;
+  if (vp != NULL) {
+    Q = new_matrix2(3,3);
+    quaternion_to_rotation_matrix(Q, &vp[3]);
+  }
+
+  double X[n], Y[n], D[n];
+  for (i = 0; i < n; i++) {
+    // get point (w.r.t. viewpoint)
+    double p[3];
+    for (j = 0; j < 3; j++)
+      p[j] = pcd->points[j][i];
+    if (vp != NULL) {
+      for (j = 0; j < 3; j++)
+	p[j] -= vp[j];
+      double p2[3];
+      matrix_vec_mult(p2, Q, p, 3, 3);
+      for (j = 0; j < 3; j++)
+	p[j] = p2[j];
+    }
+    // compute range image coordinates
+    D[i] = norm(p,3);
+    X[i] = atan2(p[0], p[2]);
+    Y[i] = asin(p[1]/D[i]);
+  }
+
+  // create range image
+  range_image_t *R;
+  safe_calloc(R, 1, range_image_t);
+  if (vp != NULL)
+    for (i = 0; i < 7; i++)
+      R->vp[i] = vp[i];
+  R->res = res;
+
+  R->min[0] = min(X,n) - res/2.0;
+  R->min[1] = min(Y,n) - res/2.0;
+  int w0 = (int)ceil(2*M_PI/res);
+  double **image = new_matrix2(w0,w0);
+
+  for (i = 0; i < w0; i++)
+    for (j = 0; j < w0; j++)
+      image[i][j] = -1.0;
+  int **idx = new_matrix2i(w0,w0);
+
+  // fill in range image
+  for (i = 0; i < n; i++) {
+    int cx = (int)floor( (X[i] - R->min[0]) / res);
+    int cy = (int)floor( (Y[i] - R->min[1]) / res);
+    double d = D[i];
+
+    double r = image[cx][cy];
+    if (r < 0 || r > d) {
+      image[cx][cy] = d;
+      idx[cx][cy] = i;
+      R->w = MAX(R->w, cx+1);
+      R->h = MAX(R->h, cy+1);
+    }
+  }
+
+  // crop empty range pixels
+  R->image = new_matrix2(R->w, R->h);
+  R->idx = new_matrix2i(R->w, R->h);
+  for (i = 0; i < R->w; i++) {
+    for (j = 0; j < R->h; j++) {
+      R->image[i][j] = image[i][j];
+      R->idx[i][j] = idx[i][j];
+    }
+  }
+
+  // cleanup
+  free_matrix2(image);
+  free_matrix2i(idx);
+  if (vp != NULL)
+    free_matrix2(Q);
+
+  return R;
+}
+
+
+/*
+ * Single Cluttered Object Pose Estimation (SCOPE)
+ *
+olf_pose_samples_t *scope(pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *range_image, scope_params_t *params)
+{
+
+}
+*/
+
+

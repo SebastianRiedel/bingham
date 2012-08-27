@@ -50,6 +50,18 @@ extern "C" {
   } pcd_t;
 
 
+  // range image
+  typedef struct {
+    double res;
+    double min[2];
+    double vp[7];
+    int w;
+    int h;
+    double **image;  // stored column-wise: image[x][y]
+    int **idx;
+  } range_image_t;
+
+
   // oriented local feature model
   typedef struct {
     pcd_t *pcd;                   // point cloud
@@ -86,6 +98,11 @@ extern "C" {
   void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
   int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
   int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
+
+  range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res);
+
+
+
 
   olf_t *load_olf(char *fname);                       // loads an olf from fname.pcd and fname.bmx
   void olf_free(olf_t *olf);                          // frees the contents of an olf_t, but not the pointer itself
