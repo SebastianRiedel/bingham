@@ -216,6 +216,7 @@ void kdtree_free(kdtree_t *tree);
 int kdtree_NN(kdtree_t *tree, double *x);
 
 
+
 #ifdef __cplusplus
 }
 #endif 

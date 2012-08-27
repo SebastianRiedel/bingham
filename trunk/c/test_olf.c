@@ -108,10 +108,37 @@ void test_olf_pose_sample(int argc, char *argv[])
 }
 
 
+void test_range_image(int argc, char *argv[])
+{
+  if (argc < 3) {
+    printf("usage: %s <pcd> <res>\n", argv[0]);
+    return;
+  }
+
+  double t = get_time_ms();
+  pcd_t *pcd = load_pcd(argv[1]);
+  fprintf(stderr, "Loaded pcd in %f ms\n", get_time_ms() - t);
+
+  t = get_time_ms();
+  double res = atof(argv[2]);
+  range_image_t *R = pcd_to_range_image(pcd, NULL, res);
+
+  printf("I = [");
+  int i,j;
+  for (i = 0; i < R->w; i++) {
+    for (j = 0; j < R->h; j++)
+      printf("%.4f ", R->image[i][j]);
+    printf("; ...\n");
+  }
+  printf("];\n");
+}
+
+
 int main(int argc, char *argv[])
 {
   //test_load_pcd(argc, argv);
-  test_olf_pose_sample(argc, argv);
+  //test_olf_pose_sample(argc, argv);
+  test_range_image(argc, argv);
 
   return 0;
 }
