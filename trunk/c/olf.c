@@ -4,6 +4,9 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+
+#include <flann/flann.h>
+
 #include "bingham/util.h"
 #include "bingham/olf.h"
 
@@ -239,15 +242,24 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_x = pcd_channel(pcd, "x");
   int ch_y = pcd_channel(pcd, "y");
   int ch_z = pcd_channel(pcd, "z");
+  int ch_red = pcd_channel(pcd, "red");
+  int ch_green = pcd_channel(pcd, "green");
+  int ch_blue = pcd_channel(pcd, "blue");
   int ch_nx = pcd_channel(pcd, "nx");
   int ch_ny = pcd_channel(pcd, "ny");
   int ch_nz = pcd_channel(pcd, "nz");
   int ch_pcx = pcd_channel(pcd, "pcx");
   int ch_pcy = pcd_channel(pcd, "pcy");
   int ch_pcz = pcd_channel(pcd, "pcz");
+  int ch_pc1 = pcd_channel(pcd, "pc1");
+  int ch_pc2 = pcd_channel(pcd, "pc2");
   int ch_f1 = pcd_channel(pcd, "f1");
   int ch_f33 = pcd_channel(pcd, "f33");
   int ch_balls = pcd_channel(pcd, "balls");
+  int ch_sift1 = pcd_channel(pcd, "sift1");
+  int ch_sift128 = pcd_channel(pcd, "sift128");
+  int ch_surfdist = pcd_channel(pcd, "surfdist");
+  int ch_surfwidth = pcd_channel(pcd, "surfwidth");
 
 
   if (ch_cluster>=0) {
@@ -262,6 +274,12 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->points[1] = pcd->data[ch_y];
     pcd->points[2] = pcd->data[ch_z];
   }
+  if (ch_red>=0 && ch_green>=0 && ch_blue>=0) {
+    safe_calloc(pcd->colors, 3, double *);
+    pcd->colors[0] = pcd->data[ch_red];
+    pcd->colors[1] = pcd->data[ch_green];
+    pcd->colors[2] = pcd->data[ch_blue];
+  }
   if (ch_nx>=0 && ch_ny>=0 && ch_nz>=0) {
     safe_calloc(pcd->normals, 3, double *);
     pcd->normals[0] = pcd->data[ch_nx];
@@ -274,10 +292,24 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->principal_curvatures[1] = pcd->data[ch_pcy];
     pcd->principal_curvatures[2] = pcd->data[ch_pcz];
   }
+  if (ch_pc1>=0 && ch_pc2>=0) {
+    pcd->pc1 = pcd->data[ch_pc1];
+    pcd->pc2 = pcd->data[ch_pc2];
+  }
   if (ch_f1>=0 && ch_f33>=0) {
     safe_calloc(pcd->shapes, 33, double *);
     for (i = 0; i < 33; i++)
       pcd->shapes[i] = pcd->data[ch_f1 + i];
+  }
+  if (ch_sift1>=0 && ch_sift128>=0) {
+    safe_calloc(pcd->sift, 128, double *);
+    for (i = 0; i < 128; i++)
+      pcd->sift[i] = pcd->data[ch_sift1 + i];
+  }
+  if (ch_surfdist>=0 && ch_surfwidth>=0) {
+    safe_calloc(pcd->sdw, 2, double *);
+    pcd->sdw[0] = pcd->data[ch_surfdist];
+    pcd->sdw[1] = pcd->data[ch_surfwidth];
   }
 
   // add quaternion orientation features
@@ -306,6 +338,8 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 {
   if (pcd->points)
     free(pcd->points);
+  if (pcd->colors)
+    free(pcd->colors);
   if (pcd->normals)
     free(pcd->normals);
   if (pcd->principal_curvatures)
@@ -314,6 +348,10 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free(pcd->shapes);
   if (pcd->clusters)
     free(pcd->clusters);
+  if (pcd->sift)
+    free(pcd->sift);
+  if (pcd->sdw)
+    free(pcd->sdw);
 
   if (pcd->quaternions[0])
     free_matrix2(pcd->quaternions[0]);
@@ -1322,13 +1360,136 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res)
 }
 
 
+double *compute_model_saliency(pcd_t *pcd_model)
+{
+  double epsilon = 1e-50;
+
+  int i;
+  double *model_pmf;
+  int n = pcd_model->num_points;
+  safe_calloc(model_pmf, n, double);
+  for (i = 0; i < pcd_model->num_points; i++) {
+    double pc1 = MAX(pcd_model->pc1[i], epsilon);
+    double pc2 = MAX(pcd_model->pc2[i], epsilon);
+    model_pmf[i] = pc1/pc2 - 1.0;
+    model_pmf[i] = MIN(model_pmf[i], 10);
+  }
+  mult(model_pmf, model_pmf, 1.0/sum(model_pmf, n), n);
+
+  return model_pmf;
+}
+
+
+int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *sift_model, double sift_dthresh)
+{
+  const int sift_len = 128;
+
+  int n1 = sift_obs->num_points;
+  int n2 = sift_model->num_points;
+
+  double **desc1 = new_matrix2(n1, sift_len);
+  double **desc2 = new_matrix2(n2, sift_len);
+  transpose(desc1, sift_obs->sift, sift_len, n1);
+  transpose(desc2, sift_model->sift, sift_len, n2);
+
+  int num_matches = 0;
+  int i,j;
+  for (i = 0; i < n1; i++) {
+    double dmin = 100000.0;
+    int jmin = 0;
+    for (j = 0; j < n2; j++) {
+      double d = acos(dot(desc1[i], desc2[j], sift_len));
+      if (d < dmin) {
+	dmin = d;
+	jmin = j;
+      }
+    }
+    if (dmin < sift_dthresh) {
+      obs_idx[num_matches] = i;
+      model_idx[num_matches] = jmin;
+      num_matches++;
+    }
+  }
+
+  free_matrix2(desc1);
+  free_matrix2(desc2);
+
+  return num_matches;
+}
+
+
+
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
- *
-olf_pose_samples_t *scope(pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *range_image, scope_params_t *params)
+ */
+olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params)
 {
+  int i,j,k;
 
+  // unpack model arguments
+  pcd_t *pcd_model = model->obj_pcd;
+  pcd_t *sift_model = model->sift_pcd;
+
+  // unpack obs arguments
+  pcd_t *pcd_obs = obs->fg_pcd;
+  pcd_t *sift_obs = obs->sift_pcd;
+  range_image_t *obs_range_image = obs->range_image;
+
+  // compute model feature saliency
+  double *model_pmf = compute_model_saliency(pcd_model);
+
+  // find sift matches
+  int sift_match_obs_idx[sift_obs->num_points], sift_match_model_idx[sift_obs->num_points];
+  int num_sift_matches = find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, sift_obs, sift_model, params->sift_dthresh);
+
+  // get combined feature matrices
+  double **obs_xyzn = new_matrix2(pcd_obs->num_points, 6);
+  for (i = 0; i < pcd_obs->num_points; i++) {
+    for (j = 0; j < 3; j++) {
+      obs_xyzn[i][j] = params->xyz_weight * pcd_obs->points[j][i];
+      obs_xyzn[i][j+3] = params->normal_weight * pcd_obs->normals[j][i];
+    }
+  }
+  double **model_xyzn = new_matrix2(pcd_model->num_points, 6);
+  for (i = 0; i < pcd_model->num_points; i++) {
+    for (j = 0; j < 3; j++) {
+      model_xyzn[i][j] = params->xyz_weight * pcd_model->points[j][i];
+      model_xyzn[i][j+3] = params->normal_weight * pcd_model->normals[j][i];
+    }
+  }
+  double **model_fsurf = new_matrix2(pcd_model->num_points, 35);
+  for (i = 0; i < pcd_model->num_points; i++) {
+    for (j = 0; j < 33; j++)
+      model_fsurf[i][j] = pcd_model->shapes[j][i];
+    double surfdist = MIN(pcd_model->sdw[0][i], params->surfdist_thresh);
+    double surfwidth = MIN(pcd_model->sdw[1][i], params->surfwidth_thresh);
+    model_fsurf[i][33] = params->surfdist_weight * surfdist;
+    model_fsurf[i][34] = params->surfwidth_weight * surfwidth;
+  }
+
+  // flann params
+  struct FLANNParameters flann_params = DEFAULT_FLANN_PARAMETERS;
+  flann_params.algorithm = FLANN_INDEX_KDTREE;
+  flann_params.trees = 8;
+  flann_params.checks = 64;
+  struct FLANNParameters obs_xyzn_params = flann_params;
+  struct FLANNParameters model_xyzn_params = flann_params;
+  struct FLANNParameters model_fsurf_params = flann_params;
+
+  // build flann indices
+  float speedup;
+  flann_index_t obs_xyzn_index = flann_build_index(obs_xyzn, pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
+  flann_index_t model_xyzn_index = flann_build_index(model_xyzn, pcd_model->num_points, 6, &speedup, &model_xyzn_params);
+  flann_index_t model_fsurf_index = flann_build_index(model_fsurf, pcd_model->num_points, 35, &speedup, &model_fsurf_params);
+
+
+  // cleanup
+  free(model_pmf);
+  free_matrix2(obs_xyzn);
+  free_matrix2(model_xyzn);
+  free_matrix2(model_fsurf);
+
+  return NULL; //dbug
 }
-*/
 
 
