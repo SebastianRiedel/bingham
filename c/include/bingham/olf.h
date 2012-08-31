@@ -37,9 +37,14 @@ extern "C" {
 
     // data pointers
     double **points;
+    double **colors;
     double **normals;
     double **principal_curvatures;
+    double *pc1;
+    double *pc2;
     double **shapes;
+    double **sift;
+    double **sdw;
 
     // computed data
     int *clusters;
@@ -86,6 +91,8 @@ extern "C" {
   } olf_t;
 
 
+
+
   typedef struct {
     double **X;
     double **Q;
@@ -119,6 +126,39 @@ extern "C" {
 
   olf_pose_samples_t *olf_pose_samples_new(int n);          // create a new olf_pose_samples_t
   void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
+
+
+
+
+  // ICRA
+
+  typedef struct {
+    pcd_t *obj_pcd;
+    pcd_t *sift_pcd;
+  } olf_model_t;
+
+  typedef struct {
+    pcd_t *fg_pcd;
+    pcd_t *sift_pcd;
+    range_image_t *range_image;
+  } olf_obs_t;
+
+  typedef struct {
+    double sift_dthresh;
+    double xyz_weight;
+    double normal_weight;
+    double surfdist_weight;
+    double surfwidth_weight;
+    double surfdist_thresh;
+    double surfwidth_thresh;
+  } scope_params_t;
+
+
+  olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params);
+  
+
+
+
 
 
 #ifdef __cplusplus
