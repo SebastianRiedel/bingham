@@ -1504,7 +1504,8 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
   int flip = (frand() < .5);
   double *q_feature_to_world = pcd_obs->quaternions[flip][c_obs];
   double q_feature_to_model[4], q_model_to_feature[4];
-  bingham_sample(&q_feature_to_model, &B, 1);
+  double *q_feature_to_model_ptr[1] = {q_feature_to_model};
+  bingham_sample(q_feature_to_model_ptr, &B, 1);
   quaternion_inverse(q_model_to_feature, q_feature_to_model);
   quaternion_mult(q, q_feature_to_world, q_model_to_feature);
   double **R = new_matrix2(3,3);
@@ -1532,6 +1533,8 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params)
 {
   int i,j,k;
+
+  printf("scope()\n");
 
   // unpack model arguments
   pcd_t *pcd_model = model->obj_pcd;
@@ -1592,6 +1595,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   struct FLANNParameters model_xyzn_params = flann_params;
   struct FLANNParameters model_fsurf_params = flann_params;
 
+  printf("Building FLANN indices\n");
+
   // build flann indices
   float speedup;
   flann_index_t obs_xyzn_index = flann_build_index_double(obs_xyzn[0], pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
@@ -1606,6 +1611,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   double **X = new_matrix2(num_samples_init, 3);                                 // sample positions
   double **Q = new_matrix2(num_samples_init, 4);                                 // sample orientations
   double *W;  safe_calloc(W, num_samples_init, double);                          // sample weights
+
+  printf("Sampling first correspondences\n");
 
   // sample poses from one correspondence
   for (i = 0; i < num_samples_init; i++) {
