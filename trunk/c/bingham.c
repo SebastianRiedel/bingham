@@ -385,7 +385,7 @@ double bingham_F(bingham_t *B)
     B->F = bingham_F_2d(Z[0], Z[1]);
     break;
   case 4:
-    B->F = bingham_F_3d(Z[0], Z[1], Z[2]);
+    B->F = bingham_F_lookup_3d(Z);
     break;
   default:
     B->F = 0;

@@ -151,6 +151,11 @@ extern "C" {
     double surfwidth_weight;
     double surfdist_thresh;
     double surfwidth_thresh;
+    int num_samples_init;
+    int num_correspondences;
+    int knn;
+    double fsurf_sigma;
+    int num_validation_points;
   } scope_params_t;
 
 

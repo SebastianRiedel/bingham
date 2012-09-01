@@ -1418,6 +1418,113 @@ int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *
 }
 
 
+void olf_to_bingham(bingham_t *B, int idx, pcd_t *pcd)
+{
+  double epsilon = 1e-50;
+
+  bingham_alloc(B, 4);
+
+  double r1[3] = {pcd->normals[0][idx], pcd->normals[1][idx], pcd->normals[2][idx]};
+  double r2[3] = {pcd->principal_curvatures[0][idx], pcd->principal_curvatures[1][idx], pcd->principal_curvatures[2][idx]};
+  double r3[3];
+  cross(r3, r1, r2);
+  double *R[3] = {r1,r2,r3};
+
+  // v1: mode
+  double v1[4];
+  rotation_matrix_to_quaternion(v1, R);
+  quaternion_inverse(v1, v1);
+
+  // B->V[2]: rotation about the normal vector
+  int i;
+  for (i = 0; i < 3; i++) {
+    r2[i] = -r2[i];
+    r3[i] = -r3[i];
+  }
+  rotation_matrix_to_quaternion(B->V[2], R);
+  quaternion_inverse(B->V[2], B->V[2]);
+
+  double **V1 = new_matrix2(4,4);  // v1's projection matrix 
+  outer_prod(V1, v1, v1, 4, 4);
+  mult(V1[0], V1[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V1[i][i] += 1.0;
+  double **V2 = new_matrix2(4,4);  // B->V[2]'s projection matrix
+  outer_prod(V2, B->V[2], B->V[2], 4, 4);
+  mult(V2[0], V2[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V2[i][i] += 1.0;
+  double **V12 = new_matrix2(4,4);
+  matrix_mult(V12, V1, V2, 4, 4, 4);
+
+  // find a third orthogonal vector, B->V[1]
+  double v3[4];
+  for (i = 0; i < 4; i++)
+    v3[i] = frand() - 0.5;
+  matrix_vec_mult(B->V[1], V12, v3, 4, 4);
+  normalize(B->V[1], B->V[1], 4);
+
+  double **V3 = new_matrix2(4,4);  // B->V[1]'s projection matrix
+  outer_prod(V3, B->V[1], B->V[1], 4, 4);
+  mult(V3[0], V3[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V3[i][i] += 1.0;
+  double **V123 = new_matrix2(4,4);
+  matrix_mult(V123, V12, V3, 4, 4, 4);
+
+  // find a fourth orthogonal vector, B->V[0]
+  double v4[4];
+  for (i = 0; i < 4; i++)
+    v4[i] = frand() - 0.5;
+  matrix_vec_mult(B->V[0], V123, v4, 4, 4);
+  normalize(B->V[0], B->V[0], 4);
+
+  // compute concentration params
+  double pc1 = MAX(pcd->pc1[idx], epsilon);
+  double pc2 = MAX(pcd->pc2[idx], epsilon);
+  double z3 = MIN(10*(pc1/pc2 - 1), 100);
+  B->Z[0] = -100;
+  B->Z[1] = -100;
+  B->Z[2] = -z3;
+
+  // look up the normalization constant
+  bingham_F(B);
+
+  free_matrix2(V1);
+  free_matrix2(V2);
+  free_matrix2(V12);
+}
+
+
+void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_model, pcd_t *pcd_obs, pcd_t *pcd_model)
+{
+  // compute rotation
+  bingham_t B;
+  olf_to_bingham(&B, c_model, pcd_model);
+  int flip = (frand() < .5);
+  double *q_feature_to_world = pcd_obs->quaternions[flip][c_obs];
+  double q_feature_to_model[4], q_model_to_feature[4];
+  bingham_sample(&q_feature_to_model, &B, 1);
+  quaternion_inverse(q_model_to_feature, q_feature_to_model);
+  quaternion_mult(q, q_feature_to_world, q_model_to_feature);
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, q);
+
+  // compute translation
+  double obs_point[3], model_point[3];
+  int i;
+  for (i = 0; i < 3; i++) {
+    obs_point[i] = pcd_obs->points[i][c_obs];
+    model_point[i] = pcd_model->points[i][c_model];
+  }
+  double model_point_rot[3];
+  matrix_vec_mult(model_point_rot, R, model_point, 3, 3);
+  sub(x, obs_point, model_point_rot, 3);
+
+  // cleanup
+  free_matrix2(R);
+}
+
 
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
@@ -1457,6 +1564,15 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       model_xyzn[i][j+3] = params->normal_weight * pcd_model->normals[j][i];
     }
   }
+  double **obs_fsurf = new_matrix2(pcd_obs->num_points, 35);
+  for (i = 0; i < pcd_obs->num_points; i++) {
+    for (j = 0; j < 33; j++)
+      obs_fsurf[i][j] = pcd_obs->shapes[j][i];
+    double surfdist = MIN(pcd_obs->sdw[0][i], params->surfdist_thresh);
+    double surfwidth = MIN(pcd_obs->sdw[1][i], params->surfwidth_thresh);
+    obs_fsurf[i][33] = params->surfdist_weight * surfdist;
+    obs_fsurf[i][34] = params->surfwidth_weight * surfwidth;
+  }
   double **model_fsurf = new_matrix2(pcd_model->num_points, 35);
   for (i = 0; i < pcd_model->num_points; i++) {
     for (j = 0; j < 33; j++)
@@ -1478,9 +1594,54 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
   // build flann indices
   float speedup;
-  flann_index_t obs_xyzn_index = flann_build_index(obs_xyzn, pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
-  flann_index_t model_xyzn_index = flann_build_index(model_xyzn, pcd_model->num_points, 6, &speedup, &model_xyzn_params);
-  flann_index_t model_fsurf_index = flann_build_index(model_fsurf, pcd_model->num_points, 35, &speedup, &model_fsurf_params);
+  flann_index_t obs_xyzn_index = flann_build_index_double(obs_xyzn[0], pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
+  flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
+  flann_index_t model_fsurf_index = flann_build_index_double(model_fsurf[0], pcd_model->num_points, 35, &speedup, &model_fsurf_params);
+
+  // create correspondences and pose data structures
+  int num_samples_init = params->num_samples_init + num_sift_matches;
+  int **C_obs = new_matrix2i(num_samples_init, params->num_correspondences);     // obs correspondences
+  int **C_model = new_matrix2i(num_samples_init, params->num_correspondences);   // model correspondences
+  int **C_issift = new_matrix2i(num_samples_init, params->num_correspondences);  // sift indicator
+  double **X = new_matrix2(num_samples_init, 3);                                 // sample positions
+  double **Q = new_matrix2(num_samples_init, 4);                                 // sample orientations
+  double *W;  safe_calloc(W, num_samples_init, double);                          // sample weights
+
+  // sample poses from one correspondence
+  for (i = 0; i < num_samples_init; i++) {
+    if (i < num_sift_matches) {  // sift correspondence
+      C_issift[i][0] = 1;
+      C_obs[i][0] = sift_match_obs_idx[i];
+      C_model[i][0] = sift_match_model_idx[i];
+
+      // sample a model pose given one correspondence
+      model_pose_from_one_correspondence(X[i], Q[i], C_obs[i][0], C_model[i][0], sift_obs, sift_model);
+    }
+    else {  // fpfh+sdw correspondence
+      C_issift[i][0] = 0;
+      C_obs[i][0] = irand(pcd_obs->num_points);
+      int nn_idx[params->knn];
+      double nn_d2[params->knn];
+      flann_find_nearest_neighbors_index_double(model_fsurf_index, obs_fsurf[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_fsurf_params);
+      double p[params->knn];
+      for (j = 0; j < params->knn; j++)
+	p[j] = exp(-.5*nn_d2[j] / params->fsurf_sigma);
+      mult(p, p, 1.0/sum(p, params->knn), params->knn);
+      j = pmfrand(p, params->knn);
+      C_model[i][0] = nn_idx[j];
+
+      // sample a model pose given one correspondence
+      model_pose_from_one_correspondence(X[i], Q[i], C_obs[i][0], C_model[i][0], pcd_obs, pcd_model);
+    }
+
+    // score hypothesis
+    W[i] = 1.0;
+    //W[i] = model_placement_score(X[i], Q[i], params->num_validation_points);
+  }
+
+
+
+
 
 
   // cleanup
@@ -1488,6 +1649,17 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   free_matrix2(obs_xyzn);
   free_matrix2(model_xyzn);
   free_matrix2(model_fsurf);
+  flann_free_index(obs_xyzn_index, &obs_xyzn_params);
+  flann_free_index(model_xyzn_index, &model_xyzn_params);
+  flann_free_index(model_fsurf_index, &model_fsurf_params);
+  free_matrix2i(C_obs);
+  free_matrix2i(C_model);
+  free_matrix2i(C_issift);
+  free_matrix2(X);
+  free_matrix2(Q);
+  free(W);
+
+
 
   return NULL; //dbug
 }
