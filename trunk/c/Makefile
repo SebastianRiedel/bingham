@@ -33,7 +33,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample olf_pose_sample gauss_mix
+TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample olf_pose_sample scope gauss_mix
 endif
 
 
@@ -82,6 +82,9 @@ test_olf: test_olf.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 olf_pose_sample: olf_pose_sample.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+scope: scope.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 gauss_mix: gauss_mix.o libbingham.a
