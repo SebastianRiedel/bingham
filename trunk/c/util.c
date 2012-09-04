@@ -591,7 +591,7 @@ double dot(double x[], double y[], int n)
 
 
 //computes the cross product of x and y
-double cross(double z[3], double x[3], double y[3])
+void cross(double z[3], double x[3], double y[3])
 {
   z[0] = x[1]*y[2] - x[2]*y[1];
   z[1] = x[2]*y[0] - x[0]*y[2];
@@ -630,6 +630,16 @@ void mult(double y[], double x[], double c, int n)
 void normalize(double y[], double x[], int n)
 {
   double d = norm(x, n);
+  int i;
+  for (i = 0; i < n; i++)
+    y[i] = x[i]/d;
+}
+
+
+// sets y = x/sum(x)
+void normalize_pmf(double y[], double x[], int n)
+{
+  double d = sum(x, n);
   int i;
   for (i = 0; i < n; i++)
     y[i] = x[i]/d;
@@ -1269,8 +1279,15 @@ void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
 void matrix_vec_mult(double *y, double **A, double *x, int n, int m)
 {
   int i;
-  for (i = 0; i < n; i++)
-    y[i] = dot(A[i], x, m);
+  if (y == x) {
+    double z[m];
+    memcpy(z, x, m*sizeof(double));
+    for (i = 0; i < n; i++)
+      y[i] = dot(A[i], z, m);
+  }
+  else
+    for (i = 0; i < n; i++)
+      y[i] = dot(A[i], x, m);
 }
 
 
@@ -2443,4 +2460,39 @@ void kdtree_free(kdtree_t *tree)
   free(tree);
 }
 
+// RGB to CIELAB color space
+void rgb2lab(double lab[], double rgb[])
+{
+  double R = rgb[0];
+  double G = rgb[1];
+  double B = rgb[2];
+  if (R > 1.0 || G > 1.0 || B > 1.0) {
+    R /= 255.0;
+    G /= 255.0;
+    B /= 255.0;
+  }
+  
+  // set a threshold
+  double T = 0.008856;
+  
+  // RGB to XYZ
+  double X = 0.412453*R + 0.357580*G + 0.180423*B;
+  double Y = 0.212671*R + 0.715160*G + 0.072169*B;
+  double Z = 0.019334*R + 0.119193*G + 0.950227*B;
 
+  // normalize for D65 white point
+  X /= 0.950456;
+  Z /= 1.088754;
+
+  double X3 = pow(X, 1/3.);
+  double Y3 = pow(Y, 1/3.);
+  double Z3 = pow(Z, 1/3.);
+
+  double fX = (X>T ? X3 : 7.787*X + 16/116.);
+  double fY = (Y>T ? Y3 : 7.787*Y + 16/116.);
+  double fZ = (Z>T ? Z3 : 7.787*Z + 16/116.);
+
+  lab[0] = (Y>T ? 116*Y3 - 16.0 : 903.3*Y);
+  lab[1] = 500*(fX - fY);
+  lab[2] = 200*(fY - fZ);
+}

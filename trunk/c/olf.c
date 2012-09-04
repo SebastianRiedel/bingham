@@ -1278,6 +1278,60 @@ void olf_pose_samples_free(olf_pose_samples_t *poses)
 
 //------------------------------- ICRA -------------------------------//
 
+range_image_t *pcd_to_range_image_from_template(pcd_t *pcd, range_image_t *R0)
+{
+  double *vp = R0->vp;
+  double **Q;
+  Q = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(Q, &vp[3]);
+
+  int i, j, n = pcd->num_points;
+  double X[n], Y[n], D[n];
+  for (i = 0; i < n; i++) {
+    // get point (w.r.t. viewpoint)
+    double p[3];
+    for (j = 0; j < 3; j++)
+      p[j] = pcd->points[j][i] - vp[j];
+    matrix_vec_mult(p, Q, p, 3, 3);
+    // compute range image coordinates
+    D[i] = norm(p,3);
+    X[i] = atan2(p[0], p[2]);
+    Y[i] = asin(p[1]/D[i]);
+  }
+
+  range_image_t *R;
+  safe_calloc(R, 1, range_image_t);
+  *R = *R0;  // shallow copy
+
+  int w = R->w, h = R->h;
+  R->image = new_matrix2(w, h);
+  R->idx = new_matrix2i(w, h);
+
+  for (i = 0; i < w; i++) {
+    for (j = 0; j < h; j++) {
+      R->image[i][j] = -1.0;
+      R->idx[i][j] = -1;
+    }
+  }
+
+  // fill in range image
+  for (i = 0; i < n; i++) {
+    int cx = (int)floor( (X[i] - R->min[0]) / R->res);
+    int cy = (int)floor( (Y[i] - R->min[1]) / R->res);
+    double d = D[i];
+    double r = R->image[cx][cy];
+    if (r < 0 || r > d) {
+      R->image[cx][cy] = d;
+      R->idx[cx][cy] = i;
+    }
+  }
+
+  free_matrix2(Q);
+
+  return R;
+}
+
+
 range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res)
 {
   int i, j, n = pcd->num_points;
@@ -1313,17 +1367,22 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res)
   if (vp != NULL)
     for (i = 0; i < 7; i++)
       R->vp[i] = vp[i];
+  else
+    R->vp[3] = 1.0;  // identity transform: (0,0,0,1,0,0,0)
   R->res = res;
 
   R->min[0] = min(X,n) - res/2.0;
   R->min[1] = min(Y,n) - res/2.0;
   int w0 = (int)ceil(2*M_PI/res);
   double **image = new_matrix2(w0,w0);
-
-  for (i = 0; i < w0; i++)
-    for (j = 0; j < w0; j++)
-      image[i][j] = -1.0;
   int **idx = new_matrix2i(w0,w0);
+
+  for (i = 0; i < w0; i++) {
+    for (j = 0; j < w0; j++) {
+      image[i][j] = -1.0;
+      idx[i][j] = -1;
+    }
+  }
 
   // fill in range image
   for (i = 0; i < n; i++) {
@@ -1357,6 +1416,58 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res)
     free_matrix2(Q);
 
   return R;
+}
+
+
+int range_image_xyz2sub(int *i, int *j, range_image_t *range_image, double *xyz)
+{
+  //TODO: use range image viewpoint
+
+  double d = norm(xyz, 3);
+  double x = atan2(xyz[0], xyz[2]);
+  double y = asin(xyz[1] / d);
+
+  int cx = (int)floor((x - range_image->min[0]) / range_image->res);
+  int cy = (int)floor((y - range_image->min[1]) / range_image->res);
+
+  *i = cx;
+  *j = cy;
+
+  return cx>=0 && cy>=0 && (cx < range_image->w) && (cy < range_image->h);
+}
+
+
+void range_image_find_nn(int *nn_idx, double *nn_d2, double *query_xyz, double *query, int query_len,
+			 double **data, range_image_t *range_image, int search_radius_pixels)
+{
+  int imin = 0;
+  double d2min = dist2(query, data[0], query_len);
+
+  int x, y;
+  int inbounds = range_image_xyz2sub(&x, &y, range_image, query_xyz);
+
+  if (inbounds) {
+    int r = search_radius_pixels;
+    int x0 = MAX(0, x-r);
+    int x1 = MIN(x+r, range_image->w - 1);
+    int y0 = MAX(0, y-r);
+    int y1 = MIN(y+r, range_image->h - 1);
+    for (x = x0; x <= x1; x++) {
+      for (y = y0; y <= y1; y++) {
+	int i = range_image->idx[x][y];
+	if (i < 0)
+	  continue;
+	double d2 = dist2(query, data[i], query_len);
+	if (imin < 0 || d2 < d2min) {
+	  imin = i;
+	  d2min = d2;
+	}
+      }
+    }
+  }
+
+  *nn_idx = imin;
+  *nn_d2 = d2min;
 }
 
 
@@ -1527,6 +1638,157 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 }
 
 
+double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
+			     range_image_t *obs_fg_range_image, double **obs_xyzn, scope_params_t *params)
+{
+  int i, j;
+
+  int num_validation_points = params->num_validation_points;
+  double L_weight = params->L_weight;
+  double range_sigma = params->range_sigma;
+  double f_sigma = params->f_sigma;
+  double lab_sigma = params->lab_sigma;
+  double xyz_weight = params->xyz_weight;
+  double normal_weight = params->normal_weight;
+
+  // get model validation points
+  int *idx;
+  if (num_validation_points == 0) {  // use all the points
+    num_validation_points = pcd_model->num_points;
+    safe_calloc(idx, num_validation_points, int);
+    for (i = 0; i < pcd_model->num_points; i++)
+      idx[i] = i;
+  }
+  else {
+    safe_calloc(idx, num_validation_points, int);
+    randperm(idx, pcd_model->num_points, num_validation_points);
+  }
+
+  // extract transformed model validation features
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, q);
+  double **cloud = new_matrix2(num_validation_points, 3);
+  double **cloud_normals = new_matrix2(num_validation_points, 3);
+  double **cloud_f = new_matrix2(num_validation_points, 33);
+  double **cloud_lab = new_matrix2(num_validation_points, 3);
+  for (i = 0; i < num_validation_points; i++) {
+    int idx_i = idx[i];
+    double p[3] = {pcd_model->points[0][idx_i], pcd_model->points[1][idx_i], pcd_model->points[2][idx_i]};
+    matrix_vec_mult(cloud[i], R, p, 3, 3);
+    add(cloud[i], cloud[i], x, 3);
+    double n[3] = {pcd_model->normals[0][idx_i], pcd_model->normals[1][idx_i], pcd_model->normals[2][idx_i]};
+    matrix_vec_mult(cloud_normals[i], R, n, 3, 3);
+    for (j = 0; j < 33; j++)
+      cloud_f[i][j] = pcd_model->shapes[j][idx_i];
+    double rgb[3] = {pcd_model->colors[0][idx_i], pcd_model->colors[1][idx_i], pcd_model->colors[2][idx_i]};
+    rgb2lab(cloud_lab[i], rgb);
+    cloud_lab[i][0] *= L_weight;
+  }
+
+  // compute p(visibile)
+  double vis_prob[num_validation_points];
+  for (i = 0; i < num_validation_points; i++) {
+    if (dot(cloud[i], cloud_normals[i], 3) >= 0) {  // normals pointing away
+      vis_prob[i] = 0;
+      continue;
+    }
+    int x, y;
+    int inbounds = range_image_xyz2sub(&x, &y, obs_range_image, cloud[i]);
+    if (!inbounds)
+      vis_prob[i] = 0;
+    else {
+      double model_range = norm(cloud[i], 3);
+      double obs_range = obs_range_image->image[x][y];
+      // let obs_range be the max of its neighbors
+      if (x > 0)
+	obs_range = MAX(obs_range, obs_range_image->image[x-1][y]);
+      if (y > 0)
+	obs_range = MAX(obs_range, obs_range_image->image[x][y-1]);
+      if (x < obs_range_image->w - 1)
+	obs_range = MAX(obs_range, obs_range_image->image[x+1][y]);
+      if (y < obs_range_image->h - 1)
+	obs_range = MAX(obs_range, obs_range_image->image[x][y+1]);
+      double dR = model_range - obs_range;
+      vis_prob[i] = (dR < 0 ? 1.0 : normpdf(dR/range_sigma, 0, 1));
+    }
+  }
+  normalize_pmf(vis_prob, vis_prob, num_validation_points);
+
+  // compute nearest neighbors
+  int nn_idx[num_validation_points];
+  double nn_d2[num_validation_points];
+  for (i = 0; i < num_validation_points; i++) {
+    double query[6];
+    for (j = 0; j < 3; j++) {
+      query[j] = xyz_weight * cloud[i][j];
+      query[j+3] = normal_weight * cloud_normals[i][j];
+    }
+    int search_radius = 5;  // pixels
+    range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
+    //flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
+    //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
+    //nn_d2[i] = dist2(query, obs_xyzn[nn_idx[i]], 6);
+  }
+
+  // compute score
+  double score = 0.0;
+  for (i = 0; i < num_validation_points; i++) {
+    int nn_i = nn_idx[i];
+    // nn dist    
+    double d = nn_d2[i] / xyz_weight;  // TODO: make this a param
+    d = MIN(d, 3*range_sigma);         // TODO: make this a param
+    double d_score = vis_prob[i] * log(normpdf(d, 0, range_sigma));
+
+    // fpfh dist
+    double obs_f[33];
+    for (j = 0; j < 33; j++)
+      obs_f[j] = pcd_obs->shapes[j][nn_i];
+    double df = dist(cloud_f[i], obs_f, 33);
+    df = MIN(df, 4*f_sigma);  // TODO: make this a param
+    double f_score = vis_prob[i] * log(normpdf(df, 0, 2*f_sigma));
+
+    // color dist
+    double obs_lab[3], obs_rgb[3] = {pcd_obs->colors[0][nn_i], pcd_obs->colors[1][nn_i], pcd_obs->colors[2][nn_i]};
+    rgb2lab(obs_lab, obs_rgb);
+    obs_lab[0] *= L_weight;
+    double dlab = dist(cloud_lab[i], obs_lab, 3);
+    dlab = MIN(dlab, 2*lab_sigma);  // TODO: make this a param
+    double lab_score = vis_prob[i] * log(normpdf(dlab, 0, lab_sigma));
+    
+    score += d_score + f_score + lab_score;
+  }
+
+  // add bonus for num inliers
+  char inlier_mask[pcd_obs->num_points];
+  int inlier_cnt = 0;
+  memset(inlier_mask, 0, pcd_obs->num_points);
+  for (i = 0; i < num_validation_points; i++) {
+    if (vis_prob[i] == 0.0)
+      continue;
+    int nn_i = nn_idx[i];
+    if (inlier_mask[nn_i])  // already counted this point as an inlier
+      continue;
+    if (nn_d2[i] / xyz_weight < 2*range_sigma) {  // TODO: make this a param
+      inlier_mask[nn_i] = 1;
+      inlier_cnt++;
+    }
+  }
+  score += inlier_cnt / (double) num_validation_points;
+
+
+  // cleanup
+  free(idx);
+  free_matrix2(R);
+  free_matrix2(cloud);
+  free_matrix2(cloud_normals);
+  free_matrix2(cloud_f);
+  free_matrix2(cloud_lab);
+
+  return score;
+}
+
+
+
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
  */
@@ -1545,12 +1807,17 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   pcd_t *sift_obs = obs->sift_pcd;
   range_image_t *obs_range_image = obs->range_image;
 
+  // compute obs->fg_pcd range image
+  range_image_t *obs_fg_range_image = pcd_to_range_image_from_template(pcd_obs, obs_range_image);
+
   // compute model feature saliency
   double *model_pmf = compute_model_saliency(pcd_model);
 
   // find sift matches
   int sift_match_obs_idx[sift_obs->num_points], sift_match_model_idx[sift_obs->num_points];
   int num_sift_matches = find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, sift_obs, sift_model, params->sift_dthresh);
+
+
 
   // get combined feature matrices
   double **obs_xyzn = new_matrix2(pcd_obs->num_points, 6);
@@ -1603,6 +1870,10 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
   flann_index_t model_fsurf_index = flann_build_index_double(model_fsurf[0], pcd_model->num_points, 35, &speedup, &model_fsurf_params);
 
+  //printf("Building kdtrees\n");
+  //kdtree_t *obs_xyzn_kdtree = kdtree(obs_xyzn, pcd_obs->num_points, 6);
+
+
   // create correspondences and pose data structures
   int num_samples_init = params->num_samples_init + num_sift_matches;
   int **C_obs = new_matrix2i(num_samples_init, params->num_correspondences);     // obs correspondences
@@ -1642,8 +1913,9 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     }
 
     // score hypothesis
-    W[i] = 1.0;
-    //W[i] = model_placement_score(X[i], Q[i], params->num_validation_points);
+    //W[i] = 1.0;
+    //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_xyzn, params);
+    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
   }
 
 
@@ -1659,6 +1931,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_free_index(obs_xyzn_index, &obs_xyzn_params);
   flann_free_index(model_xyzn_index, &model_xyzn_params);
   flann_free_index(model_fsurf_index, &model_fsurf_params);
+  //kdtree_free(obs_xyzn_kdtree);
   free_matrix2i(C_obs);
   free_matrix2i(C_model);
   free_matrix2i(C_issift);

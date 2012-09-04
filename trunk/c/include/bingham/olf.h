@@ -144,18 +144,22 @@ extern "C" {
   } olf_obs_t;
 
   typedef struct {
+    int num_samples_init;
+    int num_correspondences;
+    int knn;
+    int num_validation_points;
     double sift_dthresh;
     double xyz_weight;
     double normal_weight;
+    double L_weight;
     double surfdist_weight;
     double surfwidth_weight;
     double surfdist_thresh;
     double surfwidth_thresh;
-    int num_samples_init;
-    int num_correspondences;
-    int knn;
     double fsurf_sigma;
-    int num_validation_points;
+    double range_sigma;
+    double f_sigma;
+    double lab_sigma;
   } scope_params_t;
 
 
