@@ -72,6 +72,23 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->fsurf_sigma);
       }
+      else if (!wordcmp(s, "L_weight", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->L_weight);
+      }
+      else if (!wordcmp(s, "range_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->range_sigma);
+      }
+      else if (!wordcmp(s, "f_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->f_sigma);
+      }
+      else if (!wordcmp(s, "lab_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->lab_sigma);
+      }
+
       else {
 	fprintf(stderr, "Error: bad parameter ''%s'' at line %d of %s\n", s, cnt, param_file);
 	exit(1);

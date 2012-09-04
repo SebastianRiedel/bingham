@@ -76,11 +76,12 @@ double norm(double x[], int n);                                       /* compute
 double dist(double x[], double y[], int n);                           /* computes the norm of x-y */
 double dist2(double x[], double y[], int n);                          /* computes the norm^2 of x-y */
 double dot(double x[], double y[], int n);                            /* computes the dot product of x and y */
-double cross(double z[3], double x[3], double y[3]);                  /* computes the cross product of x and y */
+void cross(double z[3], double x[3], double y[3]);                    /* computes the cross product of x and y */
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */
 void normalize(double y[], double x[], int n);                        /* sets y = x/norm(x) */
+void normalize_pmf(double y[], double x[], int n);                    /* sets y = x/sum(x) */
 void vmult(double z[], double x[], double y[], int n);                /* multiplies two vectors, z = x.*y */
 void avg(double z[], double x[], double y[], int n);                  /* averages two vectors, z = (x+y)/2 */
 void wavg(double z[], double x[], double y[], double w, int n);       /* averages two vectors, z = w*x+(1-w)*y */
@@ -120,7 +121,7 @@ void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* f
 
 void print_matrix(double **X, int n, int m);
 
-
+void rgb2lab(double lab[], double rgb[]);                                 /* RGB to CIELAB color space */
 
 
 typedef struct ilist {
