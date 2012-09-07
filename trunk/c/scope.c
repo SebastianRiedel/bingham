@@ -24,7 +24,11 @@ void load_params(scope_params_t *params, char *param_file)
     char *s = sbuf;
     if (fgets(s, 1024, f)) {
       cnt++;
-      if (!wordcmp(s, "num_samples_init", " \t\n")) {
+      if (!wordcmp(s, "num_samples", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->num_samples);
+      }
+      else if (!wordcmp(s, "num_samples_init", " \t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%d", &params->num_samples_init);
       }
@@ -117,7 +121,43 @@ int main(int argc, char *argv[])
   scope_params_t params;
   load_params(&params, argv[6]);
 
-  scope(&model, &obs, &params);
+  FILE *f = fopen(argv[7], "w");
+  if (f == NULL) {
+    printf("Can't open %s for writing\n", argv[2]);
+    return 1;
+  }
+
+  olf_pose_samples_t *poses = scope(&model, &obs, &params);
+
+  // write pose samples to file
+  double **X = poses->X;
+  double **Q = poses->Q;
+  double *W = poses->W;
+  int n = poses->n;
+  /*
+  for (n = 1; n < poses->n; n++)
+    if (W[n] < .01 * W[0])
+      break;
+  mult(W, W, 1/sum(W,n), n);
+  */
+
+  fprintf(f, "X = [");
+  int i;
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f, %f, %f;  ", X[i][0], X[i][1], X[i][2]);
+  fprintf(f, "];\n");
+
+  fprintf(f, "Q = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f, %f, %f, %f;  ", Q[i][0], Q[i][1], Q[i][2], Q[i][3]);
+  fprintf(f, "];\n");
+
+  fprintf(f, "W = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f ", W[i]);
+  fprintf(f, "];\n");
+
+  fclose(f);
 
   return 0;
 }

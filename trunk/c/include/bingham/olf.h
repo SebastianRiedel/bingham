@@ -144,6 +144,7 @@ extern "C" {
   } olf_obs_t;
 
   typedef struct {
+    int num_samples;
     int num_samples_init;
     int num_correspondences;
     int knn;

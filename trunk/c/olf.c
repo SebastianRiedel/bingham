@@ -1639,7 +1639,8 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 
 
 double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
-			     range_image_t *obs_fg_range_image, double **obs_xyzn, scope_params_t *params)
+			     range_image_t *obs_fg_range_image, double **obs_xyzn, flann_index_t obs_xyzn_index,
+			     struct FLANNParameters *obs_xyzn_params, scope_params_t *params)
 {
   int i, j;
 
@@ -1723,21 +1724,23 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       query[j] = xyz_weight * cloud[i][j];
       query[j+3] = normal_weight * cloud_normals[i][j];
     }
-    int search_radius = 5;  // pixels
-    range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
-    //flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
+    //int search_radius = 5;  // pixels
+    //range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
+    flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
     //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
     //nn_d2[i] = dist2(query, obs_xyzn[nn_idx[i]], 6);
   }
 
   // compute score
-  double score = 0.0;
+  double d_score = 0.0;
+  double f_score = 0.0;
+  double lab_score = 0.0;
   for (i = 0; i < num_validation_points; i++) {
     int nn_i = nn_idx[i];
     // nn dist    
-    double d = nn_d2[i] / xyz_weight;  // TODO: make this a param
+    double d = sqrt(nn_d2[i]) / xyz_weight;  // TODO: make this a param
     d = MIN(d, 3*range_sigma);         // TODO: make this a param
-    double d_score = vis_prob[i] * log(normpdf(d, 0, range_sigma));
+    d_score += vis_prob[i] * log(normpdf(d, 0, range_sigma));
 
     // fpfh dist
     double obs_f[33];
@@ -1745,7 +1748,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       obs_f[j] = pcd_obs->shapes[j][nn_i];
     double df = dist(cloud_f[i], obs_f, 33);
     df = MIN(df, 4*f_sigma);  // TODO: make this a param
-    double f_score = vis_prob[i] * log(normpdf(df, 0, 2*f_sigma));
+    f_score += vis_prob[i] * log(normpdf(df, 0, 2*f_sigma));
 
     // color dist
     double obs_lab[3], obs_rgb[3] = {pcd_obs->colors[0][nn_i], pcd_obs->colors[1][nn_i], pcd_obs->colors[2][nn_i]};
@@ -1753,10 +1756,11 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
     obs_lab[0] *= L_weight;
     double dlab = dist(cloud_lab[i], obs_lab, 3);
     dlab = MIN(dlab, 2*lab_sigma);  // TODO: make this a param
-    double lab_score = vis_prob[i] * log(normpdf(dlab, 0, lab_sigma));
-    
-    score += d_score + f_score + lab_score;
+    lab_score += vis_prob[i] * log(normpdf(dlab, 0, lab_sigma));
   }
+  d_score -= log(normpdf(0,0,range_sigma));
+  f_score -= log(normpdf(0,0,2*f_sigma));
+  lab_score -= log(normpdf(0, 0, lab_sigma));
 
   // add bonus for num inliers
   char inlier_mask[pcd_obs->num_points];
@@ -1768,13 +1772,18 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
     int nn_i = nn_idx[i];
     if (inlier_mask[nn_i])  // already counted this point as an inlier
       continue;
-    if (nn_d2[i] / xyz_weight < 2*range_sigma) {  // TODO: make this a param
+    if (sqrt(nn_d2[i]) / xyz_weight < 2*range_sigma) {  // TODO: make this a param
       inlier_mask[nn_i] = 1;
       inlier_cnt++;
     }
   }
-  score += inlier_cnt / (double) num_validation_points;
+  double inlier_score = inlier_cnt / (double) num_validation_points;
 
+  double score = d_score + f_score + lab_score + inlier_score;
+
+  //dbug
+  //printf("score_comp = (%f, %f, %f, %f)\n", d_score, f_score, lab_score, inlier_score);
+  //printf("score = %f\n", score);
 
   // cleanup
   free(idx);
@@ -1912,12 +1921,33 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       model_pose_from_one_correspondence(X[i], Q[i], C_obs[i][0], C_model[i][0], pcd_obs, pcd_model);
     }
 
+    //dbug
+    //X[i][0] = 0.0045;  X[i][1] = 0.0761;  X[i][2] = 0.9252;
+    //Q[i][0] = 0.5132;  Q[i][1] = 0.6698;  Q[i][2] = 0.4644;  Q[i][3] = -0.2690;
+
     // score hypothesis
     //W[i] = 1.0;
     //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_xyzn, params);
-    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
+    //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
+    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, params);
   }
 
+  // sort hypotheses
+  int idx[num_samples_init];
+  sort_indices(W, idx, num_samples_init);  // smallest to biggest
+  for (i = 0; i < num_samples_init/2; i++) {  // reverse idx (biggest to smallest)
+    int tmp = idx[i];
+    idx[i] = idx[num_samples_init - i - 1];
+    idx[num_samples_init - i - 1] = tmp;
+  }
+  int num_samples = params->num_samples;
+  reorder_rows(X, X, idx, num_samples, 3);
+  reorder_rows(Q, Q, idx, num_samples, 4);
+  double *W2;  safe_calloc(W2, num_samples, double);
+  for (i = 0; i < num_samples; i++)
+    W2[i] = W[idx[i]];
+  free(W);
+  W = W2;
 
 
 
@@ -1935,13 +1965,16 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   free_matrix2i(C_obs);
   free_matrix2i(C_model);
   free_matrix2i(C_issift);
-  free_matrix2(X);
-  free_matrix2(Q);
-  free(W);
 
+  // pack return value
+  olf_pose_samples_t *pose_samples;
+  safe_calloc(pose_samples, 1, olf_pose_samples_t);
+  pose_samples->X = X;
+  pose_samples->Q = Q;
+  pose_samples->W = W;
+  pose_samples->n = num_samples;
 
-
-  return NULL; //dbug
+  return pose_samples;
 }
 
 
