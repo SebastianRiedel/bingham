@@ -1801,7 +1801,6 @@ void bingham_mixture_free(bingham_mix_t *BM)
   free(BM->B);
 }
 
-
 /*
  * Multiply two bingham mixtures, BM = BM1 * BM2.
  */
@@ -2073,8 +2072,108 @@ void print_bingham(bingham_t *B)
   }
 }
 
+void bingham_pre_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q) {
+  if (B_rot != B) {
+    bingham_copy(B_rot, B);
+  }
+  quaternion_mult(B_rot->V[0], B->V[0], q);
+  quaternion_mult(B_rot->V[1], B->V[1], q);
+  quaternion_mult(B_rot->V[2], B->V[2], q);
+}
 
+void bingham_post_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q) {
+  if (B_rot != B) {
+    bingham_copy(B_rot, B);
+  }
+  quaternion_mult(B_rot->V[0], q, B->V[0]);
+  quaternion_mult(B_rot->V[1], q, B->V[1]);
+  quaternion_mult(B_rot->V[2], q, B->V[2]);
+}
 
+void bingham_invert_3d(bingham_t *B_inv, bingham_t *B) {
+  bingham_copy(B_inv, B);
+  double diag[4] = {1, -1, -1, -1};
+  double **H = new_diag_matrix2(diag, 4);
+  B_inv->V = new_matrix2(4, 4);
+  matrix_mult(B_inv->V, H, B->V, 4, 4, 4);
+}
+
+/*void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants) {
+  
+  B->d = 4;
+
+  double **r = new_matrix2(3, 3);
+  int i;
+  double tmp_cross[3];
+  cross(tmp_cross, normal, pc);
+  for (i = 0; i < 3; ++i) {
+    r[i][0] = normal[i];
+    r[i][1] = pc[i];
+    r[i][2] = tmp_cross[i];
+  }  
+  double *v1, *v2;
+  safe_malloc(v1, 4, double);
+  safe_malloc(v2, 4, double);
+  rotation_matrix_to_quaternion(v1, r); // this is transposed in matlab
+  for (i = 0; i < 3; ++i) {
+    r[i][1] *= -1;
+    r[i][2] *= -2;
+  }
+  rotation_matrix_to_quaternion(v2, r);
+  
+  double *v3;
+  safe_calloc(v3, 4, double);
+  double **m1 = new_matrix2(4, 4);
+  double **m2 = new_matrix2(4, 4);
+  int j;
+  for (i = 0; i < 4; ++i) {
+    for (j = 0; j < 4; ++j) {
+      m1[j][i] = v1[i] * v1[j];
+      m2[j][i] = v2[i] * v2[j];
+    }
+    v3[i] = normrand(0, 1);
+  }
+  double **id_mat = new_identity_matrix2(4);
+  matrix_sub(m1, id_mat, m1, 4, 4);
+  matrix_sub(m2, id_mat, m2, 4, 4);
+  free_matrix2(id_mat);
+  matrix_mult(m1, m1, m2, 4, 4, 4);
+  matrix_vec_mult(v3, m1, v3, 4, 4);
+  normalize(v3, v3, 4);
+  
+  double *v4;
+  safe_malloc(v4, 4, double);
+  cross4d(v4, v1, v2, v3);
+  free(B->V);
+  safe_malloc(B->V, 3, double*); // NOTE(sanja): not sure if this is the way to initialize
+  for (i = 0; i < 3; ++i) {
+    free(B->V[i]);
+    safe_malloc(B->V[i], 4, double);
+  }
+  
+  for (i = 0; i < 4; ++i) {
+    B->V[0][i] = v3[i];
+    B->V[1][i] = v4[i];
+    B->V[2][i] = v2[i];
+  }
+
+  safe_malloc(B->Z, 3, double);
+  B->Z[0] = -100;
+  B->Z[1] = -100;
+  B->Z[2] = MIN(10 * (pc1 / pc2 - 1), 100);
+
+  if (lookup_constants) {
+    bingham_F(B); // NOTE(sanja): this bingham_F doesn't populate dF field in the stats unlike MATLAB. Intentional?
+  }
+  
+  free_matrix2(r);
+  free(v1);
+  free(v2);
+  free(v3);
+  free(v4);
+  free_matrix2(m1);
+  free_matrix2(m2);
+  }*/
 
 //------------ DEPRECATED ------------//
 

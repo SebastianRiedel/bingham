@@ -11,7 +11,7 @@ extern "C" {
 
 #include "bingham.h"
 #include "hll.h"
-
+#include <flann/flann.h>
 
   // heirarchical segmentation and balls model
   typedef struct {
@@ -100,6 +100,11 @@ extern "C" {
     int n;
   } olf_pose_samples_t;
 
+  typedef struct {
+    double X[3];
+    double Q[3];
+  } simple_pose_t;
+
 
   pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
   void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
@@ -128,8 +133,6 @@ extern "C" {
   void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
 
 
-
-
   // ICRA
 
   typedef struct {
@@ -149,6 +152,10 @@ extern "C" {
     int num_correspondences;
     int knn;
     int num_validation_points;
+    int use_range_image;
+    int do_icp;
+    int branching_factor;
+    int dispersion_weight;
     double sift_dthresh;
     double xyz_weight;
     double normal_weight;
@@ -161,13 +168,19 @@ extern "C" {
     double range_sigma;
     double f_sigma;
     double lab_sigma;
+    double xyz_sigma;
   } scope_params_t;
 
 
-  olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params);
+  olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
   
+  int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev, int n_model_prev, double *model_pmf, pcd_t *pcd_model);
 
-
+  int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, pcd_t *pcd_model, int shape_length, double **obs_fxyzn, flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params, scope_params_t *params);
+  void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int n, int *c_model, double xyz_sigma, double *x, bingham_t *B);
+  void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q);
+  void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B, double xyz_sigma, double f_sigma, double dispersion_weight, 
+			     double *logp, double logp_comp[4]);
 
 
 

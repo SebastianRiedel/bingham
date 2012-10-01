@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +7,27 @@
 #include "bingham/olf.h"
 
 
+void load_true_pose(char *pose_file, simple_pose_t *true_pose) {
+  FILE *f = fopen(pose_file, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error loading true pose file: %s\n", pose_file);
+    return;
+  }
+  char sbuf[1024];
+  char *s = sbuf;
+  if (fgets(s, 1024, f)) {
+    s = sword(s, " ", 1);
+    int i;
+    for (i = 0; i < 3; ++i) {
+      s = sword(s, " ", 1);
+      true_pose->X[i] = atof(s);
+    }
+    for (i = 0; i < 4; ++i) {
+      s = sword(s, " ", 1);
+      true_pose->Q[i] = atof(s);
+    }
+  }
+}
 
 void load_params(scope_params_t *params, char *param_file)
 {
@@ -43,6 +63,22 @@ void load_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(s, "num_validation_points", " \t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%d", &params->num_validation_points);
+      }
+      else if (!wordcmp(s, "use_range_image", "\t\n")) {
+	s = sword(s, "\ t", 1);
+	sscanf(s, "%d", params->use_range_image);
+      }
+      else if (!wordcmp(s, "do_icp", "\t\n")) {
+	s = sword(s, "\ t", 1);
+	sscanf(s, "%d", params->do_icp);
+      }
+      else if (!wordcmp(s, "dispersion_weight", "\t\n")) {
+	s = sword(s, "\ t", 1);
+	sscanf(s, "%d", params->dispersion_weight);
+      }
+      else if (!wordcmp(s, "branching_factor", "\t\n")) {
+	s = sword(s, "\ t", 1);
+	sscanf(s, "%d", params->branching_factor);
       }
       else if (!wordcmp(s, "sift_dthresh", " \t\n")) {
 	s = sword(s, " \t", 1);
@@ -92,7 +128,10 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->lab_sigma);
       }
-
+      else if (!wordcmp(s, "xyz_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->xyz_sigma);
+      }
       else {
 	fprintf(stderr, "Error: bad parameter ''%s'' at line %d of %s\n", s, cnt, param_file);
 	exit(1);
@@ -104,9 +143,15 @@ void load_params(scope_params_t *params, char *param_file)
 
 int main(int argc, char *argv[])
 {
+  short have_true_pose = 0;
+  simple_pose_t true_pose;
   if (argc < 8) {
     printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <param_file> <samples_output>\n", argv[0]);
+    printf("or\n");
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <param_file> <samples_output> <ground_truth_folder>\n", argv[0]);
     return 1;
+  } else if (argc == 9) {
+    have_true_pose = 1;
   }
 
   olf_obs_t obs;
@@ -121,13 +166,22 @@ int main(int argc, char *argv[])
   scope_params_t params;
   load_params(&params, argv[6]);
 
+  if (have_true_pose) {
+    load_true_pose(argv[8], &true_pose);
+  }
+
   FILE *f = fopen(argv[7], "w");
   if (f == NULL) {
     printf("Can't open %s for writing\n", argv[2]);
     return 1;
   }
 
-  olf_pose_samples_t *poses = scope(&model, &obs, &params);
+  olf_pose_samples_t *poses;
+  if (have_true_pose) {
+    poses = scope(&model, &obs, &params, have_true_pose, &true_pose);
+  } else {
+    poses = scope(&model, &obs, &params, have_true_pose, NULL);
+  }
 
   // write pose samples to file
   double **X = poses->X;
