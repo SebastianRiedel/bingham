@@ -2445,6 +2445,7 @@ int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, scope_params_t 
   double **xyzn_query = new_matrix2(2, 3);
   mult(xyzn_query[0], xyz_obs_point2, params->xyz_weight, 3);
   mult(xyzn_query[1], nxyz_obs_point2, params->normal_weight, 3);
+  
 
   if (!use_f) {
     
