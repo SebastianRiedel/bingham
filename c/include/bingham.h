@@ -74,6 +74,12 @@ void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
 void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
 void print_bingham(bingham_t *B);
 
+void bingham_pre_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q); 
+void bingham_post_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q);
+void bingham_invert_3d(bingham_t *B_inv, bingham_t *B);
+
+//void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants);
+
 /* Bingham mixtures */
 void bingham_mixture_mult(bingham_mix_t *BM, bingham_mix_t *BM1, bingham_mix_t *BM2);
 void bingham_mixture_copy(bingham_mix_t *dst, bingham_mix_t *src);

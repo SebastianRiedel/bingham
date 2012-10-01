@@ -32,6 +32,8 @@ void sort_indices(double *x, int *idx, int n);  /* sort the indices of x (leavin
 int qselect(double *x, int n, int k);           /* fast select algorithm */
 void mink(double *x, int *idx, int n, int k);   /* fills idx with the indices of the k min entries of x */
 
+short double_is_equal(double a, double b); /* Checks if two doubles are equal using eps as threshold */
+
 double get_time_ms();  /* get the current system time in millis */
 
 char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
@@ -77,6 +79,7 @@ double dist(double x[], double y[], int n);                           /* compute
 double dist2(double x[], double y[], int n);                          /* computes the norm^2 of x-y */
 double dot(double x[], double y[], int n);                            /* computes the dot product of x and y */
 void cross(double z[3], double x[3], double y[3]);                    /* computes the cross product of x and y */
+void cross4d(double w[4], double x[4], double y[4], double z[4]);     /* takes the 4-D cross product of the 4x1 unit vectors x, y, z. */
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */
@@ -92,9 +95,18 @@ void quaternion_mult(double z[4], double x[4], double y[4]);          /* quatern
 void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 void quaternion_to_rotation_matrix(double **R, double *q);            /* convert a unit quaternion to a rotation matrix */
+int find_first_non_zero(double *v, int n);                            /* Finds an index of the first non-zero element. Returns -1 if none is found */
+void orthogonal_vector(double *w, double *v, int n);                  /* finds a unit vector orthogonal to v */
+void vector_to_possible_quaternion(double *v, double *q);             /* compute one possible quaternion rotation which takes [1,0,0] to v */
+short *ismember(double *A, double *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
+short *ismemberi(int *A, int *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
 
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
+double **new_identity_matrix2(int n);                                /* create a new n-by-n 2d indetity matrix of doubles */
+int **new_identity_matrix2i(int n);                                  /* create a new n-by-n 2d indetity matrix of ints */
+double **new_diag_matrix2(double *diag, int n);
+double **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
 void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
 void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
@@ -106,8 +118,11 @@ void inv(double **Y, double **X, int n);                                    /* c
 void matrix_copy(double **Y, double **X, int n, int m);                     /* matrix copy, Y = X */
 double **matrix_clone(double **X, int n, int m);                            /* matrix clone, Y = new(X) */
 void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* matrix addition, Z = X+Y */
+void matrix_sub(double **Z, double **X, double **Y, int n, int m);          /* matrix subtaction, Z = X-Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
 void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* matrix-vector multiplication, y = A*x */
+void matrix_pow(double **Y, double **X, int n, int m, double pw);           /* taking every element of a matrix to the power of pw */ 
+void matrix_sum(double y[], double **X, int n, int m);                      /* sums the columns of the matrix */
 void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
 void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
@@ -115,6 +130,9 @@ void wmean(double *mu, double **X, double *w, int n, int m);                /* w
 void wcov(double **S, double **X, double *w, double *mu, int n, int m);     /* compute the weighted covariance of the rows of X, given mean mu */
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
+void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m);    /* replicates and tiles a 2D matrix of ints */
+void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m);         /* replicates and tiles a 2D matrix of ints */
+void variance(double *vars, double **X, int n, int m);                           /* Returns a row-vector of variances for each column */
 
 void linear_regression(double *b, double **X, double *y, int n, int d);     /* perform linear regression: dot(b,x[i]) = y[i], i=1..n */
 void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d */

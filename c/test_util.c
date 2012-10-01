@@ -339,10 +339,22 @@ void test_regression(int argc, char *argv[])
   printf("]\n");
 }
 
+void test_repmat() {
+  // TODO(sanja): silly sanity check, write a better test
+  double **A = new_matrix2(2, 3);
+  int i, j;
+  for (i = 0; i < 2; ++i)
+    for (j = 0; j < 3; ++j)
+      A[i][j] = (3 * i + (j+1));
+  double **B;
+  B = repmat(A, 2, 3, 2, 3);
+  print_matrix(B, 4, 9);
+}
 
 int main(int argc, char *argv[])
 {
-  test_regression(argc, argv);
+  //test_regression(argc, argv);
+  test_repmat();
   //test_kdtree(argc, argv);
   //test_normrand(argc, argv);
   //test_safe_alloc();

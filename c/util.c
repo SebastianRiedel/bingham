@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -598,6 +597,49 @@ void cross(double z[3], double x[3], double y[3])
   z[2] = x[0]*y[1] - x[1]*y[0];
 }
 
+void cross4d(double w[4], double x[4], double y[4], double z[4]) {
+  double **V = new_matrix2(4, 3);
+  int i;
+  for (i = 0; i < 4; ++i) {
+    V[i][0] = x[i];
+    V[i][1] = y[1];
+    V[i][2] = z[i];
+  }
+  double **W = new_matrix2(3, 3);
+  int indices[4][3] = {{2, 3, 4}, {1, 3, 4}, {1, 2, 4}, {1, 2, 3}};
+  int cut_axis = 0;
+  double dmax = 0;
+  for (i = 0; i < 4; ++i) {
+    reorder_rows(W, V, indices[i], 3, 3);
+    double tmp = fabs(det(W, 3));
+    if (dmax < tmp) {
+      dmax = tmp;
+      cut_axis = i;
+    }    
+  }
+  double *c0 = V[cut_axis];
+  int uncut_axis[3];
+  for (i = 0; i < cut_axis; ++i) {
+    uncut_axis[i] = i;
+    w[i] = 0;
+  }
+  for (i = cut_axis + 1; i < 4; ++i) {
+    uncut_axis[i-1] = i;
+    w[i] = 0;
+  }
+  w[cut_axis] = 1;
+  reorder_rows(W, V, uncut_axis, 3, 3);
+  inv(W, W, 3);
+  mult(c0, c0, -1, 3);
+  
+  double tmp[3];
+  matrix_vec_mult(tmp, W, c0, 3, 3); 
+  for (i = 0; i < 3; ++i) {
+    w[uncut_axis[i]] = tmp[i];
+  }
+  free_matrix2(V);
+  free_matrix2(W);
+}
 
 // adds two vectors, z = x+y
 void add(double z[], double x[], double y[], int n)
@@ -624,7 +666,6 @@ void mult(double y[], double x[], double c, int n)
   for (i = 0; i < n; i++)
     y[i] = c*x[i];
 }
-
 
 // sets y = x/norm(x)
 void normalize(double y[], double x[], int n)
@@ -801,6 +842,81 @@ void quaternion_to_rotation_matrix(double **R, double *q)
   R[2][2] = a*a - b*b - c*c + d*d;
 }
 
+int find_first_non_zero(double *v, int n) {
+  int i;
+  for (i = 0; i < n; ++i) {
+    if (v[i] != 0) return i;
+  }
+  return -1;
+}
+
+void orthogonal_vector(double *w, double *v, int n) {
+  int i = find(v, 3);
+  int j;
+  for (j = 0; j < n; ++j) {
+    w[j] = 0;
+  }
+
+  if (i == -1) {
+    w[0] = 1;
+    return;
+  }
+  if (n == 1) {
+    return;
+  }
+  int i2 = (i % n) + 1;
+  w[i] = v[i2];
+  w[i2] = -v[i];
+  double norm_factor = sqrt(w[i] * w[i] + w[i2] * w[i2]);
+  mult(w, w, norm_factor, 3);
+}
+
+void vector_to_possible_quaternion(double *v, double *q) {
+  if (find_first_non_zero(v, 3) == -1) {
+    q = {1, 0, 0, 0};
+    return;
+  }
+
+  double **r = new_matrix2(3, 3);
+  normalize(r[0], v, 3);
+  orthogonal_vector(r[1], r1, 3);
+  cross(r[2], r[0], r[1]);
+  transpose(r, r, 3, 3);
+  
+  rotation_matrix_to_quaternion(q, r);
+}
+
+short *ismember(double *A, double *B, int n, int m) {
+  short *C;
+  safe_calloc(C, n, short);
+  int i, j;
+  // NOTE(sanja): this can be done in O(n log n + m) if necessary. Also, SSE2-able :)
+  for (i = 0; i < n; ++i) {
+    for (j = 0; j < m; ++j) {
+      if (double_is_equal(A[i], B[j])) {
+	C[i] = 1;
+	break;
+      }
+    }
+  }
+  return C;
+}
+
+short *ismemberi(int *A, int *B, int n, int m) {
+  short *C;
+  safe_calloc(C, n, short);
+  int i, j;
+  // NOTE(sanja): this can be done in O(n log n + m) if necessary. Also, SSE2-able :)
+  for (i = 0; i < n; ++i) {
+    for (j = 0; j < m; ++j) {
+      if (A[i] == B[j]) {
+	C[i] = 1;
+	break;
+      }
+    }
+  }
+  return C;
+}
 
 // add an element to the front of a list
 ilist_t *ilist_add(ilist_t *x, int a)
@@ -1056,6 +1172,7 @@ double acgpdf_pcs(double *x, double *z, double **V, int d)
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {
+  if (n*m == 0) return NULL;
   int i;
   double *raw, **X;
   safe_calloc(raw, n*m, double);
@@ -1070,6 +1187,7 @@ double **new_matrix2(int n, int m)
 // create a new n-by-m 2d matrix of ints
 int **new_matrix2i(int n, int m)
 {
+  if (n*m == 0) return NULL;
   int i, *raw, **X;
   safe_calloc(raw, n*m, int);
   safe_malloc(X, n, int*);
@@ -1080,9 +1198,44 @@ int **new_matrix2i(int n, int m)
   return X;
 }
 
+double **new_identity_matrix2(int n) {
+  double **mat = new_matrix2(n);
+  int i;
+  for (i = 0; i < n; ++i)
+    mat[i][i] = 1;
+  return mat;
+}
+
+int **new_identity_matrix2i(int n, int m) {
+  int **mat = new_matrix2i(n);
+  int i;
+  for (i = 0; i < n; ++i)
+    mat[i][i] = 1;
+  return mat;
+}
+
+double **new_diag_matrix2(double *diag, int n) {
+  double **mat = new_matrix2(n, n);
+  int i;
+  for (i = 0; i < n; ++i) {
+    mat[i][i] = diag[i];
+  }
+  return mat;
+}
+
+double **new_diag_matrix2i(int *diag, int n) {
+  int **mat = new_matrix2(n, n);
+  int i;
+  for (i = 0; i < n; ++i) {
+    mat[i][i] = diag[i];
+  }
+  return mat;
+}
+
 // free a 2d matrix of doubles
 void free_matrix2(double **X)
 {
+  if (X == NULL) return;
   free(X[0]);
   free(X);
 }
@@ -1090,6 +1243,7 @@ void free_matrix2(double **X)
 // free a 2d matrix of ints
 void free_matrix2i(int **X)
 {
+  if (X == NULL) return;
   free(X[0]);
   free(X);
 }
@@ -1260,6 +1414,11 @@ void matrix_add(double **Z, double **X, double **Y, int n, int m)
   add(Z[0], X[0], Y[0], n*m);
 }
 
+// matrix subtraction, Z = X+Y
+void matrix_sub(double **Z, double **X, double **Y, int n, int m)
+{
+  sub(Z[0], X[0], Y[0], n*m);
+}
 
 // matrix multiplication, Z = X*Y, where X is n-by-p and Y is p-by-m
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
@@ -1290,6 +1449,22 @@ void matrix_vec_mult(double *y, double **A, double *x, int n, int m)
       y[i] = dot(A[i], x, m);
 }
 
+void matrix_pow(double **Y, double **X, int n, int m, double pw) {
+  int i, j;
+  for (i = 0; i < n; ++i)
+    for (j = 0; j < m; ++j)
+      Y[i][j] = pow(X[i][j], pw);
+}
+
+void matrix_sum(double y[], double **X, int n, int m) {
+  int i, j;
+  memset(y, 0, n * sizeof(double));
+  for (i = 0; i < n; ++i) {
+    for (j = 0; j < m; ++j) {
+      y[j] += X[i][j];
+    }
+  }
+}
 
 // outer product of x and y, Z = x'*y
 void outer_prod(double **Z, double x[], double y[], int n, int m)
@@ -1301,7 +1476,8 @@ void outer_prod(double **Z, double x[], double y[], int n, int m)
 }
 
 
-// row vector mean
+// row vector mean 
+// NOTE(sanja): this is adding up columns, not rows.
 void mean(double *mu, double **X, int n, int m)
 {
   memset(mu, 0, m*sizeof(double));  // mu = 0
@@ -1313,7 +1489,6 @@ void mean(double *mu, double **X, int n, int m)
 
   mult(mu, mu, 1/(double)n, m);
 }
-
 
 // compute the covariance of the rows of X, given mean mu
 void cov(double **S, double **X, double *mu, int n, int m)
@@ -1658,6 +1833,37 @@ void reorder_rows(double **Y, double **X, int *idx, int n, int m)
     free_matrix2(Y2);
 }
 
+void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m) {
+  // double **X = new_matrix2(n * rep_n, m * rep_m);
+  int i, rep_i, rep_j;
+  for (i = 0; i < n; ++i) {
+    for (rep_j = 0; rep_j < rep_m; ++rep_j) {
+      memcpy(&B[i][rep_j * m], A[i], m * sizeof(double)); 
+    }
+  }
+  for (rep_i = 0; rep_i < rep_n; ++rep_i) {
+    memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(double));
+  }  
+  //return B;
+}
+
+void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m) {
+  //int **X = new_matrix2i(n * rep_n, m * rep_m);
+  int i, rep_i, rep_j;
+  for (i = 0; i < n; ++i) {
+    for (rep_j = 0; rep_j < rep_m; ++rep_j) {
+      memcpy(&B[i][rep_j * m], A[i], m * sizeof(int)); 
+    }
+  }
+  for (rep_i = 0; rep_i < rep_n; ++rep_i) {
+    memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(int));
+  }  
+  //return B;
+}
+
+void variance(double *vars, double **X, int n, int m) {
+  printf("Variance NOT implemented\n");
+}
 
 void print_matrix(double **X, int n, int m)
 {
@@ -2205,6 +2411,9 @@ void mink(double *x, int *idx, int n, int k)
     idx[i] = idx2[i];
 }
 
+short double_is_equal(double a, double b) {
+  return fabs(a - b) < 0.00001;
+}
 
 // fast select algorithm
 int qselect(double *x, int n, int k)
