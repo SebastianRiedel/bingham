@@ -511,6 +511,29 @@ double min(double x[], int n)
   return y;
 }
 
+// returns the index of the max of x
+int find_max(double x[], int n) {
+  int i;
+
+  int idx = 0;
+  for (i = 1; i < n; i++)
+    if (x[i] > x[idx]) {
+      idx = i;
+    }
+  return idx;
+}
+
+// returns the index of the min of x
+int find_min(double x[], int n) {
+  int i;
+
+  int idx = 0;
+  for (i = 1; i < n; i++)
+    if (x[i] < x[idx]) {
+      idx = i;
+    }
+  return idx;
+}
 
 // computes the max of x
 int imax(int x[], int n)
@@ -665,6 +688,14 @@ void mult(double y[], double x[], double c, int n)
   int i;
   for (i = 0; i < n; i++)
     y[i] = c*x[i];
+}
+
+// takes absolute value element-wise
+void vec_func(double y[], double x[], double n, double (*f)(double)) {
+  int i;
+  for (i = 0; i < n; ++i) {
+    y[i] = (*f)(x[i]);
+  }
 }
 
 // sets y = x/norm(x)
@@ -851,7 +882,7 @@ int find_first_non_zero(double *v, int n) {
 }
 
 void orthogonal_vector(double *w, double *v, int n) {
-  int i = find(v, 3);
+  int i = find_first_non_zero(v, 3);
   int j;
   for (j = 0; j < n; ++j) {
     w[j] = 0;
@@ -871,19 +902,21 @@ void orthogonal_vector(double *w, double *v, int n) {
   mult(w, w, norm_factor, 3);
 }
 
-void vector_to_possible_quaternion(double *v, double *q) {
+void vector_to_possible_quaternion(double *q, double *v) {
   if (find_first_non_zero(v, 3) == -1) {
-    q = {1, 0, 0, 0};
+    q[0] = 1;
+    q[1] = 0; q[2] = 0; q[3] = 0;
     return;
   }
 
   double **r = new_matrix2(3, 3);
   normalize(r[0], v, 3);
-  orthogonal_vector(r[1], r1, 3);
+  orthogonal_vector(r[1], r[0], 3);
   cross(r[2], r[0], r[1]);
   transpose(r, r, 3, 3);
   
   rotation_matrix_to_quaternion(q, r);
+  free_matrix2(r);
 }
 
 short *ismember(double *A, double *B, int n, int m) {
@@ -1075,6 +1108,12 @@ int pmfrand(double *w, int n) {
   return 0;
 }
 
+void exp_vec(double *y, double *x, int n, double sigma) {
+  int i;
+  for (i = 0; i < n; ++i) {
+    y[i] = exp(-0.5 * x[i] / (sigma * sigma));
+  }
+}
 
 // sample from a multivariate normal
 void mvnrand(double *x, double *mu, double **S, int d)
@@ -1198,16 +1237,24 @@ int **new_matrix2i(int n, int m)
   return X;
 }
 
+void add_matrix_row(double **X, int n, int m) {
+  printf("DANGER! Reallocating matrix rows is not tested yet!\n");
+  double *raw = X[0];
+  safe_realloc(raw, (n + 1) * m, double);
+  safe_realloc(X, n+1, double*);
+  X[n] = raw + m * n;
+}
+
 double **new_identity_matrix2(int n) {
-  double **mat = new_matrix2(n);
+  double **mat = new_matrix2(n, n);
   int i;
   for (i = 0; i < n; ++i)
     mat[i][i] = 1;
   return mat;
 }
 
-int **new_identity_matrix2i(int n, int m) {
-  int **mat = new_matrix2i(n);
+int **new_identity_matrix2i(int n) {
+  int **mat = new_matrix2i(n, n);
   int i;
   for (i = 0; i < n; ++i)
     mat[i][i] = 1;
@@ -1223,8 +1270,8 @@ double **new_diag_matrix2(double *diag, int n) {
   return mat;
 }
 
-double **new_diag_matrix2i(int *diag, int n) {
-  int **mat = new_matrix2(n, n);
+int **new_diag_matrix2i(int *diag, int n) {
+  int **mat = new_matrix2i(n, n);
   int i;
   for (i = 0; i < n; ++i) {
     mat[i][i] = diag[i];
@@ -1384,10 +1431,17 @@ inline double tetrahedron_volume_old(double x[], double y[], double z[], double 
 // transpose a matrix
 void transpose(double **Y, double **X, int n, int m)
 {
+  double **X2 = X;
+  if (Y == X)
+    X2 = matrix_clone(X,n,m);
+
   int i, j;
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
-      Y[j][i] = X[i][j];
+      Y[j][i] = X2[i][j];
+
+  if (Y == X)
+    free_matrix2(X2);
 }
 
 
@@ -1447,6 +1501,16 @@ void matrix_vec_mult(double *y, double **A, double *x, int n, int m)
   else
     for (i = 0; i < n; i++)
       y[i] = dot(A[i], x, m);
+}
+
+// matrix element-wise multiplication
+void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m) {
+  int i, j;
+  for (i = 0; i < n; ++i) {
+    for (j = 0; j < m; ++j) {
+      Z[i][j] = X[i][j] * Y[i][j];
+    }
+  }
 }
 
 void matrix_pow(double **Y, double **X, int n, int m, double pw) {

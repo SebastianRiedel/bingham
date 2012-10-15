@@ -102,7 +102,7 @@ extern "C" {
 
   typedef struct {
     double X[3];
-    double Q[3];
+    double Q[4];
   } simple_pose_t;
 
 
@@ -166,6 +166,10 @@ extern "C" {
     double surfwidth_thresh;
     double fsurf_sigma;
     double range_sigma;
+    double range_weight;
+    int pose_clustering;
+    double x_cluster_thresh;
+    double q_cluster_thresh;
     double f_sigma;
     double lab_sigma;
     double xyz_sigma;
@@ -181,8 +185,11 @@ extern "C" {
   void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q);
   void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B, double xyz_sigma, double f_sigma, double dispersion_weight, 
 			     double *logp, double logp_comp[4]);
+  int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_fxyzn, scope_params_t *params, struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index, double *x, double *q, int c2_obs, int sample_nn, int use_f);
 
-
+  void get_point(double p[3], pcd_t *pcd, int idx);
+  void get_normal(double p[3], pcd_t *pcd, int idx);
+  void get_shape(double p[33], pcd_t *pcd, int idx);
 
 #ifdef __cplusplus
 }

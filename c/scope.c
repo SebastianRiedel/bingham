@@ -16,7 +16,7 @@ void load_true_pose(char *pose_file, simple_pose_t *true_pose) {
   char sbuf[1024];
   char *s = sbuf;
   if (fgets(s, 1024, f)) {
-    s = sword(s, " ", 1);
+    //s = sword(s, " ", 1);
     int i;
     for (i = 0; i < 3; ++i) {
       s = sword(s, " ", 1);
@@ -27,6 +27,7 @@ void load_true_pose(char *pose_file, simple_pose_t *true_pose) {
       true_pose->Q[i] = atof(s);
     }
   }
+  fclose(f);
 }
 
 void load_params(scope_params_t *params, char *param_file)
@@ -65,20 +66,20 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(s, "%d", &params->num_validation_points);
       }
       else if (!wordcmp(s, "use_range_image", "\t\n")) {
-	s = sword(s, "\ t", 1);
-	sscanf(s, "%d", params->use_range_image);
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->use_range_image);
       }
       else if (!wordcmp(s, "do_icp", "\t\n")) {
-	s = sword(s, "\ t", 1);
-	sscanf(s, "%d", params->do_icp);
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->do_icp);
       }
       else if (!wordcmp(s, "dispersion_weight", "\t\n")) {
-	s = sword(s, "\ t", 1);
-	sscanf(s, "%d", params->dispersion_weight);
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->dispersion_weight);
       }
       else if (!wordcmp(s, "branching_factor", "\t\n")) {
-	s = sword(s, "\ t", 1);
-	sscanf(s, "%d", params->branching_factor);
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->branching_factor);
       }
       else if (!wordcmp(s, "sift_dthresh", " \t\n")) {
 	s = sword(s, " \t", 1);
@@ -120,6 +121,22 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->range_sigma);
       }
+      else if (!wordcmp(s, "range_weight", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->range_weight);
+      }
+      else if (!wordcmp(s, "pose_clustering", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->pose_clustering);
+      }
+      else if (!wordcmp(s, "x_cluster_thresh", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->x_cluster_thresh);
+      }
+      else if (!wordcmp(s, "q_cluster_thresh", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->q_cluster_thresh);
+      }
       else if (!wordcmp(s, "f_sigma", " \t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->f_sigma);
@@ -138,6 +155,7 @@ void load_params(scope_params_t *params, char *param_file)
       }
     }
   }
+  fclose(f);
 }
 
 

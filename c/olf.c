@@ -534,7 +534,7 @@ pcd_t *load_pcd(char *f_pcd)
       }
       else if (!wordcmp(s, "DATA", " \t\n")) {
 	s = sword(s, " \t", 1);
-	if (wordcmp(s, "ascii", " \t\n")) {
+	if (wordcmp(s, "ascii", " \t\n")) {  // NOTE(sanja): should this be !wordcmp?
 	  fprintf(stderr, "Error: only ascii pcd files are supported.\n");
 	  pcd_free(pcd);
 	  free(pcd);
@@ -1722,7 +1722,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       query[j] = xyz_weight * cloud[i][j];
       query[j+3] = normal_weight * cloud_normals[i][j];
     }
-    //int search_radius = 5;  // pixels
+    int search_radius = 5;  // pixels
     //range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
     flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
     //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
@@ -1795,7 +1795,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
 }
 
 void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int good_pose_idx[], int great_pose_idx[], int *num_good_poses, int *num_great_poses) {
-  double *tmp;
+  double tmp[3];
   short good_pose, great_pose;
   *num_good_poses = 0;
   *num_great_poses = 0;
@@ -1805,13 +1805,13 @@ void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int
     double vector_norm = norm(tmp, 3);
     good_pose = vector_norm < 0.05;
     double dot_product = dot(Q[i], true_pose->Q, 4);
-    good_pose = good_pose & (dot_product < M_PI / 8);
-    if (good_pose == 1) {
+    good_pose = good_pose && (dot_product < M_PI / 8.0);
+    if (good_pose) {
       good_pose_idx[(*num_good_poses)++] = i;
     }
     great_pose = vector_norm < 0.025;
-    great_pose = great_pose & (dot_product < M_PI / 16);
-    if (great_pose == 1) {
+    great_pose = great_pose && (dot_product < M_PI / 16.0);
+    if (great_pose) {
       great_pose_idx[(*num_great_poses)++] = i;
     }    
   } 
@@ -1863,6 +1863,16 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       model_xyzn[i][j+3] = params->normal_weight * pcd_model->normals[j][i];
     }
   }
+  double **model_fxyzn = new_matrix2(pcd_model->num_points, 39);
+  for (i = 0; i < pcd_model->num_points; i++) {
+    for (j = 0; j < 33; ++j) {
+      model_fxyzn[i][j] = pcd_model->shapes[j][i];
+    }
+    for (j = 0; j < 3; j++) {
+      model_fxyzn[i][j+33] = params->xyz_weight * pcd_model->points[j][i];
+      model_fxyzn[i][j+36] = params->normal_weight * pcd_model->normals[j][i];
+    }
+  }
   double **obs_fsurf = new_matrix2(pcd_obs->num_points, 35);
   for (i = 0; i < pcd_obs->num_points; i++) {
     for (j = 0; j < 33; j++)
@@ -1898,13 +1908,13 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     model_fsurf[i][34] = params->surfwidth_weight * surfwidth;
   }
 
-  double **obs_fxyzn = new_matrix2(39, pcd_model->num_points);
+  double **obs_fxyzn = new_matrix2(pcd_obs->num_points, 39);
   for (i = 0; i < pcd_obs->num_points; ++i) {
     for (j = 0; j < 33; ++j)
-      obs_fxyzn[j][i] = pcd_obs->shapes[i][j];
+      obs_fxyzn[i][j] = pcd_obs->shapes[j][i];
     for (j = 0; j < 3; ++j) {
-      obs_fxyzn[33+j][i] = params->xyz_weight * pcd_obs->points[i][j];
-      obs_fxyzn[33+j+3][i] = params->normal_weight * pcd_obs->normals[i][j];
+      obs_fxyzn[i][33+j] = params->xyz_weight * pcd_obs->points[j][i];
+      obs_fxyzn[i][33+j+3] = params->normal_weight * pcd_obs->normals[j][i];
     }
   }
 
@@ -1942,7 +1952,6 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
   // sample poses from one correspondence
   for (i = 0; i < num_samples_init; i++) {
-    //NOTE(sanja): why are we not randomizing here?
     if (i < num_sift_matches) {  // sift correspondence
       C_issift[i][0] = 1;
       C_obs[i][0] = sift_match_obs_idx[i];
@@ -2010,12 +2019,12 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   num_good_poses = 0;
   num_great_poses = 0;
   if (have_true_pose) {
-    get_good_poses(true_pose, num_samples_init, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
+    get_good_poses(true_pose, num_samples, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
     printf("Found %d/%d good poses after 1 correspondence\n", num_good_poses, num_samples);
     printf("Found %d/%d great poses after 1 correspondence\n", num_great_poses, num_samples);
   }
-  // NOTE(sanja): Is there a reason we weighted the scores at the place that's commented out in MATLAB? I added use_range_image just in case
   
+  /*
   int c;
   for (c = 1; c < params->num_correspondences; ++c) {
     printf("c = %d\n", c);
@@ -2042,11 +2051,11 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     free(X);
     free(Q);
     free(W);
+    
     X = new_X;
     Q = new_Q;
     W = new_W;
-    // NOTE(sanja): We use W_comp only for plotting, from what I gathered.
-    
+
     int i;
     bingham_t B_full[num_samples * params->branching_factor];
     int *c_obs, *c_model;
@@ -2089,7 +2098,9 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
 
       double logp, logp_new;
-      double logp_comp[4], logp_new_comp[4];
+      double *logp_comp, *logp_new_comp;
+      safe_malloc(logp_comp, 4, double);
+      safe_malloc(logp_new_comp, 4, double);
       if (params->do_icp) {
 	// FIX: lacks variance calculation of a vector
 	model_pose_likelihood(pcd_obs, pcd_model, c_obs, c_model, c, x, q, &B, params->xyz_sigma, -1, -1, &logp, logp_comp); // NOTE(sanja): are two -1's overrides of the default params?
@@ -2097,8 +2108,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 	for (k = 0; k < 20; ++k) {
 	  int j;
 	  for (j = 0; j < c; ++j) {
-	    // ******************** FIX STUFF FROM HERE! **************
-	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, params, x, q, c_obs[j], 1, 0); //sample n, no fpfh
+	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, model_fxyzn, params, &model_xyzn_params, model_xyzn_index, x, q, c_obs[j], 1, 0); //sample nn, no fpfh
 	  }
 	  
 	  bingham_free(&B);
@@ -2117,19 +2127,137 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 	  }
 	}
       }
-      model_pose_likelihood(pcd_obs, pcd_model, c_obs, c_model, c, x, q, &B_full[i], params->xyz_sigma, params->f_sigma, params->dispersion_weight, &logp_new, logp_new_comp);
-      // Keep typing, line 384
-      
+      model_pose_likelihood(pcd_obs, pcd_model, c_obs, c_model, c, x, q, &B_full[i], params->xyz_sigma, params->f_sigma, params->dispersion_weight, &logp, logp_comp);
 
+      safe_realloc(logp_comp, 5, double);
+      
+      model_range_image_likelihood(pcd_model, pcd_obs, obs_range_image, obs_xyzn_index, x, q, params->num_validation_points, &logp_new, logp_new_comp); // This should be model_placement_score
+      logp_comp[4] = params->range_weight * logp_new;
+      logp = sum(logp_comp, 5);
+      
+      memcpy(C_obs[i], c_obs, c * sizeof(int));
+      memcpy(C_model[i], c_model, c * sizeof(int));
+      memcpy(X[i], x, 3 * sizeof(double));
+      memcpy(Q[i], q, 4 * sizeof(double));
+      W[i] = logp;
+   
       free(x_new);
       free(q_new);
       free(x0);
       free(x);
       free(q);
     }
+    
+    // sort samples by weight and prune branches
+    int num_samples_after = params->num_samples * params->branching_factor;
+    int idx[num_samples_after];
+    sort_indices(W, idx, num_samples_after);  // smallest to biggest
+    for (i = 0; i < num_samples_after/2; i++) {  // reverse idx (biggest to smallest)
+      int tmp = idx[i];
+      idx[i] = idx[num_samples_after - i - 1];
+      idx[num_samples_after - i - 1] = tmp;
+    }
+    
+    reorder_rows(X, X, idx, num_samples_after, 3);
+    reorder_rows(Q, Q, idx, num_samples_after, 4);
+    double *W2;  safe_calloc(W2, num_samples_after, double);
+    for (i = 0; i < num_samples_after; i++)
+      W2[i] = W[idx[i]];
+    free(W);
+    W = W2;
+    
+    num_good_poses = 0;
+    num_great_poses = 0;
+    if (have_true_pose) {
+      get_good_poses(true_pose, num_samples_init, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
+      printf("Found %d/%d good poses after 1 correspondence\n", num_good_poses, num_samples_after);
+      printf("Found %d/%d great poses after 1 correspondence\n", num_great_poses, num_samples_after);
+    }
+
     free(c_obs);
     free(c_model);    
     free(c_model_new);
+  }
+
+  // pose clustering
+  if (params->pose_clustering) {
+    printf("Clustering poses...\n");
+    int cnt = 1, i, j;
+    double c_obs[params->num_correspondences], c_model[params->num_correspondences];
+    double *x, *q;
+    safe_malloc(x, 3, double);
+    safe_malloc(x, 4, double);
+    double **X2 = new_matrix2(cnt, 3);
+    double **Q2 = new_matrix2(cnt, 4);
+    double *W2;
+    safe_malloc(W2, cnt, double);
+    double **C_obs2 = new_matrix2(cnt, params->num_correspondences);
+    double **C_model2 = new_matrix2(cnt, params->num_correspondences);
+    for (i = 1; i < num_samples; ++i) {
+      W2[0] = 1;
+      double dx[cnt], dq[cnt];
+      memcpy(x, X[i], 3);
+      memcpy(q, Q[i], 4);
+      memcpy(c_obs, C_obs[i], params->num_correspondences);
+      memcpy(c_model, C_model[i], params->num_correspondences);
+      double **tmpX = new_matrix2(cnt, 3);
+      double **tmpXT = new_matrix2(3, cnt);
+      repmat(tmpX, &x, cnt, 1, 1, 3);
+      matrix_sub(tmpX, tmpX, X2, cnt, 3);
+      matrix_pow(tmpX, tmpX, cnt, 3, 2);
+      transpose(tmpXT, tmpX, cnt, 3);
+      matrix_sum(dx, tmpXT, 3, cnt);
+      for (j = 0; j < cnt; ++j) {
+	dx[j] = sqrt(dx[j]);
+      }
+      
+      double **tmpQ = new_matrix2(cnt, 4);
+      double **tmpQT = new_matrix2(4, cnt);
+      repmat(tmpQ, &q, cnt, 1, 1, 4);
+      matrix_elt_mult(tmpQ, tmpQ, Q2, cnt, 4);
+      transpose(tmpQT, tmpQ, cnt, 4);
+      matrix_sum(dq, tmpQT, 4, cnt);
+      vec_func(dq, dq, cnt, fabs);
+      vec_func(dq, dq, cnt, acos);
+
+      for (j = 0; j < cnt; ++j) {
+	if (dx[j] < params->x_cluster_thresh && dq[j] < params->q_cluster_thresh) {
+	  break;
+	}
+      }
+      if (j == cnt) { // we didn't find anything in the loop above
+	++cnt;
+	// TODO(sanja): Figure out how to do this with reallocations to save time, although it seems like the matrices are small so this is not terrible
+	double **new_X2 = new_matrix2(cnt, 3);
+	memcpy(new_X2, X2, 3 * (cnt - 1) * sizeof(double));
+	memcpy(new_X2[cnt-1], x, 3 * sizeof(double));
+	free(X2);
+	X2 = new_X2;
+	//add_matrix_ros(X2, cnt, 3);
+
+	double **new_Q2 = new_matrix2(cnt, 4);
+	memcpy(new_Q2, Q2, 4 * (cnt - 1) * sizeof(double));
+	memcpy(new_Q2[cnt-1], q, 4 * sizeof(double));
+	free(Q2);
+	Q2 = new_Q2;
+
+	safe_realloc(W2, cnt, double);
+	W2[cnt-1] = 1;
+	
+	add_matrix_row(C_obs2, cnt, params->num_correspondences);
+	// Keep typing, line 460. Redo lines above to use realloc
+      }
+      
+      // NOTE(sanja): this can probably be done faster with careful callocing
+      free_matrix2(tmpX);
+      free_matrix2(tmpXT);
+      free_matrix2(tmpQ);
+      free_matrix2(tmpQT);
+      free_matrix2(X2);
+      free_matrix2(Q2);
+    }
+    free(x);
+    free(q);
   }
 
   // cleanup
@@ -2144,7 +2272,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   free_matrix2i(C_obs);
   free_matrix2i(C_model);
   free_matrix2i(C_issift);
-
+  */
   // pack return value
   olf_pose_samples_t *pose_samples;
   safe_calloc(pose_samples, 1, olf_pose_samples_t);
@@ -2154,6 +2282,25 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   pose_samples->n = num_samples;
 
   return pose_samples;
+}
+
+void get_point(double p[3], pcd_t *pcd, int idx) {
+  int i;
+  for (i = 0; i < 3; ++i) {
+    p[i] = pcd->points[i][idx];
+  }
+}
+void get_normal(double p[3], pcd_t *pcd, int idx) {
+  int i;
+  for (i = 0; i < 3; ++i) {
+    p[i] = pcd->normals[i][idx];
+  }
+}
+void get_shape(double p[33], pcd_t *pcd, int idx) {
+  int i;
+  for (i = 0; i < 33; ++i) {
+    p[i] = pcd->shapes[i][idx];
+  }
 }
 
 int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev, int n_model_prev, double* model_pmf, pcd_t *pcd_model) {
@@ -2170,9 +2317,15 @@ int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev,
     short *tmp = ismemberi(&c_model, c_model_prev, 1, n_model_prev);
     if (!tmp[0]) {
     // check if normals are pointing towards camera
-      transpose(tmp_transposed, &(pcd_model->normals[c_model]), 1, 3); 
+      double *p;
+      safe_calloc(p, 3, double);
+      get_normal(p, pcd_model, c_model);
+      transpose(tmp_transposed, &p, 1, 3); 
       matrix_mult(n, R, tmp_transposed, 3, 3, 1);
-      transpose(tmp_transposed, &(pcd_model->points[c_model]), 1, 3);
+      p[0] = pcd_model->points[0][c_model];
+      p[1] = pcd_model->points[1][c_model];
+      p[2] = pcd_model->points[2][c_model];
+      transpose(tmp_transposed, &p, 1, 3);
       matrix_mult(xyz, R, tmp_transposed, 3, 3, 1);
       if (dot(n[0], xyz[0], 3) < 0) {
 	break;
@@ -2199,10 +2352,15 @@ int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, 
 
   double **n = new_matrix2(3, 1);
   double **tmp_transposed = new_matrix2(3, 1);
-  transpose(tmp_transposed, &(pcd_model->points[model]), 1, 3); 
+  double *p;
+  safe_calloc(p, 3, double);
+  get_point(p, pcd_model, model);
+  transpose(tmp_transposed, &p, 1, 3); 
   matrix_mult(n, R, tmp_transposed, 3, 3, 1);
   matrix_add(mp_pos, n, input_transposed, 3, 1);
-  transpose(input_transposed, &(pcd_model->normals[model]), 1, 3);
+
+  get_normal(p, pcd_model, model);
+  transpose(input_transposed, &p, 1, 3);
   matrix_mult(mp_norm, R, input_transposed, 3, 3, 1);
   memcpy(mp_shapes[0], pcd_model->shapes[model], shape_length);
 
@@ -2230,14 +2388,12 @@ int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, 
   reorder_rows(nn_obs, obs_fxyzn, nn_idx, shape_length + 6, pcd_model->num_points);
   matrix_sub(query, query, nn_obs, shape_length + 6, params->knn);
   matrix_pow(query, query, shape_length + 6, params->knn, 2);
-  double p[params->knn];
-  matrix_sum(p, query, shape_length + 6, params->knn);
+
+  double s[params->knn];
+  matrix_sum(s, query, shape_length + 6, params->knn);
   
-  for (i = 0; i < params->knn; ++i) {
-    p[i] = exp(-.5 * p[i] / (params->f_sigma * params->f_sigma));
-  }
-  double p_sum = sum(p, params->knn);
-  mult(p, p, 1 / p_sum, params->knn);
+  exp_vec(s,s, params->knn, params->f_sigma);
+  norm(s, params->knn);
   
   free_matrix2(input_transposed);
   free_matrix2(R);
@@ -2247,7 +2403,9 @@ int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, 
   free_matrix2(n);
   free_matrix2(tmp_transposed);
  
-  return nn_idx[pmfrand(p, 1)];
+  int ret_idx = nn_idx[pmfrand(s, 1)];
+  free(s);
+  return ret_idx;
 }
 
 // Compute x and p(q|x) by combining Bingham distributions from least-squares
@@ -2258,12 +2416,10 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
   // shift point cloud centroids to the origin
   double **points_obs = new_matrix2(n, 3);
   double **points_model = new_matrix2(n, 3);
-  int i, j;
+  int i;
   for (i = 0; i < n; ++i) {
-    for (j = 0; j < 3; ++j) {
-      points_obs[i][j] = pcd_obs->points[i][j];
-      points_model[i][j] = pcd_model->points[i][j];
-    }
+    get_point(points_obs[i], pcd_obs, i);
+    get_point(points_model[i], pcd_model, i);
   }
   double *mean_obs, *mean_model;
   safe_malloc(mean_obs, 3, double);
@@ -2294,8 +2450,8 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
   for (i = 0; i < n; ++i) {
     v_obs = points_obs[i];
     v_model = points_obs[i];
-    vector_to_possible_quaternion(v_obs, q_obs);
-    vector_to_possible_quaternion(v_model, q_model);
+    vector_to_possible_quaternion(q_obs, v_obs);
+    vector_to_possible_quaternion(q_model, v_model);
     double k = norm(v_obs, 3) * norm(v_model, 3) / (xyz_sigma * xyz_sigma);
     B->d = 4;
     safe_malloc(B->Z, 3, double);
@@ -2322,7 +2478,7 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
       bingham_t **B_array;
       safe_malloc(B_array, i, bingham_t*);
       memcpy(B_array, B_olf, i * sizeof(bingham_t*));
-      bingham_mult_vec(B_olf_tot, {B_olf[1:ii-1], B_flipped}); // NOTE(sanja): to be implemented/fixed
+      //bingham_mult_vec(B_olf_tot, {B_olf[1:ii-1], B_flipped}); // NOTE(sanja): to be implemented/fixed
       if (fabs(prod(B_olf_tot_flipped.Z, 3)) > abs(prod(B_olf_tot.Z, 3))) {
 	bingham_copy(&B_olf[i], &B_flipped);
       }
@@ -2332,7 +2488,7 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     }
   }  
   
-  bingham_mult_vec(B, {B_ls, B_olf});
+  //bingham_mult_vec(B, {B_ls, B_olf});
 
   free_matrix2(points_obs);
   free_matrix2(points_model);
@@ -2343,9 +2499,10 @@ void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingha
   double **R = new_matrix2(3,3);
   int i;
   for (i = 0; i < c; ++i) {
-    mu[0] = pcd_model->points[c_model[i]][0];
-    mu[1] = pcd_model->points[c_model[i]][1];
-    mu[2] = pcd_model->points[c_model[i]][2];
+    
+    mu[0] += pcd_model->points[0][c_model[i]];
+    mu[1] += pcd_model->points[1][c_model[i]];
+    mu[2] += pcd_model->points[2][c_model[i]];
   }
   mult(mu, mu, 1/c, 3);
   
@@ -2369,10 +2526,8 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   double **xyz_model = new_matrix2(n, 3);
   int i, j;
   for (i = 0; i < n; ++i) {
-    for (j = 0; j < 3; ++j) {
-      xyz_obs[i][j] = pcd_obs->points[i][j];
-      xyz_model[i][j] = pcd_model->points[i][j];
-    }
+    get_point(xyz_obs[i], pcd_obs, i);
+    get_point(xyz_model[i], pcd_model, i);
   }
   
   // compute the least squares likelihood
@@ -2401,7 +2556,10 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   double logp_fpfh = 0;
   if (f_sigma > 0) {
     for (i = 0; i < n; ++i) {
-      double tmp = sum(pcd_obs->shapes[i], 33) - sum(pcd_model->shapes[i], 33);
+      double p[33], q[33];
+      get_shape(p, pcd_obs, i);
+      get_shape(q, pcd_model, i);
+      double tmp = sum(p, 33) - sum(q, 33);
       tmp *= tmp;
       logp_fpfh += log(normpdf(sqrt(tmp), 0, f_sigma));
     }
@@ -2413,7 +2571,7 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   if (dispersion_weight > 0) {
     double *vars;
     safe_malloc(vars, n, double);
-    variance(vars, xyz_model, n); //NOTE(sanja): This is NOT! implemented
+    //    variance(vars, xyz_model, n); //NOTE(sanja): This is NOT! implemented
     logp_disp = log(dispersion_weight * sum(vars, n));
   }
 
@@ -2427,28 +2585,66 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   free_matrix2(xyz_model);
 }
 
-int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, scope_params_t *params, double *x, double *q, int c2_obs, int sample_nn, int use_f) {
+int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_fxyzn, scope_params_t *params, struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index, double *x, double *q, int c2_obs, int sample_nn, int use_f) {
   double **inv_R_model = new_matrix2(3, 3);
   quaternion_to_rotation_matrix(inv_R_model, q);
   inv(inv_R_model, inv_R_model, 3);
 
   double xyz_obs_point2[3];
-  memcpy(xyz_obs_point2, pcd_obs->points[c2_obs], 3 * double);
-  sub(xyz_obs_points2, xyz_obs_points2, x, 3);
-  matrix_vec_mult(xyz_obs_points2, inv_R_model, xyz_obs_points2, 3, 3);
+  get_point(xyz_obs_point2, pcd_obs, c2_obs);
+  sub(xyz_obs_point2, xyz_obs_point2, x, 3);
+  matrix_vec_mult(xyz_obs_point2, inv_R_model, xyz_obs_point2, 3, 3);
 
   double nxyz_obs_point2[3];
-  memcpy(nxyz_obs_point2, pcd_obs->normals[c2_obs], 3 * double);
-  matrix_vec_mult(nxyz_obs_points2, inv_R_model, nxyz_obs_points2, 3, 3);
+  get_normal(nxyz_obs_point2, pcd_obs, c2_obs);
+  matrix_vec_mult(nxyz_obs_point2, inv_R_model, nxyz_obs_point2, 3, 3);
   
   // look for k-NN in xyz-normal space
-  double **xyzn_query = new_matrix2(2, 3);
-  mult(xyzn_query[0], xyz_obs_point2, params->xyz_weight, 3);
-  mult(xyzn_query[1], nxyz_obs_point2, params->normal_weight, 3);
+  double xyzn_query[6];
+  mult(xyzn_query, xyz_obs_point2, params->xyz_weight, 3);
+  mult(xyzn_query+3, nxyz_obs_point2, params->normal_weight, 3);
   
-
+  int nn_idx[params->knn];
+  double dists[params->knn];
+  flann_find_nearest_neighbors_index_double(model_xyzn_index, xyzn_query, 1, nn_idx, dists, params->knn, model_xyzn_params);
+  
+  int c2_model;
   if (!use_f) {
-    
+    if (sample_nn) {
+      c2_model = nn_idx[0];
+    } else {
+      double p[params->knn];
+      exp_vec(p, dists, params->knn, params->f_sigma);
+      norm(p, params->knn);
+      c2_model = nn_idx[pmfrand(p, 1) - 1]; // NOTE(sanja): should we have -1? I added it because matlab is 1-indexed
+    }
+  }
+  
+  // then compute full feature distance on just those k-NN
+  double query[39];
+  int i, j;
+  double d2[params->knn];
+  double tmp[params->knn];
+  for (i = 0; i < params->knn; ++i) {
+    get_shape(query, pcd_obs, c2_obs);
+    for (j = 0; j < 3; ++j) {
+      query[33 + j] = params->xyz_weight * xyz_obs_point2[i];
+      query[36 + j] = params->normal_weight * nxyz_obs_point2[i];
+    }
+    sub(tmp, query, model_fxyzn[nn_idx[i]], 39);
+    vmult(tmp, tmp, tmp, 39);
+    d2[i] = sum(tmp, 39);
+  }
+  
+  if (sample_nn) {
+    c2_model = find_min(d2, params->knn);
+    c2_model = nn_idx[c2_model];
+  } else {
+    double p[params->knn];
+    exp_vec(p, d2, params->knn, params->f_sigma);
+    norm(p, params->knn);
+    c2_model = nn_idx[pmfrand(p, 1) - 1];
   }
 
+  return c2_model;
 }
