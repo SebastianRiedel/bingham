@@ -51,6 +51,7 @@ double erfinv(double x);                                /* approximation to the 
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 int pmfrand(double *w, int n);                          /* samples from the probability mass function w with n elements */
+void exp_vec(double *y, double *x, int n, double sigma);
 
 void mvnrand(double *x, double *mu, double **S, int d);   /* sample from a multivariate normal */
 double mvnpdf(double *x, double *mu, double **S, int d);  /* compute a multivariate normal pdf */
@@ -72,6 +73,8 @@ double sum(double x[], int n);                                        /* compute
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double max(double x[], int n);                                        /* computes the max of x */
 double min(double x[], int n) ;                                       /* computes the min of x */
+int find_max(double x[], int n);                                      /* returns index of the max of x */
+int find_min(double x[], int n);                                      /* returns index of the min of x */
 int imax(int x[], int n);                                             /* computes the max of x */
 int imin(int x[], int n) ;                                            /* computes the min of x */
 double norm(double x[], int n);                                       /* computes the norm of x */
@@ -83,6 +86,7 @@ void cross4d(double w[4], double x[4], double y[4], double z[4]);     /* takes t
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */
+void vec_func(double y[], double x[], double n, double (*f)(double)); /* applies a function that takes double and returns a double to every element of the array (e.g. fabs, acos, etc.) */
 void normalize(double y[], double x[], int n);                        /* sets y = x/norm(x) */
 void normalize_pmf(double y[], double x[], int n);                    /* sets y = x/sum(x) */
 void vmult(double z[], double x[], double y[], int n);                /* multiplies two vectors, z = x.*y */
@@ -97,7 +101,7 @@ void rotation_matrix_to_quaternion(double *q, double **R);            /* convert
 void quaternion_to_rotation_matrix(double **R, double *q);            /* convert a unit quaternion to a rotation matrix */
 int find_first_non_zero(double *v, int n);                            /* Finds an index of the first non-zero element. Returns -1 if none is found */
 void orthogonal_vector(double *w, double *v, int n);                  /* finds a unit vector orthogonal to v */
-void vector_to_possible_quaternion(double *v, double *q);             /* compute one possible quaternion rotation which takes [1,0,0] to v */
+void vector_to_possible_quaternion(double *q, double *v);             /* compute one possible quaternion rotation which takes [1,0,0] to v */
 short *ismember(double *A, double *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
 short *ismemberi(int *A, int *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
 
@@ -105,8 +109,9 @@ double **new_matrix2(int n, int m);                                         /* c
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
 double **new_identity_matrix2(int n);                                /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                  /* create a new n-by-n 2d indetity matrix of ints */
+void add_matrix_row(double **X, int n, int m);                             /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
-double **new_diag_matrix2i(int *diag, int n);
+int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
 void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
 void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
@@ -121,6 +126,7 @@ void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* m
 void matrix_sub(double **Z, double **X, double **Y, int n, int m);          /* matrix subtaction, Z = X-Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
 void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* matrix-vector multiplication, y = A*x */
+void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);     /* element-wise multiplication, Z[i][j] = X[i][j] * Y[i][j] */
 void matrix_pow(double **Y, double **X, int n, int m, double pw);           /* taking every element of a matrix to the power of pw */ 
 void matrix_sum(double y[], double **X, int n, int m);                      /* sums the columns of the matrix */
 void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
