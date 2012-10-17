@@ -1893,8 +1893,10 @@ void reorder_rows(double **Y, double **X, int *idx, int n, int m)
   double **Y2 = (X==Y ? new_matrix2(n,m) : Y);
   for (i = 0; i < n; i++)
     memcpy(Y2[i], X[idx[i]], m*sizeof(double));
-  if (X==Y)
+  if (X==Y) {
+    matrix_copy(Y, Y2, n, m);
     free_matrix2(Y2);
+  }
 }
 
 void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m) {

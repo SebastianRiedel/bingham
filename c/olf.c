@@ -1794,27 +1794,22 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   return score;
 }
 
-void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int good_pose_idx[], int great_pose_idx[], int *num_good_poses, int *num_great_poses) {
-  double tmp[3];
-  short good_pose, great_pose;
+void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int good_pose_idx[], int great_pose_idx[], int *num_good_poses, int *num_great_poses)
+{
   *num_good_poses = 0;
   *num_great_poses = 0;
   int i;
+  double dx[3];
   for (i = 0; i < n; ++i) {
-    sub(tmp, X[i], true_pose->X, 3);
-    double vector_norm = norm(tmp, 3);
-    good_pose = vector_norm < 0.05;
-    double dot_product = dot(Q[i], true_pose->Q, 4);
-    good_pose = good_pose && (dot_product < M_PI / 8.0);
-    if (good_pose) {
+    sub(dx, X[i], true_pose->X, 3);
+    double dq = acos(fabs(dot(Q[i], true_pose->Q, 4)));
+    int good_pose = (norm(dx,3) < 0.05) && (dq < M_PI/8.0);
+    int great_pose = (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
+    if (good_pose)
       good_pose_idx[(*num_good_poses)++] = i;
-    }
-    great_pose = vector_norm < 0.025;
-    great_pose = great_pose && (dot_product < M_PI / 16.0);
-    if (great_pose) {
+    if (great_pose)
       great_pose_idx[(*num_great_poses)++] = i;
-    }    
-  } 
+  }
 }
 
 
@@ -1978,8 +1973,11 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     }
 
     //dbug
-    //X[i][0] = 0.0045;  X[i][1] = 0.0761;  X[i][2] = 0.9252;
-    //Q[i][0] = 0.5132;  Q[i][1] = 0.6698;  Q[i][2] = 0.4644;  Q[i][3] = -0.2690;
+    //X[i][0] = -0.0582;  X[i][1] = 0.1276;  X[i][2] = 0.8643;
+    //Q[i][0] = -0.6324;  Q[i][1] = 0.3771;  Q[i][2] = -0.0899;  Q[i][3] = 0.6707;
+    //memcpy(X[i], true_pose->X, 3*sizeof(double));
+    //memcpy(Q[i], true_pose->Q, 4*sizeof(double));
+    //X[i][2] += .02;
 
     // score hypothesis
     //W[i] = 1.0;
@@ -1990,7 +1988,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
   int num_good_poses = 0;
   int num_great_poses = 0;
-  // NOTE(sanja): malloc and realloc after we are done will take some time and we won't waste a whole lot of memory if we just allocate num_samples_init in advance. We can change this if it is a problem later.
+  // NOTE(sanja): malloc and realloc after we are done will take some time and we won't waste a whole lot of memory if we
+  // just allocate num_samples_init in advance. We can change this if it is a problem later.
   int good_pose_idx[num_samples_init], great_pose_idx[num_samples_init];
   if (have_true_pose) {
     get_good_poses(true_pose, num_samples_init, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
@@ -1998,15 +1997,26 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     printf("Found %d/%d great poses after 1 correspondence\n", num_great_poses, num_samples_init);
   }
 
+  /*dbug
+  double *gx = X[great_pose_idx[0]];
+  double *gq = Q[great_pose_idx[0]];
+  printf("first great pose (w=%f): x = [%.2f %.2f %.2f], q = [%.2f %.2f %.2f %.2f]\n", W[great_pose_idx[0]], gx[0], gx[1], gx[2], gq[0], gq[1], gq[2], gq[3]);
+  for (i = 0; i < num_samples_init; i++) {
+    memcpy(X[i], gx, 3*sizeof(double));
+    memcpy(Q[i], gq, 4*sizeof(double));
+  }
+  */
 
   // sort hypotheses
   int idx[num_samples_init];
   sort_indices(W, idx, num_samples_init);  // smallest to biggest
+
   for (i = 0; i < num_samples_init/2; i++) {  // reverse idx (biggest to smallest)
     int tmp = idx[i];
     idx[i] = idx[num_samples_init - i - 1];
     idx[num_samples_init - i - 1] = tmp;
   }
+
   int num_samples = params->num_samples;
   reorder_rows(X, X, idx, num_samples, 3);
   reorder_rows(Q, Q, idx, num_samples, 4);
