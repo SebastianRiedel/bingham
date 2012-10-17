@@ -36,7 +36,7 @@ extern "C" {
     double **data;    // e.g. data[0] = {x1,x2,x3}, data[1] = {y1,y2,y3}, etc.
 
     // data pointers
-    double **points;
+    double **points;  // x_i: points[0][i], y_i: points[1][i], 
     double **colors;
     double **normals;
     double **principal_curvatures;
