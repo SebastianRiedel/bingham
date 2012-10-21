@@ -1477,13 +1477,18 @@ void matrix_sub(double **Z, double **X, double **Y, int n, int m)
 // matrix multiplication, Z = X*Y, where X is n-by-p and Y is p-by-m
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m)
 {
+  double **Z2 = (Z==X || Z==Y ? new_matrix2(n,m) : Z);
   int i, j, k;
   for (i = 0; i < n; i++) {     // row i
     for (j = 0; j < m; j++) {   // column j
-      Z[i][j] = 0;
+      Z2[i][j] = 0;
       for (k = 0; k < p; k++)
-	Z[i][j] += X[i][k]*Y[k][j];
+	Z2[i][j] += X[i][k]*Y[k][j];
     }
+  }
+  if (Z==X || Z==Y) {
+    matrix_copy(Z, Z2, n, m);
+    free_matrix2(Z2);
   }
 }
 
