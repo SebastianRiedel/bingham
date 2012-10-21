@@ -2095,7 +2095,8 @@ void bingham_invert_3d(bingham_t *B_inv, bingham_t *B) {
   double diag[4] = {1, -1, -1, -1};
   double **H = new_diag_matrix2(diag, 4);
   B_inv->V = new_matrix2(4, 4);
-  matrix_mult(B_inv->V, H, B->V, 4, 4, 4);
+  double B_V[4][3], B_inv_V[4][3];
+  matrix_mult(B_inv->V, B->V, H, 3, 4, 4); // (AB)^T = B^T * A^T
 }
 
 /*void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants) {
