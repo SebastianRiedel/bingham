@@ -1638,7 +1638,7 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 
 double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
 			     range_image_t *obs_fg_range_image, double **obs_xyzn, flann_index_t obs_xyzn_index,
-			     struct FLANNParameters *obs_xyzn_params, scope_params_t *params)
+			     struct FLANNParameters *obs_xyzn_params, kdtree_t *obs_xyzn_kdtree, scope_params_t *params)
 {
   int i, j;
 
@@ -1723,8 +1723,8 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       query[j+3] = normal_weight * cloud_normals[i][j];
     }
     int search_radius = 5;  // pixels
-    //range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
-    flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
+    range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
+    //flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
     //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
     //nn_d2[i] = dist2(query, obs_xyzn[nn_idx[i]], 6);
   }
@@ -1930,8 +1930,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
   flann_index_t model_fsurf_index = flann_build_index_double(model_fsurf[0], pcd_model->num_points, 35, &speedup, &model_fsurf_params);
 
-  //printf("Building kdtrees\n");
-  //kdtree_t *obs_xyzn_kdtree = kdtree(obs_xyzn, pcd_obs->num_points, 6);
+  printf("Building kdtrees\n");
+  kdtree_t *obs_xyzn_kdtree = kdtree(obs_xyzn, pcd_obs->num_points, 6);
 
 
   // create correspondences and pose data structures
@@ -1983,7 +1983,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     //W[i] = 1.0;
     //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_xyzn, params);
     //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
-    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, params);
+    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
   }
 
   int num_good_poses = 0;
@@ -2141,7 +2141,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
       safe_realloc(logp_comp, 5, double);
       
-      logp_new =  model_placement_score(x, q, pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, params);
+      logp_new =  model_placement_score(x, q, pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
       // model_range_image_likelihood(pcd_model, pcd_obs, obs_range_image, obs_xyzn_index, x, q, params->num_validation_points, &logp_new, logp_new_comp); // This should be model_placement_score
       logp_comp[4] = params->range_weight * logp_new;
       logp = sum(logp_comp, 5);
@@ -2279,7 +2279,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_free_index(obs_xyzn_index, &obs_xyzn_params);
   flann_free_index(model_xyzn_index, &model_xyzn_params);
   flann_free_index(model_fsurf_index, &model_fsurf_params);
-  //kdtree_free(obs_xyzn_kdtree);
+  kdtree_free(obs_xyzn_kdtree);
   free_matrix2i(C_obs);
   free_matrix2i(C_model);
   free_matrix2i(C_issift);
@@ -2422,7 +2422,8 @@ int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, 
 // alignment (LS) with Bingham distributions from OLFs.  The tuple (x,q)
 // where q is sampled from B indicates that one should rotate pcd_model(c_model)
 // about its centroid by q, then shift by x.
-void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int n, int *c_model, double xyz_sigma, double *x, bingham_t *B) {
+void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int n, int *c_model, double xyz_sigma, double *x, bingham_t *B)
+{
   // shift point cloud centroids to the origin
   double **points_obs = new_matrix2(n, 3);
   double **points_model = new_matrix2(n, 3);
@@ -2431,10 +2432,7 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     get_point(points_obs[i], pcd_obs, i);
     get_point(points_model[i], pcd_model, i);
   }
-  double *mean_obs, *mean_model;
-  safe_malloc(mean_obs, 3, double);
-  safe_malloc(mean_model, 3, double);
-  
+  double mean_obs[3], mean_model[3];
   mean(mean_obs, points_obs, n, 3);
   mean(mean_model, points_model, n, 3);
   sub(x, mean_obs, mean_model, 3);
@@ -2445,11 +2443,7 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
   }
 
   // compute LS and OLF Bingham distributions for each point correspondence
-  double *v_obs, *v_model, *q_obs, *q_model;
-  /*safe_malloc(v_obs, 3, double);
-    safe_malloc(v_model, 3, double); */
-  safe_malloc(q_obs, 4, double);
-  safe_malloc(q_model, 4, double);
+  double q_obs[4], q_model[4];
 
   bingham_t B_ls[n];
   bingham_t B_olf[n];
@@ -2460,12 +2454,11 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
   bingham_t B_feature_to_model, B_model_to_feature;
   bingham_alloc(&B_feature_to_model, 4);
   bingham_alloc(&B_model_to_feature, 4);
-  double *q_inv, *q_feature_to_world;
-  safe_malloc(q_inv, 4, double);
+  double q_inv[4], *q_feature_to_world;
 
   for (i = 0; i < n; ++i) {
-    v_obs = points_obs[i];
-    v_model = points_obs[i];
+    double *v_obs = points_obs[i];
+    double *v_model = points_obs[i];
     vector_to_possible_quaternion(q_obs, v_obs);
     vector_to_possible_quaternion(q_model, v_model);
     double k = norm(v_obs, 3) * norm(v_model, 3) / (xyz_sigma * xyz_sigma);
@@ -2473,14 +2466,8 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     B->Z[0] = -2 * k;
     B->Z[1] = -2 * k;
     B->Z[2] = 0;
-    double tmp_V[3][4] =  {{0, 0, 1, 0}, {0, 0, 0, 1}, {0, 1, 0, 0}}; // Transpose of {{0, 0, 0}, {0, 0, 1}, {1, 0, 0}, {0, 1, 0}};
-    int ii, jj;
-    for (ii = 0; ii < 3; ++ii) {
-      for (jj = 0; jj < 4; ++jj) {
-	B->V[ii][jj] = tmp_V[ii][jj];
-      }
-    }
-    //memcpy(B->V, &tmp_V, 12 * sizeof(double));
+    double tmp_V[12] = {0, 0, 1, 0,   0, 0, 0, 1,   0, 1, 0, 0};
+    memcpy(B->V[0], tmp_V, 12*sizeof(double));
     quaternion_inverse(q_inv, q_model);
     bingham_pre_rotate_3d(B, B, q_inv);
     bingham_post_rotate_3d(&B_ls[i], B, q_obs);
@@ -2492,31 +2479,27 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
 
     // greedy check for principal curvature flips
     if (i > 1) {
-      bingham_t B_flipped, B_olf_tot, B_olf_tot_flipped;
-      bingham_post_rotate_3d(&B_flipped, &B_model_to_feature, pcd_obs->quaternions[1][c_obs[i]]);
-      
-      bingham_t **B_array;
-      safe_malloc(B_array, i, bingham_t*);
-      memcpy(B_array, B_olf, i * sizeof(bingham_t*));
-      //bingham_mult_vec(B_olf_tot, {B_olf[1:ii-1], B_flipped}); // NOTE(sanja): to be implemented/fixed
-      if (fabs(prod(B_olf_tot_flipped.Z, 3)) > abs(prod(B_olf_tot.Z, 3))) {
-	bingham_copy(&B_olf[i], &B_flipped);
-      }
-      bingham_free(&B_flipped);
-      bingham_free(&B_olf_tot);
-      bingham_free(&B_olf_tot_flipped);
+      bingham_mult_array(B, B_olf, i, 0);  // compute product of B_olf[]
+      double z_prod_orig = fabs(prod(B->Z, 3));
+      bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, pcd_obs->quaternions[1][c_obs[i]]);
+      bingham_mult_array(B, B_olf, i, 0);  // compute product of B_olf[] with B_olf[i] flipped
+      double z_prod_flipped = fabs(prod(B->Z, 3));
+      if (z_prod_orig > z_prod_flipped)
+	bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, q_feature_to_world);  // revert to original
     }
   }  
-  
-  //bingham_mult_vec(B, {B_ls, B_olf});
 
+  bingham_t B_array[2*n];  // {B_ls, B_olf}
+  memcpy(B_array, B_ls, n*sizeof(bingham_t));
+  memcpy(&B_array[n], B_olf, n*sizeof(bingham_t));
+  bingham_mult_array(B, B_array, 2*n, 1);
+  
   for (i = 0; i < n; ++i) {
     bingham_free(&B_ls[i]);
     bingham_free(&B_olf[i]);
   }
   bingham_free(&B_feature_to_model);
   bingham_free(&B_model_to_feature);
-  
 
   free_matrix2(points_obs);
   free_matrix2(points_model);

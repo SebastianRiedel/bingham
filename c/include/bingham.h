@@ -72,6 +72,7 @@ void bingham_sample_pmf(double **X, bingham_pmf_t *pmf, int n);
 void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh);
 void bingham_cluster(bingham_mix_t *BM, double **X, int n, int d);
 void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2);
+void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F);
 void print_bingham(bingham_t *B);
 
 void bingham_pre_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q); 
