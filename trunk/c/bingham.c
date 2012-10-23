@@ -1752,6 +1752,67 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
 
 
 /*
+ * Multiplies an array of bingham distributions.  Assumes B is already allocated.
+ */
+void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F)
+{
+  int i, j, k;
+  int d = B_array[0].d;
+
+  B->d = d;
+
+  double **C = new_matrix2(d, d);   // C = 0
+  double **C2 = new_matrix2(d, d);
+
+  double **v;
+  double *vt[d];
+
+  // compute C
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < d-1; j++) {
+      v = &B_array[i].V[j];
+      for (k = 0; k < d; k++)
+	vt[k] = &v[0][k];
+      matrix_mult(C2, vt, v, d, 1, d);
+      mult(C2[0], C2[0], B_array[i].Z[j], d*d);
+      matrix_add(C, C, C2, d, d);
+    }
+  }
+
+  // compute the principal components of C
+  double z[d];
+  double **V = C2;  // save an alloc
+  eigen_symm(z, V, C, d);
+  //matrix_copy(B->V, V, d-1, d);
+  for (i = 0; i < d-1; i++)
+    for (j = 0; j < d; j++)
+      B->V[i][j] = V[d-1-i][j];  //V[j][d-1-i];
+
+  // set the smallest z[i] (in magnitude) to zero
+  for (i = 0; i < d-1; i++)
+    B->Z[i] = MAX(z[d-1-i] - z[0], BINGHAM_MIN_CONCENTRATION);
+
+  if (compute_F) {
+    // lookup F
+    if (d == 4)
+      B->F = bingham_F_lookup_3d(B->Z);
+    else if (d == 3)
+      B->F = bingham_F_2d(B->Z[0], B->Z[1]);
+    else if (d == 2)
+      B->F = bingham_F_1d(B->Z[0]);
+    else {
+      fprintf(stderr, "Error: bingham_mult_array() only supports 1D, 2D, and 3D binghams.\n");
+      B->F = 0;
+    }
+  }
+
+  free_matrix2(C);
+  free_matrix2(C2);
+}
+
+
+
+/*
  * Add two bingham mixtures (dst += src)
  */
 void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src)
@@ -2072,31 +2133,40 @@ void print_bingham(bingham_t *B)
   }
 }
 
-void bingham_pre_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q) {
+// Assumes B_rot is already allocated
+void bingham_pre_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q)
+{
   if (B_rot != B) {
-    bingham_copy(B_rot, B);
+    B_rot->F = B->F;
+    memcpy(B_rot->Z, B->Z, 3*sizeof(double));
   }
   quaternion_mult(B_rot->V[0], B->V[0], q);
   quaternion_mult(B_rot->V[1], B->V[1], q);
   quaternion_mult(B_rot->V[2], B->V[2], q);
 }
 
-void bingham_post_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q) {
+// Assumes B_rot is already allocated
+void bingham_post_rotate_3d(bingham_t *B_rot, bingham_t *B, double *q)
+{
   if (B_rot != B) {
-    bingham_copy(B_rot, B);
+    B_rot->F = B->F;
+    memcpy(B_rot->Z, B->Z, 3*sizeof(double));
   }
   quaternion_mult(B_rot->V[0], q, B->V[0]);
   quaternion_mult(B_rot->V[1], q, B->V[1]);
   quaternion_mult(B_rot->V[2], q, B->V[2]);
 }
 
-void bingham_invert_3d(bingham_t *B_inv, bingham_t *B) {
-  bingham_copy(B_inv, B);
-  double diag[4] = {1, -1, -1, -1};
-  double **H = new_diag_matrix2(diag, 4);
-  B_inv->V = new_matrix2(4, 4);
-  double B_V[4][3], B_inv_V[4][3];
-  matrix_mult(B_inv->V, B->V, H, 3, 4, 4); // (AB)^T = B^T * A^T
+// Assumes B_inv is already allocated
+void bingham_invert_3d(bingham_t *B_inv, bingham_t *B)
+{
+  if (B_inv != B) {
+    B_inv->F = B->F;
+    memcpy(B_inv->Z, B->Z, 3*sizeof(double));
+  }
+  quaternion_inverse(B_inv->V[0], B->V[0]);
+  quaternion_inverse(B_inv->V[1], B->V[1]);
+  quaternion_inverse(B_inv->V[2], B->V[2]);
 }
 
 /*void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants) {
