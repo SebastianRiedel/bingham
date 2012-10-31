@@ -2075,12 +2075,13 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     safe_malloc(c_model_new, c, int);
 
     for (i = 0; i < num_samples * params->branching_factor; ++i) {
+      bingham_alloc(&B_full[i], 4);
       // sample a new model point, given model pose
       int *C_model_prev;
-      safe_malloc(C_model_prev, c-1, int);
+      safe_malloc(C_model_prev, c, int);
       memcpy(C_model_prev, C_model[i], c * sizeof(int));
       
-      C_model[i][c] = sample_model_point_given_model_pose(X[i], Q[i], C_model_prev, c-1, model_pmf, pcd_model);
+      C_model[i][c] = sample_model_point_given_model_pose(X[i], Q[i], C_model_prev, c, model_pmf, pcd_model);
 
       // sample an observed point corresponding to c2_model given the model pose
       C_obs[i][c] = sample_obs_correspondence_given_model_pose(X[i], Q[i], C_model[i][c], pcd_model, 33, obs_fxyzn, obs_xyzn_index, &obs_xyzn_params, params); // NOTE(sanja): what is olf->shape_length in this function?
@@ -2094,25 +2095,22 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       double *x0;
       safe_malloc(x0, 3, double);
 
-      // FIX: Lacks Bingham multiplication of Bingham vector
       get_model_pose_distribution_from_correspondences(pcd_obs, pcd_model, c_obs, c, c_model, params->xyz_sigma, x0, &B);
       double *x, *q;
       safe_malloc(x, 3, double);
       safe_malloc(q, 4, double);
       sample_model_pose(pcd_model, c_model, c, x0, &B, x, q);
-      B_full[i] = B;
+      bingham_copy(&B_full[i], &B);
 
       double *x_new, *q_new;
       safe_malloc(x_new, 3, double);
       safe_malloc(q_new, 4, double);
-
 
       double logp, logp_new;
       double *logp_comp, *logp_new_comp;
       safe_malloc(logp_comp, 4, double);
       safe_malloc(logp_new_comp, 4, double);
       if (params->do_icp) {
-	// FIX: lacks variance calculation of a vector
 	model_pose_likelihood(pcd_obs, pcd_model, c_obs, c_model, c, x, q, &B, params->xyz_sigma, -1, -1, &logp, logp_comp); // NOTE(sanja): are two -1's overrides of the default params?
 	int k;
 	for (k = 0; k < 20; ++k) {
@@ -2121,17 +2119,20 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, model_fxyzn, params, &model_xyzn_params, model_xyzn_index, x, q, c_obs[j], 1, 0); //sample nn, no fpfh
 	  }
 	  
-	  bingham_free(&B); //NOTE(sanja): This is all messed up with bingham allocations/freeing
+	  bingham_free(&B);
+	  bingham_alloc(&B, 4);
 	  get_model_pose_distribution_from_correspondences(pcd_obs, pcd_model, c_obs, c, c_model_new, params->xyz_sigma, x0, &B);
 	  sample_model_pose(pcd_model, c_model_new, c, x0, &B, x_new, q_new);
 	  model_pose_likelihood(pcd_obs, pcd_model, c_obs, c_model_new, c, x_new, q_new, &B, params->xyz_sigma, -1, -1, &logp_new, logp_new_comp);
 	  
 	  if (logp_new > logp) {
 	    memcpy(c_model, c_model_new, c*sizeof(int));
+	    free(x);
+	    free(q);
 	    x = x_new;
 	    q = q_new;
 	    logp = logp_new;
-	    B_full[i] = B;
+	    bingham_copy(&B_full[i], &B);
 	  } else {
 	    break;
 	  }
@@ -2152,8 +2153,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       memcpy(Q[i], q, 4 * sizeof(double));
       W[i] = logp;
    
-      free(x_new);
-      free(q_new);
+      free(logp_comp);
+      free(logp_new_comp);
       free(x0);
       free(x);
       free(q);
@@ -2176,6 +2177,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       W2[i] = W[idx[i]];
     free(W);
     W = W2;
+    // FIX: reorder Binghams
     
     num_good_poses = 0;
     num_great_poses = 0;
@@ -2403,7 +2405,7 @@ int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, 
   double s[params->knn];
   matrix_sum(s, query, shape_length + 6, params->knn);
   
-  exp_vec(s,s, params->knn, params->f_sigma);
+  exp_vec(s, s, params->knn, params->f_sigma);
   norm(s, params->knn);
   
   free_matrix2(input_transposed);
@@ -2544,7 +2546,7 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   transpose(R, R, 3, 3); // we won't need R anymore
   matrix_mult(tmp, xyz_model, R, n, 3, 3);
   for (i = 0; i < n; ++i) {
-    for (j = 0; j < n; ++j) {
+    for (j = 0; j < 3; ++j) {
       tmp[i][j] += x[j] - xyz_obs[i][j];
       tmp[i][j] *= tmp[i][j];
     }
@@ -2579,9 +2581,9 @@ void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_
   double logp_disp = 0;
   if (dispersion_weight > 0) {
     double *vars;
-    safe_malloc(vars, n, double);
-    //    variance(vars, xyz_model, n); //NOTE(sanja): This is NOT! implemented
-    logp_disp = log(dispersion_weight * sum(vars, n));
+    safe_malloc(vars, 3, double);
+    variance(vars, xyz_model, n, 3);
+    logp_disp = log(dispersion_weight * sum(vars, 3));
   }
 
   *logp = logp_ls + logp_olf + logp_fpfh + logp_disp;
