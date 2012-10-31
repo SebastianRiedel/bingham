@@ -1905,35 +1905,45 @@ void reorder_rows(double **Y, double **X, int *idx, int n, int m)
 }
 
 void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m) {
-  // double **X = new_matrix2(n * rep_n, m * rep_m);
   int i, rep_i, rep_j;
   for (i = 0; i < n; ++i) {
     for (rep_j = 0; rep_j < rep_m; ++rep_j) {
       memcpy(&B[i][rep_j * m], A[i], m * sizeof(double)); 
     }
   }
-  for (rep_i = 0; rep_i < rep_n; ++rep_i) {
+  for (rep_i = 1; rep_i < rep_n; ++rep_i) {
     memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(double));
   }  
-  //return B;
 }
 
 void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m) {
-  //int **X = new_matrix2i(n * rep_n, m * rep_m);
   int i, rep_i, rep_j;
   for (i = 0; i < n; ++i) {
     for (rep_j = 0; rep_j < rep_m; ++rep_j) {
       memcpy(&B[i][rep_j * m], A[i], m * sizeof(int)); 
     }
   }
-  for (rep_i = 0; rep_i < rep_n; ++rep_i) {
+  for (rep_i = 1; rep_i < rep_n; ++rep_i) {
     memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(int));
   }  
-  //return B;
 }
 
 void variance(double *vars, double **X, int n, int m) {
-  printf("Variance NOT implemented\n");
+  int i, j;
+  for (i = 0; i < m; ++i) {
+    double mean = 0;
+    for (j = 0; j < n; ++j) {
+      mean += X[j][i];
+    }
+    mean /= n;
+    vars[i] = 0;
+    for (j = 0; j < n; ++j) {
+      vars[i] += (X[j][i] - mean) * (X[j][i] - mean);
+    }
+    if (n > 1) {
+      vars[i] /= n - 1;
+    }
+  }
 }
 
 void print_matrix(double **X, int n, int m)
