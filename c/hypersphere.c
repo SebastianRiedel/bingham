@@ -90,7 +90,7 @@ static void octetramesh_to_tessellation(hypersphere_tessellation_t *T, octetrame
   // dimensions
   T->d = 4;
   T->n = T->tetramesh->nt;
-  int i, j, n = T->n, d = T->d;
+  int n = T->n, d = T->d;
 
   // compute cell centroids and volumes
   T->centroids = new_matrix2(n, d);

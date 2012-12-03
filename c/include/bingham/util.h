@@ -51,7 +51,6 @@ double erfinv(double x);                                /* approximation to the 
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 int pmfrand(double *w, int n);                          /* samples from the probability mass function w with n elements */
-void exp_vec(double *y, double *x, int n, double sigma);
 
 void mvnrand(double *x, double *mu, double **S, int d);   /* sample from a multivariate normal */
 double mvnpdf(double *x, double *mu, double **S, int d);  /* compute a multivariate normal pdf */
@@ -75,6 +74,7 @@ double max(double x[], int n);                                        /* compute
 double min(double x[], int n) ;                                       /* computes the min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
+int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
 int imax(int x[], int n);                                             /* computes the max of x */
 int imin(int x[], int n) ;                                            /* computes the min of x */
 double norm(double x[], int n);                                       /* computes the norm of x */
@@ -99,11 +99,10 @@ void quaternion_mult(double z[4], double x[4], double y[4]);          /* quatern
 void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 void quaternion_to_rotation_matrix(double **R, double *q);            /* convert a unit quaternion to a rotation matrix */
-int find_first_non_zero(double *v, int n);                            /* Finds an index of the first non-zero element. Returns -1 if none is found */
-void orthogonal_vector(double *w, double *v, int n);                  /* finds a unit vector orthogonal to v */
-void vector_to_possible_quaternion(double *q, double *v);             /* compute one possible quaternion rotation which takes [1,0,0] to v */
-short *ismember(double *A, double *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
-short *ismemberi(int *A, int *B, int n, int m);                             /* returns an array of the same length as A where the value at i-th place is 1 if A[i] is in B */ 
+int ismemberi(int x, int *y, int n);                                  /* checks if y contains x */
+void reverse(double *y, double *x, int n);                            /* reverses an array of doubles */
+void reversei(int *y, int *x, int n);                                 /* reverses an array of ints */
+void reorder(double *y, double *x, int *idx, int n);                  /* reorder an array of doubles (safe for x==y) */
 
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
@@ -131,14 +130,15 @@ void matrix_pow(double **Y, double **X, int n, int m, double pw);           /* t
 void matrix_sum(double y[], double **X, int n, int m);                      /* sums the columns of the matrix */
 void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
 void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
+void variance(double *vars, double **X, int n, int m);                      /* returns a row-vector of variances for each column */
 void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
 void wmean(double *mu, double **X, double *w, int n, int m);                /* weighted row vector mean */
 void wcov(double **S, double **X, double *w, double *mu, int n, int m);     /* compute the weighted covariance of the rows of X, given mean mu */
 void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
 void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
+void reorder_rowsi(int **Y, int **X, int *idx, int n, int m);               /* reorder the rows of X, Y = X(idx,:) */
 void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m);    /* replicates and tiles a 2D matrix of ints */
 void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m);         /* replicates and tiles a 2D matrix of ints */
-void variance(double *vars, double **X, int n, int m);                           /* Returns a row-vector of variances for each column */
 
 void linear_regression(double *b, double **X, double *y, int n, int d);     /* perform linear regression: dot(b,x[i]) = y[i], i=1..n */
 void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d */
