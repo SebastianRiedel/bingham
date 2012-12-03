@@ -512,26 +512,24 @@ double min(double x[], int n)
 }
 
 // returns the index of the max of x
-int find_max(double x[], int n) {
+int find_max(double x[], int n)
+{
   int i;
-
   int idx = 0;
   for (i = 1; i < n; i++)
-    if (x[i] > x[idx]) {
+    if (x[i] > x[idx])
       idx = i;
-    }
   return idx;
 }
 
 // returns the index of the min of x
-int find_min(double x[], int n) {
+int find_min(double x[], int n)
+{
   int i;
-
   int idx = 0;
   for (i = 1; i < n; i++)
-    if (x[i] < x[idx]) {
+    if (x[i] < x[idx])
       idx = i;
-    }
   return idx;
 }
 
@@ -873,52 +871,16 @@ void quaternion_to_rotation_matrix(double **R, double *q)
   R[2][2] = a*a - b*b - c*c + d*d;
 }
 
-int find_first_non_zero(double *v, int n) {
+int find_first_non_zero(double *v, int n)
+{
   int i;
   for (i = 0; i < n; ++i) {
-    if (v[i] != 0) return i;
+    if (v[i] != 0.) return i;
   }
   return -1;
 }
 
-void orthogonal_vector(double *w, double *v, int n) {
-  int i = find_first_non_zero(v, 3);
-  int j;
-  for (j = 0; j < n; ++j) {
-    w[j] = 0;
-  }
-
-  if (i == -1) {
-    w[0] = 1;
-    return;
-  }
-  if (n == 1) {
-    return;
-  }
-  int i2 = (i % n) + 1;
-  w[i] = v[i2];
-  w[i2] = -v[i];
-  double norm_factor = sqrt(w[i] * w[i] + w[i2] * w[i2]);
-  mult(w, w, norm_factor, 3);
-}
-
-void vector_to_possible_quaternion(double *q, double *v) {
-  if (find_first_non_zero(v, 3) == -1) {
-    q[0] = 1;
-    q[1] = 0; q[2] = 0; q[3] = 0;
-    return;
-  }
-
-  double **r = new_matrix2(3, 3);
-  normalize(r[0], v, 3);
-  orthogonal_vector(r[1], r[0], 3);
-  cross(r[2], r[0], r[1]);
-  transpose(r, r, 3, 3);
-  
-  rotation_matrix_to_quaternion(q, r);
-  free_matrix2(r);
-}
-
+/*
 short *ismember(double *A, double *B, int n, int m) {
   short *C;
   safe_calloc(C, n, short);
@@ -949,6 +911,54 @@ short *ismemberi(int *A, int *B, int n, int m) {
     }
   }
   return C;
+}
+*/
+
+// check if y contains x
+int ismemberi(int x, int *y, int n)
+{
+  int i;
+  for (i = 0; i < n; ++i)
+    if (x == y[i])
+      return 1;
+  return 0;
+}
+
+// reverses an array of doubles (safe for x==y)
+void reverse(double *y, double *x, int n)
+{
+  int i;
+  for (i = 0; i < n/2; i++) {
+    double tmp = x[i];
+    y[i] = x[n-i-1];
+    y[n-i-1] = tmp;
+  }
+}
+
+// reverses an array of ints (safe for x==y)
+void reversei(int *y, int *x, int n)
+{
+  int i;
+  for (i = 0; i < n/2; i++) {
+    int tmp = x[i];
+    y[i] = x[n-i-1];
+    y[n-i-1] = tmp;
+  }
+}
+
+// reorder an array of doubles (safe for x==y)
+void reorder(double *y, double *x, int *idx, int n)
+{
+  int i;
+  double *y2 = y;
+  if (x==y)
+    safe_calloc(y2, n, double);
+  for (i = 0; i < n; i++)
+    y2[i] = x[idx[i]];
+  if (x==y) {
+    memcpy(y, y2, n*sizeof(double));
+    free(y2);
+  }
 }
 
 // add an element to the front of a list
@@ -1106,13 +1116,6 @@ int pmfrand(double *w, int n) {
   }
 
   return 0;
-}
-
-void exp_vec(double *y, double *x, int n, double sigma) {
-  int i;
-  for (i = 0; i < n; ++i) {
-    y[i] = exp(-0.5 * x[i] / (sigma * sigma));
-  }
 }
 
 // sample from a multivariate normal
@@ -1559,6 +1562,21 @@ void mean(double *mu, double **X, int n, int m)
   mult(mu, mu, 1/(double)n, m);
 }
 
+void variance(double *vars, double **X, int n, int m)
+{
+  double mu[m];
+  mean(mu, X, n, m);
+  memset(vars, 0, m*sizeof(double));
+  int i, j;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++) {
+      double dx = X[i][j] - mu[j];
+      vars[j] += dx*dx;
+    }
+  }
+  mult(vars, vars, 1/(double)n, n);
+}
+
 // compute the covariance of the rows of X, given mean mu
 void cov(double **S, double **X, double *mu, int n, int m)
 {
@@ -1869,11 +1887,12 @@ void eigen_symm(double z[], double **V, double **X, int n)
     z[i] = A[i][i];
   sort_indices(z, idx, n);
   if (z[idx[0]] < 0) {  // negative eigenvalues --> sort in reverse order
-    for (i = 0; i < n/2; i++) {
-      int tmp = idx[i];
-      idx[i] = idx[n-i-1];
-      idx[n-i-1] = tmp;
-    }
+    reversei(idx, idx, n);
+    //for (i = 0; i < n/2; i++) {
+    //  int tmp = idx[i];
+    //  idx[i] = idx[n-i-1];
+    //  idx[n-i-1] = tmp;
+    //}
   }
   for (i = 0; i < n; i++)
     z2[i] = z[idx[i]];
@@ -1904,46 +1923,55 @@ void reorder_rows(double **Y, double **X, int *idx, int n, int m)
   }
 }
 
-void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m) {
-  int i, rep_i, rep_j;
-  for (i = 0; i < n; ++i) {
-    for (rep_j = 0; rep_j < rep_m; ++rep_j) {
-      memcpy(&B[i][rep_j * m], A[i], m * sizeof(double)); 
-    }
+// reorder the rows of X, Y = X(idx,:)
+void reorder_rowsi(int **Y, int **X, int *idx, int n, int m)
+{
+  int i;
+  int **Y2 = (X==Y ? new_matrix2i(n,m) : Y);
+  for (i = 0; i < n; i++)
+    memcpy(Y2[i], X[idx[i]], m*sizeof(int));
+  if (X==Y) {
+    memcpy(Y[0], Y2[0], n*m*sizeof(int));
+    free_matrix2i(Y2);
   }
-  for (rep_i = 1; rep_i < rep_n; ++rep_i) {
+}
+
+void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m)
+{
+  int i, rep_i, rep_j;
+
+  // copy A into top-left corner of B
+  if (A != B)
+    for (i = 0; i < n; ++i)
+      memcpy(B[i], A[i], m * sizeof(double)); 
+
+  // repeat top-left corner to the right
+  for (i = 0; i < n; ++i)
+    for (rep_j = 1; rep_j < rep_m; ++rep_j)
+      memcpy(&B[i][rep_j * m], B[i], m * sizeof(double)); 
+
+  // repeat top of B downwards
+  for (rep_i = 1; rep_i < rep_n; ++rep_i)
     memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(double));
-  }  
 }
 
-void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m) {
+void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m)
+{
   int i, rep_i, rep_j;
-  for (i = 0; i < n; ++i) {
-    for (rep_j = 0; rep_j < rep_m; ++rep_j) {
-      memcpy(&B[i][rep_j * m], A[i], m * sizeof(int)); 
-    }
-  }
-  for (rep_i = 1; rep_i < rep_n; ++rep_i) {
-    memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(int));
-  }  
-}
 
-void variance(double *vars, double **X, int n, int m) {
-  int i, j;
-  for (i = 0; i < m; ++i) {
-    double mean = 0;
-    for (j = 0; j < n; ++j) {
-      mean += X[j][i];
-    }
-    mean /= n;
-    vars[i] = 0;
-    for (j = 0; j < n; ++j) {
-      vars[i] += (X[j][i] - mean) * (X[j][i] - mean);
-    }
-    if (n > 1) {
-      vars[i] /= n - 1;
-    }
-  }
+  // copy A into top-left corner of B
+  if (A != B)
+    for (i = 0; i < n; ++i)
+      memcpy(B[i], A[i], m * sizeof(int)); 
+
+  // repeat top-left corner to the right
+  for (i = 0; i < n; ++i)
+    for (rep_j = 1; rep_j < rep_m; ++rep_j)
+      memcpy(&B[i][rep_j * m], B[i], m * sizeof(int)); 
+
+  // repeat top of B downwards
+  for (rep_i = 1; rep_i < rep_n; ++rep_i)
+    memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(int));
 }
 
 void print_matrix(double **X, int n, int m)

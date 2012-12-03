@@ -177,7 +177,9 @@ extern "C" {
 
 
   olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
-  
+
+
+  /*  
   int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev, int n_model_prev, double *model_pmf, pcd_t *pcd_model);
 
   int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, pcd_t *pcd_model, int shape_length, double **obs_fxyzn, flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params, scope_params_t *params);
@@ -190,6 +192,8 @@ extern "C" {
   void get_point(double p[3], pcd_t *pcd, int idx);
   void get_normal(double p[3], pcd_t *pcd, int idx);
   void get_shape(double p[33], pcd_t *pcd, int idx);
+  */
+
 
 #ifdef __cplusplus
 }

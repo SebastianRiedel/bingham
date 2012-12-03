@@ -67,7 +67,7 @@ static void bingham_dF(double *dF, bingham_t *B)
 
 /*
  * Computes the partial derivatives of the average log likelihood w.r.t. B->Z.
- */
+ *
 static void bingham_dL(double *dL, bingham_t *B, double **X, int n)
 {
   int i, j, d = B->d;
@@ -88,7 +88,7 @@ static void bingham_dL(double *dL, bingham_t *B, double **X, int n)
   mult(dF, dF, -1/F, d-1);
   add(dL, dL, dF, d-1);
 }
-
+*/
 
 
 //------------------- Bingham MLE of parameters -------------------//
@@ -245,7 +245,7 @@ static void bingham_MLE_3d_grad_desc(double *Z, double V[][4], double X[][4], in
 /*
  * Compute MLE parameters concentration parameters B->Z given n samples X with principal components B->V
  * using gradient descent.
- */
+ *
 static void bingham_MLE_grad_desc(bingham_t *B, double **X, int n)
 {
   double YMIN = 0.0, YMAX = 25.0;
@@ -309,7 +309,7 @@ static void bingham_MLE_grad_desc(bingham_t *B, double **X, int n)
     bingham_F(B);
   }
 }
-
+*/
 
 /*
  * Compute MLE parameters concentration parameters B->Z given scatter matrix S with principal components B->V
@@ -1172,9 +1172,9 @@ void bingham_sample(double **X, bingham_t *B, int n)
   double x[d], x2[d];
   double pcs[d];
   double **V = new_matrix2(d,d);
-  double mu[d];
-  for (i = 0; i < d; i++)
-    mu[i] = 0;
+  //double mu[d];
+  //for (i = 0; i < d; i++)
+  //  mu[i] = 0;
 
   eigen_symm(pcs, V, B->stats->scatter, d);
   //printf("pcs = [");
