@@ -1686,6 +1686,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   }
 
   // compute p(visibile)
+  int cnt = 0;
   double vis_prob[num_validation_points];
   for (i = 0; i < num_validation_points; i++) {
     if (dot(cloud[i], cloud_normals[i], 3) >= 0) {  // normals pointing away
@@ -1711,8 +1712,11 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       double dR = model_range - obs_range;
       vis_prob[i] = (dR < 0 ? 1.0 : normpdf(dR/range_sigma, 0, 1));
     }
+    //if (cnt++ < 100)  printf("%.4f\n", vis_prob[i]);  //dbug
   }
+  //printf("cnt = %d, sum(vis_prob) = %.4f\n", cnt, sum(vis_prob, num_validation_points));  //dbug
   normalize_pmf(vis_prob, vis_prob, num_validation_points);
+
 
   // compute nearest neighbors
   int nn_idx[num_validation_points];
@@ -1723,9 +1727,9 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       query[j] = xyz_weight * cloud[i][j];
       query[j+3] = normal_weight * cloud_normals[i][j];
     }
-    int search_radius = 5;  // pixels
-    range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
-    //flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
+    //int search_radius = 5;  // pixels
+    //range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
+    flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
     //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
     //nn_d2[i] = dist2(query, obs_xyzn[nn_idx[i]], 6);
   }
@@ -1947,6 +1951,9 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
   for (i = 0; i < n; ++i) {
     get_point(points_obs[i], pcd_obs, c_obs[i]);
     get_point(points_model[i], pcd_model, c_model[i]);
+
+    //printf("points_obs[%d] = [%.4f, %.4f, %.4f]\n", i, points_obs[i][0], points_obs[i][1], points_obs[i][2]);
+    //printf("points_model[%d] = [%.4f, %.4f, %.4f]\n", i, points_model[i][0], points_model[i][1], points_model[i][2]);
   }
   double mean_obs[3], mean_model[3];
   mean(mean_obs, points_obs, n, 3);
@@ -2168,6 +2175,14 @@ int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_
  */
 olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose)
 {
+  /*dbug
+  params->num_samples_init = 1;
+  params->num_samples = 1;
+  params->num_correspondences = 2;
+  params->branching_factor = 1;
+  params->do_icp = 0;
+  */
+
   int i,j;
 
   printf("scope()\n");
@@ -2263,12 +2278,14 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   }
 
   // flann params
+  struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
+  flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
   struct FLANNParameters flann_params = DEFAULT_FLANN_PARAMETERS;
   flann_params.algorithm = FLANN_INDEX_KDTREE;
   flann_params.trees = 8;
   flann_params.checks = 64;
-  struct FLANNParameters obs_xyzn_params = flann_params;
-  struct FLANNParameters model_xyzn_params = flann_params;
+  struct FLANNParameters obs_xyzn_params = flann_params_single;
+  struct FLANNParameters model_xyzn_params = flann_params_single;
   struct FLANNParameters model_fsurf_params = flann_params;
 
   printf("Building FLANN indices\n");
@@ -2294,6 +2311,16 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   double **X = new_matrix2(max_num_samples, 3);                                 // sample positions
   double **Q = new_matrix2(max_num_samples, 4);                                 // sample orientations
   double W[max_num_samples];                                                    // sample weights
+
+
+
+  //dbug: test scoring function
+  //double x_test[3] = {0.0054, 0.0937, 0.8934};
+  //double q_test[4] = {-0.3618, -0.4992, 0.5511, -0.5623};
+  //params->num_validation_points = 0;
+  //model_placement_score(x_test, q_test, pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
+  //exit(0);
+
 
   printf("Sampling first correspondences\n");
 
@@ -2331,17 +2358,25 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     //memcpy(Q[i], true_pose->Q, 4*sizeof(double));
     //X[i][2] += .02;
 
+
     // score hypothesis
     //W[i] = 1.0;
     //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_xyzn, params);
     //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
-    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
+    //W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
   }
+
+  /*dbug
+  C_obs[0][0] = 1464 - 1;
+  C_model[0][0] = 3512 - 1;
+  double x_test[3] = {0.0054, 0.0937, 0.8934};
+  double q_test[4] = {-0.3618, -0.4992, 0.5511, -0.5623};
+  memcpy(X[0], x_test, 3*sizeof(double));
+  memcpy(Q[0], q_test, 4*sizeof(double));
+  */
 
   int num_good_poses = 0;
   int num_great_poses = 0;
-  // NOTE(sanja): malloc and realloc after we are done will take some time and we won't waste a whole lot of memory if we
-  // just allocate num_samples_init in advance. We can change this if it is a problem later.
   int good_pose_idx[num_samples_init], great_pose_idx[num_samples_init];
   if (have_true_pose) {
     get_good_poses(true_pose, num_samples_init, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
@@ -2358,6 +2393,10 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     memcpy(Q[i], gq, 4*sizeof(double));
   }
   */
+
+  // score hypotheses
+  for (i = 0; i < num_samples_init; i++)
+    W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, obs_xyzn_index, &obs_xyzn_params, obs_xyzn_kdtree, params);
 
   // sort hypotheses
   int idx[num_samples_init];
@@ -2396,18 +2435,25 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     for (i = 0; i < num_samples * branching_factor; ++i) {
       // sample a new model point, given model pose
       C_model[i][c] = sample_model_point_given_model_pose(X[i], Q[i], C_model[i], c, model_pmf, pcd_model);
+      //C_model[i][c] = 4279 - 1;
 
       // sample an observed point corresponding to C_model[i][c] given the model pose
       C_obs[i][c] = sample_obs_correspondence_given_model_pose(X[i], Q[i], C_model[i][c], pcd_model, 33, obs_fxyzn, obs_xyzn_index, &obs_xyzn_params, params); // NOTE(sanja): what is olf->shape_length in this function?
+      //C_obs[i][c] = 8797 - 1;
       
+      //printf("c_obs = %d\n", C_obs[i][c]); //dbug
+
       // compute max likelihood model pose given the point correspondences
       bingham_t B;
       bingham_alloc(&B, 4);
       double x0[3];
 
       get_model_pose_distribution_from_correspondences(pcd_obs, pcd_model, C_obs[i], C_model[i], c+1, params->xyz_sigma, x0, &B);
-      sample_model_pose(pcd_model, C_model[i], c, x0, &B, X[i], Q[i]);
+      sample_model_pose(pcd_model, C_model[i], c+1, x0, &B, X[i], Q[i]);
 
+      //dbug
+      //printf("x0 = [%.4f, %.4f, %.4f]\n", x0[0], x0[1], x0[2]);
+      //print_bingham(&B);
 
       if (params->do_icp) {
 
