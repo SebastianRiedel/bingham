@@ -1727,9 +1727,9 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       query[j] = xyz_weight * cloud[i][j];
       query[j+3] = normal_weight * cloud_normals[i][j];
     }
-    //int search_radius = 5;  // pixels
-    //range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
-    flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
+    int search_radius = 5;  // pixels
+    range_image_find_nn(&nn_idx[i], &nn_d2[i], cloud[i], query, 6, obs_xyzn, obs_fg_range_image, search_radius);
+    //flann_find_nearest_neighbors_index_double(obs_xyzn_index, query, 1, &nn_idx[i], &nn_d2[i], 1, obs_xyzn_params);
     //nn_idx[i] = kdtree_NN(obs_xyzn_kdtree, query);
     //nn_d2[i] = dist2(query, obs_xyzn[nn_idx[i]], 6);
   }
