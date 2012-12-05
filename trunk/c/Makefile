@@ -8,7 +8,7 @@ CC=gcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2
+CFLAGS=-Wall -I$(IDIR) -O3 -msse2 #-g -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
 #CYGWIN=1
@@ -23,7 +23,7 @@ endif
 LFLAGS=-lm -lflann #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
-	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h bingham/gauss_mix.h
+	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h #bingham/gauss_mix.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 ifdef CYGWIN
@@ -34,7 +34,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample olf_pose_sample scope gauss_mix
+TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope #olf_pose_sample gauss_mix
 endif
 
 
