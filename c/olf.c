@@ -1193,8 +1193,8 @@ double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *
   return logp;
 }
 
-int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_fxyzn, scope_params_t *params,
-						 struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index,
+int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_xyzn, double **model_fxyzn, scope_params_t *params,
+						 struct FLANNParameters *model_xyz_params, flann_index_t model_xyz_index,
 						 double *x, double *q, int c2_obs, int sample_nn, int use_f)
 {
   int shape_length = pcd_obs->shape_length;
@@ -1217,10 +1217,13 @@ int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_
   // look for k-NN in xyz-normal space
   double xyzn_query[6];
   mult(xyzn_query, xyz_obs_point2, params->xyz_weight, 3);
-  mult(&xyzn_query[3], nxyz_obs_point2, params->normal_weight, 3);  
+  mult(&xyzn_query[3], nxyz_obs_point2, params->normal_weight, 3);
   int nn_idx[params->knn];
   double nn_d2[params->knn];
-  flann_find_nearest_neighbors_index_double(model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, model_xyzn_params);
+  //flann_find_nearest_neighbors_index_double(model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, model_xyzn_params);
+  flann_find_nearest_neighbors_index_double(model_xyz_index, xyz_obs_point2, 1, nn_idx, nn_d2, params->knn, model_xyz_params);
+  for (i = 0; i < params->knn; i++)
+    nn_d2[i] = dist2(xyzn_query, model_xyzn[nn_idx[i]], 6);
   
   if (use_f) {
     // then compute full feature distance on just those k-NN
@@ -1367,6 +1370,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   //flann_params.trees = 8;
   //flann_params.checks = 64;
   struct FLANNParameters obs_xyzn_params = flann_params_single;
+  struct FLANNParameters model_xyz_params = flann_params_single;
   struct FLANNParameters model_xyzn_params = flann_params_single;
   struct FLANNParameters model_fsurf_params = flann_params;
 
@@ -1375,6 +1379,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   // build flann indices
   float speedup;
   flann_index_t obs_xyzn_index = flann_build_index_double(obs_xyzn[0], pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
+  flann_index_t model_xyz_index = flann_build_index_double(pcd_model->points[0], pcd_model->num_points, 3, &speedup, &model_xyz_params);
   flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
   flann_index_t model_fsurf_index = flann_build_index_float(model_fsurf[0], pcd_model->num_points, shape_length + 2, &speedup, &model_fsurf_params);
 
@@ -1576,7 +1581,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 	for (k = 0; k < 20; ++k) {
 	  int j;
 	  for (j = 0; j <= c; ++j)
-	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, model_fxyzn, params, &model_xyzn_params, model_xyzn_index, X[i], Q[i], C_obs[i][j], 1, 0);  //sample nn, no fpfh
+	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, model_xyzn, model_fxyzn, params, &model_xyz_params, model_xyz_index, X[i], Q[i], C_obs[i][j], 1, 0);  //sample nn, no fpfh
 	  get_model_pose_distribution_from_correspondences(pcd_obs, pcd_model, C_obs[i], c_model_new, c+1, params->xyz_sigma, x0_new, &B_new);
 	  sample_model_pose(pcd_model, c_model_new, c+1, x0_new, &B_new, x_new, q_new);
 	  logp_new = model_pose_likelihood(pcd_obs, pcd_model, C_obs[i], c_model_new, c+1, x_new, q_new, &B_new, params->xyz_sigma, -1, -1, NULL);
