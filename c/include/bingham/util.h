@@ -51,6 +51,7 @@ double erfinv(double x);                                /* approximation to the 
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
 int pmfrand(double *w, int n);                          /* samples from the probability mass function w with n elements */
+int cmfrand(double *w, int n);                          /* samples from the cumulative mass function w with n elements (much faster than pmfrand) */
 
 void mvnrand(double *x, double *mu, double **S, int d);   /* sample from a multivariate normal */
 double mvnpdf(double *x, double *mu, double **S, int d);  /* compute a multivariate normal pdf */
@@ -86,6 +87,7 @@ void cross4d(double w[4], double x[4], double y[4], double z[4]);     /* takes t
 void add(double z[], double x[], double y[], int n);                  /* adds two vectors, z = x+y */
 void sub(double z[], double x[], double y[], int n);                  /* subtracts two vectors, z = x-y */
 void mult(double y[], double x[], double c, int n);                   /* multiplies a vector by a scalar, y = c*x */
+void cumsum(double y[], double x[], int n);                           /* computes the cumulative sum of x */
 void vec_func(double y[], double x[], double n, double (*f)(double)); /* applies a function that takes double and returns a double to every element of the array (e.g. fabs, acos, etc.) */
 void normalize(double y[], double x[], int n);                        /* sets y = x/norm(x) */
 void normalize_pmf(double y[], double x[], int n);                    /* sets y = x/sum(x) */
@@ -105,6 +107,7 @@ void reversei(int *y, int *x, int n);                                 /* reverse
 void reorder(double *y, double *x, int *idx, int n);                  /* reorder an array of doubles (safe for x==y) */
 
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
+float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
 double **new_identity_matrix2(int n);                                /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                  /* create a new n-by-n 2d indetity matrix of ints */
@@ -112,6 +115,7 @@ void add_matrix_row(double **X, int n, int m);                             /* re
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
+void free_matrix2f(float **X);                                              /* free a 2d matrix of floats */
 void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
 void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                            /* load a matrix from a file */

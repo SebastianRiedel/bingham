@@ -13,20 +13,6 @@ extern "C" {
 #include "hll.h"
 #include <flann/flann.h>
 
-  // heirarchical segmentation and balls model
-  typedef struct {
-    int num_segments;
-    int *num_balls;
-    int *segment_labels;
-    int *ball_labels;
-    double **segment_centers;
-    double *segment_radii;
-    double ***ball_centers;
-    double **ball_radii;
-    double mean_segment_radius;
-    double mean_ball_radius;
-  } pcd_balls_t;
-
 
   // point cloud data structure
   typedef struct {
@@ -36,12 +22,14 @@ extern "C" {
     double **data;    // e.g. data[0] = {x1,x2,x3}, data[1] = {y1,y2,y3}, etc.
 
     // data pointers
+    double *pc1;
+    double *pc2;
+
+    // transposed data
     double **points;  // x_i: points[0][i], y_i: points[1][i], 
     double **colors;
     double **normals;
     double **principal_curvatures;
-    double *pc1;
-    double *pc2;
     double **shapes;
     double **sift;
     double **sdw;
@@ -49,8 +37,15 @@ extern "C" {
     // computed data
     int *clusters;
     double **quaternions[2];
-    kdtree_t *points_kdtree;
-    pcd_balls_t *balls;
+    double **lab;
+
+    // data sizes
+    int shape_length;
+    int sift_length;
+    int sdw_length;
+
+    //kdtree_t *points_kdtree;
+    //pcd_balls_t *balls;
 
   } pcd_t;
 
@@ -65,32 +60,6 @@ extern "C" {
     double **image;  // stored column-wise: image[x][y]
     int **idx;
   } range_image_t;
-
-
-  // oriented local feature model
-  typedef struct {
-    pcd_t *pcd;                   // point cloud
-    bingham_mix_t *bmx;           // bingham mixture models (one per cluster)
-    hll_t *hll;                   // hyperspherical local likelihood models (one per cluster)
-    int num_clusters;             // # local feature clusters
-    double *cluster_weights;      // cluster weights
-    int shape_length;             // local shape descriptor length
-    double **mean_shapes;         // cluster means
-    double *shape_variances;      // cluster variances
-
-    // params
-    int rot_symm;
-    int num_validators;
-    double lambda;
-    double pose_agg_x;
-    double pose_agg_q;
-    double *proposal_weights;
-    int cluttered;
-    int num_proposal_segments;
-    int *proposal_segments;
-  } olf_t;
-
-
 
 
   typedef struct {
@@ -115,25 +84,7 @@ extern "C" {
 
 
 
-
-  olf_t *load_olf(char *fname);                       // loads an olf from fname.pcd and fname.bmx
-  void olf_free(olf_t *olf);                          // frees the contents of an olf_t, but not the pointer itself
-  void olf_classify_points(pcd_t *pcd, olf_t *olf);   // classify pcd points (add channel "cluster") using olf shapes
-
-  // computes the pdf of pose (x,q) given n points from pcd w.r.t. olf (assumes points are classified)
-  double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, int n);
-
-  // samples n weighted poses (X,Q,W) using olf model "olf" and point cloud "pcd"
-  olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n);
-
-  // aggregate the weighted pose samples, (X,Q,W)
-  olf_pose_samples_t *olf_aggregate_pose_samples(olf_pose_samples_t *poses, olf_t *olf);
-
-  olf_pose_samples_t *olf_pose_samples_new(int n);          // create a new olf_pose_samples_t
-  void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
-
-
-  // ICRA
+  // BPA (Bingham Procrustean Alignment)
 
   typedef struct {
     pcd_t *obj_pcd;
@@ -193,6 +144,68 @@ extern "C" {
   void get_normal(double p[3], pcd_t *pcd, int idx);
   void get_shape(double p[33], pcd_t *pcd, int idx);
   */
+
+
+
+  //
+  // DEPRECATED
+  //
+
+  /* heirarchical segmentation and balls model
+  typedef struct {
+    int num_segments;
+    int *num_balls;
+    int *segment_labels;
+    int *ball_labels;
+    double **segment_centers;
+    double *segment_radii;
+    double ***ball_centers;
+    double **ball_radii;
+    double mean_segment_radius;
+    double mean_ball_radius;
+  } pcd_balls_t;
+  */
+
+  /* oriented local feature model
+  typedef struct {
+    pcd_t *pcd;                   // point cloud
+    bingham_mix_t *bmx;           // bingham mixture models (one per cluster)
+    hll_t *hll;                   // hyperspherical local likelihood models (one per cluster)
+    int num_clusters;             // # local feature clusters
+    double *cluster_weights;      // cluster weights
+    int shape_length;             // local shape descriptor length
+    double **mean_shapes;         // cluster means
+    double *shape_variances;      // cluster variances
+
+    // params
+    int rot_symm;
+    int num_validators;
+    double lambda;
+    double pose_agg_x;
+    double pose_agg_q;
+    double *proposal_weights;
+    int cluttered;
+    int num_proposal_segments;
+    int *proposal_segments;
+  } olf_t;
+  */
+
+  //olf_t *load_olf(char *fname);                       // loads an olf from fname.pcd and fname.bmx
+  //void olf_free(olf_t *olf);                          // frees the contents of an olf_t, but not the pointer itself
+  //void olf_classify_points(pcd_t *pcd, olf_t *olf);   // classify pcd points (add channel "cluster") using olf shapes
+
+  // computes the pdf of pose (x,q) given n points from pcd w.r.t. olf (assumes points are classified)
+  //double olf_pose_pdf(double *x, double *q, olf_t *olf, pcd_t *pcd, int *indices, int n);
+
+  // samples n weighted poses (X,Q,W) using olf model "olf" and point cloud "pcd"
+  //olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n);
+
+  // aggregate the weighted pose samples, (X,Q,W)
+  //olf_pose_samples_t *olf_aggregate_pose_samples(olf_pose_samples_t *poses, olf_t *olf);
+
+  //olf_pose_samples_t *olf_pose_samples_new(int n);          // create a new olf_pose_samples_t
+  //void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
+
 
 
 #ifdef __cplusplus

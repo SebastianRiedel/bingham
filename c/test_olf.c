@@ -39,6 +39,7 @@ void test_load_pcd(int argc, char *argv[])
 }
 
 
+/*
 void test_olf_pose_sample(int argc, char *argv[])
 {
   if (argc < 4) {
@@ -106,6 +107,7 @@ void test_olf_pose_sample(int argc, char *argv[])
     printf("%f; ...\n", W[i]);
   printf("%f];\n", W[i]);
 }
+*/
 
 
 void test_range_image(int argc, char *argv[])

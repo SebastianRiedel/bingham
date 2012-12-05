@@ -472,7 +472,6 @@ double sum(double x[], int n)
   return y;
 }
 
-
 // computes the product of x's elements
 double prod(double x[], int n)
 {
@@ -686,6 +685,17 @@ void mult(double y[], double x[], double c, int n)
   int i;
   for (i = 0; i < n; i++)
     y[i] = c*x[i];
+}
+
+// computes the cumulative sum of x
+void cumsum(double y[], double x[], int n)
+{
+  int i;
+  double c = 0;
+  for (i = 0; i < n; i++) {
+    c += x[i];
+    y[i] = c;
+  }
 }
 
 // takes absolute value element-wise
@@ -1118,6 +1128,13 @@ int pmfrand(double *w, int n) {
   return 0;
 }
 
+// samples from the cumulative mass function w with n elements (much faster than pmfrand)
+int cmfrand(double *w, int n)
+{
+  double r = frand();
+  return binary_search(r, w, n);
+}
+
 // sample from a multivariate normal
 void mvnrand(double *x, double *mu, double **S, int d)
 {
@@ -1226,6 +1243,21 @@ double **new_matrix2(int n, int m)
   return X;
 }
 
+// create a new n-by-m 2d matrix of floats
+float **new_matrix2f(int n, int m)
+{
+  if (n*m == 0) return NULL;
+  int i;
+  float *raw, **X;
+  safe_calloc(raw, n*m, float);
+  safe_malloc(X, n, float*);
+
+  for (i = 0; i < n; i++)
+    X[i] = raw + m*i;
+
+  return X;
+}
+
 // create a new n-by-m 2d matrix of ints
 int **new_matrix2i(int n, int m)
 {
@@ -1284,6 +1316,14 @@ int **new_diag_matrix2i(int *diag, int n) {
 
 // free a 2d matrix of doubles
 void free_matrix2(double **X)
+{
+  if (X == NULL) return;
+  free(X[0]);
+  free(X);
+}
+
+// free a 2d matrix of floats
+void free_matrix2f(float **X)
 {
   if (X == NULL) return;
   free(X[0]);

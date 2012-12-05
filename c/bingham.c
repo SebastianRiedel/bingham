@@ -455,7 +455,8 @@ void bingham_alloc(bingham_t *B, int d)
 {
   B->d = d;
   B->V = new_matrix2(d-1, d);
-  safe_malloc(B->Z, d-1, double);
+  safe_calloc(B->Z, d-1, double);
+  B->F = 0;
   B->stats = NULL;
 }
 
