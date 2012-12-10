@@ -885,9 +885,28 @@ int find_first_non_zero(double *v, int n)
 {
   int i;
   for (i = 0; i < n; ++i) {
-    if (v[i] != 0.) return i;
+    if (v[i] != 0.)
+      return i;
   }
   return -1;
+}
+
+int find_first_lt(double *x, double a, int n)
+{
+  int i;
+  for (i = 0; i < n; ++i)
+    if (x[i] < a)
+      break;
+  return i;
+}
+
+int find_first_gt(double *x, double a, int n)
+{
+  int i;
+  for (i = 0; i < n; ++i)
+    if (x[i] > a)
+      break;
+  return i;
 }
 
 /*
