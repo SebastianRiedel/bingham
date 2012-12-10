@@ -107,6 +107,7 @@ int ismemberi(int x, int *y, int n);                                  /* checks 
 void reverse(double *y, double *x, int n);                            /* reverses an array of doubles */
 void reversei(int *y, int *x, int n);                                 /* reverses an array of ints */
 void reorder(double *y, double *x, int *idx, int n);                  /* reorder an array of doubles (safe for x==y) */
+void reorderi(int *y, int *x, int *idx, int n);                       /* reorder an array of ints (safe for x==y) */
 
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
