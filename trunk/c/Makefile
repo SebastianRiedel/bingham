@@ -5,6 +5,7 @@ LDIR=lib
 INSTALL_DIR=/usr
 
 CC=gcc
+CPP=g++
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
@@ -34,7 +35,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_olf test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope #olf_pose_sample gauss_mix
+TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope #olf_pose_sample gauss_mix test_olf
 endif
 
 
@@ -47,15 +48,17 @@ all: $(TARGETS)
 #else
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
+$(ODIR)/%.o: %.cpp $(DEPS)
+	$(CPP) -c -o $@ $< $(CFLAGS)
 #endif
 
-libbingham.a: bingham.o bingham_constants.o hll.o olf.o gauss_mix.o tetramesh.o octetramesh.o hypersphere.o util.o
+libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(LINK) $@ $^
 
-libbingham.so.1.0.1: bingham.o bingham_constants.o hll.o olf.o gauss_mix.o tetramesh.o octetramesh.o hypersphere.o util.o
+libbingham.so.1.0.1: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(CC) -shared -Wl,-soname,libbingham.so.1 -o $@ $^ $(LFLAGS)
 
-$(LDIR)/bingham.dll: bingham.o bingham_constants.o hll.o olf.o gauss_mix.o tetramesh.o octetramesh.o hypersphere.o util.o
+$(LDIR)/bingham.dll: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(CC) -shared -o $@ $^ $(LFLAGS)
 
 test_bingham: test_bingham.o libbingham.a
@@ -76,20 +79,20 @@ cluster_bingham: cluster_bingham.o libbingham.a
 test_util: test_util.o util.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-test_hll: test_hll.o libbingham.a
+test_hll: test_hll.o hll.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-test_olf: test_olf.o libbingham.a
+#test_olf: test_olf.o olf.o libbingham.a
+#	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+#olf_pose_sample: olf_pose_sample.o olf.o libbingham.a
+#	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+scope: scope.o olf.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-olf_pose_sample: olf_pose_sample.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
-
-scope: scope.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
-
-gauss_mix: gauss_mix.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+#gauss_mix: gauss_mix.o libbingham.a
+#	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 .PHONY: clean install doc
 
