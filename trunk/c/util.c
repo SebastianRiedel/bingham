@@ -990,6 +990,21 @@ void reorder(double *y, double *x, int *idx, int n)
   }
 }
 
+// reorder an array of ints (safe for x==y)
+void reorderi(int *y, int *x, int *idx, int n)
+{
+  int i;
+  int *y2 = y;
+  if (x==y)
+    safe_calloc(y2, n, int);
+  for (i = 0; i < n; i++)
+    y2[i] = x[idx[i]];
+  if (x==y) {
+    memcpy(y, y2, n*sizeof(int));
+    free(y2);
+  }
+}
+
 // add an element to the front of a list
 ilist_t *ilist_add(ilist_t *x, int a)
 {

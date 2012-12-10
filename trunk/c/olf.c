@@ -723,22 +723,14 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 }
 
 
-int *get_validation_points(pcd_t *pcd_model, int *num_validation_points)
+void get_validation_points(int *idx, pcd_t *pcd_model, int num_validation_points)
 {
-  int *idx, i;
-
-  if (*num_validation_points == 0) {  // use all the points
-    *num_validation_points = pcd_model->num_points;
-    safe_calloc(idx, *num_validation_points, int);
+  int i;
+  if (num_validation_points == pcd_model->num_points)  // use all the points
     for (i = 0; i < pcd_model->num_points; i++)
       idx[i] = i;
-  }
-  else {
-    safe_calloc(idx, *num_validation_points, int);
-    randperm(idx, pcd_model->num_points, *num_validation_points);
-  }
-
-  return idx;
+  else
+    randperm(idx, pcd_model->num_points, num_validation_points);
 }
 
 double compute_visibility_prob(double *point, double *normal, range_image_t *obs_range_image, double range_sigma)
@@ -935,8 +927,9 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
 			     range_image_t *obs_fg_range_image, double **obs_xyzn, scope_params_t *params)
 {
   // get model validation points
-  int num_validation_points = params->num_validation_points;
-  int *idx = get_validation_points(pcd_model, &num_validation_points);
+  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : pcd_model->num_points);
+  int idx[num_validation_points];
+  get_validation_points(idx, pcd_model, num_validation_points);
 
   // extract transformed model validation features
   double **cloud = get_sub_cloud_at_pose(pcd_model, idx, num_validation_points, x, q);
@@ -973,7 +966,6 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   //printf("score = %f\n", score);
 
   // cleanup
-  free(idx);
   free_matrix2(cloud);
   free_matrix2(cloud_normals);
   //free_matrix2(cloud_f);
@@ -981,6 +973,19 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   free_matrix2(cloud_xyzn);
 
   return score;
+}
+
+/*
+ * Run model_placement_score() multiple times and average the results.
+ */
+double model_placement_score_multi(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
+				   range_image_t *obs_fg_range_image, double **obs_xyzn, scope_params_t *params, int num_trials)
+{
+  int i;
+  double score = 0.0;
+  for (i = 0; i < num_trials; i++)
+    score += model_placement_score(x, q, pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
+  return score / (double) num_trials;
 }
 
 void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int good_pose_idx[], int great_pose_idx[],
@@ -1137,16 +1142,14 @@ int sample_obs_correspondence_given_model_pose(double *x, double *q, int c_model
   return c_obs;
 }
 
+
 /*
- * Compute x and p(q|x) by combining Bingham distributions from least-squares
- * alignment (LS) with Bingham distributions from OLFs.  The tuple (x,q)
- * where q is sampled from B indicates that one should rotate pcd_model(c_model)
- * about its centroid by q, then shift by x.
+ * Use only least-squares information (not OLFs).
  */
-void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n,
-						      double xyz_sigma, double *x, bingham_t *B)
+void get_model_pose_distribution_from_correspondences_LS(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n,
+							 double xyz_sigma, double *x, bingham_t *B)
 {
-  // shift point cloud centroids to the origin
+  // shift point cloud centroids to the origin and compute translation, x
   double **points_obs = new_matrix2(n, 3);
   double **points_model = new_matrix2(n, 3);
   int i;
@@ -1167,23 +1170,15 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     sub(points_model[i], points_model[i], mean_model, 3);
   }
 
-  // compute LS and OLF Bingham distributions for each point correspondence
-  double q_obs[4], q_model[4];
-
+  // compute LS Bingham distributions for each point correspondence
   bingham_t B_ls[n];
-  bingham_t B_olf[n];
   for (i = 0; i < n; ++i) {
     bingham_alloc(&B_ls[i], 4);
-    bingham_alloc(&B_olf[i], 4);
   }
-  bingham_t B_feature_to_model, B_model_to_feature;
-  bingham_alloc(&B_feature_to_model, 4);
-  bingham_alloc(&B_model_to_feature, 4);
-  double q_inv[4], *q_feature_to_world;
-
   for (i = 0; i < n; ++i) {
     double *v_obs = points_obs[i];
     double *v_model = points_model[i];
+    double q_obs[4], q_model[4];
     vector_to_possible_quaternion(q_obs, v_obs);
     vector_to_possible_quaternion(q_model, v_model);
     double k = norm(v_obs, 3) * norm(v_model, 3) / (xyz_sigma * xyz_sigma);
@@ -1193,10 +1188,44 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     B->Z[2] = 0;
     double V_data[12] = {0, 0, 1, 0,   0, 0, 0, 1,   0, 1, 0, 0};
     memcpy(B->V[0], V_data, 12*sizeof(double));
+    double q_inv[4];
     quaternion_inverse(q_inv, q_model);
     bingham_pre_rotate_3d(B, B, q_inv);
     bingham_post_rotate_3d(&B_ls[i], B, q_obs);
-    
+  }  
+
+  bingham_mult_array(B, B_ls, n, 1);
+  
+  for (i = 0; i < n; ++i)
+    bingham_free(&B_ls[i]);
+
+  free_matrix2(points_obs);
+  free_matrix2(points_model);
+}
+
+/*
+ * Compute x and p(q|x) by combining Bingham distributions from least-squares
+ * alignment (LS) with Bingham distributions from OLFs.  The tuple (x,q)
+ * where q is sampled from B indicates that one should rotate pcd_model(c_model)
+ * about its centroid by q, then shift by x.
+ */
+void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n,
+						      double xyz_sigma, double *x, bingham_t *B)
+{
+  bingham_t B_array[n+1];
+  bingham_alloc(&B_array[0], 4);
+  get_model_pose_distribution_from_correspondences_LS(pcd_obs, pcd_model, c_obs, c_model, n, xyz_sigma, x, &B_array[0]);
+
+  bingham_t *B_olf = &B_array[1];
+  int i;
+  for (i = 0; i < n; ++i)
+    bingham_alloc(&B_olf[i], 4);
+  bingham_t B_feature_to_model, B_model_to_feature;
+  bingham_alloc(&B_feature_to_model, 4);
+  bingham_alloc(&B_model_to_feature, 4);
+  double *q_feature_to_world;
+
+  for (i = 0; i < n; ++i) {    
     olf_to_bingham(&B_feature_to_model, c_model[i], pcd_model);
     bingham_invert_3d(&B_model_to_feature, &B_feature_to_model);
     q_feature_to_world = pcd_obs->quaternions[0][c_obs[i]];
@@ -1214,20 +1243,12 @@ void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd
     }
   }  
 
-  bingham_t B_array[2*n];  // {B_ls, B_olf}
-  memcpy(B_array, B_ls, n*sizeof(bingham_t));
-  memcpy(&B_array[n], B_olf, n*sizeof(bingham_t));
-  bingham_mult_array(B, B_array, 2*n, 1);
-  
-  for (i = 0; i < n; ++i) {
-    bingham_free(&B_ls[i]);
-    bingham_free(&B_olf[i]);
-  }
+  bingham_mult_array(B, B_array, n, 1);
+
+  for (i = 0; i < n+1; i++)
+    bingham_free(&B_array[i]);
   bingham_free(&B_feature_to_model);
   bingham_free(&B_model_to_feature);
-
-  free_matrix2(points_obs);
-  free_matrix2(points_model);
 }
 
 void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q)
@@ -1379,12 +1400,47 @@ int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_
 void align_model_icp_dense(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
 			   range_image_t *obs_fg_range_image, scope_params_t *params)
 {
-  int k, max_iter = 20;  //TODO: make this a param
+  int i, iter;
+  int max_iter = 20;  //TODO: make this a param
+  int num_icp_points = 500;  // TODO: make this a param
+  double x0[3];
+  bingham_t B;
+  bingham_alloc(&B, 4);
 
-  //double d2min = 
+  for (iter = 0; iter < max_iter; iter++) {
 
-  for (k = 0; k < max_iter; k++) {
-    
+    // get model icp points
+    int c_model[num_icp_points];
+    get_validation_points(c_model, pcd_model, num_icp_points);
+
+    // extract transformed model icp features
+    double **cloud = get_sub_cloud_at_pose(pcd_model, c_model, num_icp_points, x, q);
+    double **cloud_normals = get_sub_cloud_normals_rotated(pcd_model, c_model, num_icp_points, q);
+
+    // compute visibility mask and remove hidden model points
+    int vis_mask[num_icp_points];
+    for (i = 0; i < num_icp_points; i++) {
+      double vis_prob = compute_visibility_prob(cloud[i], cloud_normals[i], obs_range_image, params->range_sigma);
+      vis_mask[i] = (vis_prob > .1);
+    }
+    int idx[num_icp_points];
+    int n = find(idx, vis_mask, num_icp_points);
+    reorder_rows(cloud, cloud, idx, n, 3);
+    reorder_rows(cloud_normals, cloud_normals, idx, n, 3);
+    reorderi(c_model, c_model, idx, n);
+
+    // compute nearest neighbors
+    int c_obs[n];
+    double nn_d2[n];
+    int search_radius = 5;  // pixels
+    range_image_find_nn(c_obs, nn_d2, cloud, cloud, n, 3, pcd_obs->points, obs_fg_range_image, search_radius);
+
+    // update model pose
+    get_model_pose_distribution_from_correspondences_LS(pcd_obs, pcd_model, c_obs, c_model, n, params->xyz_sigma, x0, &B);
+    sample_model_pose(pcd_model, c_model, n, x0, &B, x, q);
+
+    free_matrix2(cloud);
+    free_matrix2(cloud_normals);
   }
 }
 
@@ -1657,39 +1713,34 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   //dbug
   t0 = get_time_ms();
 
-  // remove low-weight samples
+  // params
   double w_sigma = 1.0;  //TODO: make this a parameter
-  num_samples = find_first_lt(W, W[0] - 2*w_sigma, num_samples);
+  int num_score_trials = 10;
+  double w_sigma_multi = w_sigma / sqrt((double)num_score_trials);
 
-  // pose clustering
+  // remove low-weight samples, cluster poses, re-weight, sort, and remove low-weight samples again
+  num_samples = find_first_lt(W, W[0] - 2*w_sigma, num_samples);
   if (params->pose_clustering)
     num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
-
-  // average sample weights across multiple random trials
-  int num_score_trials = 10;
-  double **W_trials = new_matrix2(num_score_trials, num_samples);
-  for (j = 0; j < num_score_trials; j++)
-    for (i = 0; i < num_samples; i++)
-      W_trials[j][i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);
-  mean(W, W_trials, num_score_trials, num_samples);
-  //double W_var[num_samples];
-  //variance(W_var, W_trials, num_score_trials, num_samples);
-  w_sigma /= sqrt((double)num_score_trials);
-
-  // sort samples by weight
+  for (i = 0; i < num_samples; i++)
+    W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params, num_score_trials);
   sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+  num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
 
-  // remove low-weight samples
-  num_samples = find_first_lt(W, W[0] - 2*w_sigma, num_samples);
-
-  // align samples and re-weight
+  // align samples, cluster poses, re-weight, sort, and remove low-weight samples
   for (i = 0; i < num_samples; i++)
     align_model_icp_dense(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, params);
-  
+  if (params->pose_clustering)
+    num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
+  for (i = 0; i < num_samples; i++)
+    W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params, num_score_trials);
+  sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+  num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
+
   //dbug
   printf("Scored and sorted final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);
   if (have_true_pose)
-    print_good_poses_verbose(true_pose, X, Q, W, w_sigma, num_samples);
+    print_good_poses_verbose(true_pose, X, Q, W, w_sigma_multi, num_samples);
 
   // cleanup
   free(model_pmf);
