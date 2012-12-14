@@ -98,6 +98,7 @@ extern "C" {
   } olf_obs_t;
 
   typedef struct {
+    int verbose;
     int num_samples;
     int num_samples_init;
     int num_correspondences;
@@ -105,6 +106,7 @@ extern "C" {
     int num_validation_points;
     int use_range_image;
     int do_icp;
+    int do_final_icp;
     int branching_factor;
     int dispersion_weight;
     double sift_dthresh;

@@ -934,7 +934,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   // extract transformed model validation features
   double **cloud = get_sub_cloud_at_pose(pcd_model, idx, num_validation_points, x, q);
   double **cloud_normals = get_sub_cloud_normals_rotated(pcd_model, idx, num_validation_points, q);
-  //double **cloud_f = get_sub_cloud_fpfh(pcd_model, idx, num_validation_points);
+  double **cloud_f = get_sub_cloud_fpfh(pcd_model, idx, num_validation_points);
   double **cloud_lab = get_sub_cloud_lab(pcd_model, idx, num_validation_points);
   double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
 
@@ -955,15 +955,16 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
       range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud_xyzn[i], 1, 6, obs_xyzn, obs_fg_range_image, search_radius);
 
   double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
-  //double f_score = compute_fpfh_score(cloud_f, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
+  double f_score = compute_fpfh_score(cloud_f, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   double lab_score = compute_lab_score(cloud_lab, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   double vis_score = compute_vis_score(vis_prob, num_validation_points); //, params);
 
-  double score = xyzn_score + lab_score + vis_score;  //+ f_score + inlier_score;
+  double score = xyzn_score + lab_score + vis_score + f_score;
 
-  //dbug
-  //printf("score_comp = (%f, %f, %f, %f)\n", d_score, f_score, lab_score, inlier_score);
-  //printf("score = %f\n", score);
+  if (params->verbose) {
+    printf("score_comp = (%f, %f, %f, %f)\n", xyzn_score, f_score, lab_score, vis_score);
+    printf("score = %f\n", score);
+  }
 
   // cleanup
   free_matrix2(cloud);
@@ -1079,21 +1080,30 @@ int sample_model_point_given_model_pose(double *x, double *q, int *c_model_prev,
   double **R = new_matrix2(3,3);
   quaternion_to_rotation_matrix(R,q);
 
-  int c_model;
-  while (1) {
-    c_model = cmfrand(model_cmf, pcd_model->num_points);
+  int i, c_model, found_point = 0;
+  for (i = 0; i < 20; i++) {
+
+    if (i < 10)  // try sampling from model_cmf
+      c_model = cmfrand(model_cmf, pcd_model->num_points);
+    else  // if that doesn't work, try uniform sampling
+      c_model = irand(pcd_model->num_points);
 
     if (!ismemberi(c_model, c_model_prev, n_model_prev)) {  // if a point is new
       double n[3], xyz[3];
       matrix_vec_mult(n, R, pcd_model->normals[c_model], 3, 3);
       matrix_vec_mult(xyz, R, pcd_model->points[c_model], 3, 3);
-      if (dot(n, xyz, 3) < 0)  // check if normals are pointing towards camera
+      add(xyz, xyz, x, 3);
+
+      if (dot(n, xyz, 3) < 0) {  // check if normals are pointing towards camera
+	found_point = 1;
 	break;
+      }
     }
   }
+
   free_matrix2(R);
 
-  return c_model;
+  return (found_point ? c_model : -1);
 }
 
 int sample_obs_correspondence_given_model_pose(double *x, double *q, int c_model, pcd_t *pcd_model, double **obs_fxyzn,
@@ -1495,6 +1505,10 @@ void sort_pose_samples(double **X, double **Q, double *W, int **C_obs, int **C_m
  */
 olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose)
 {
+  const double MIN_SCORE = -100000.0;
+
+  params->verbose = 0;
+
   /*dbug
   params->num_samples_init = 1;
   params->num_samples = 1;
@@ -1644,8 +1658,13 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
     for (i = 0; i < num_samples * branching_factor; ++i) {
 
-      // sample a new correspondence
+      // sample a new model point
       C_model[i][c] = sample_model_point_given_model_pose(X[i], Q[i], C_model[i], c, model_cmf, pcd_model);  // + .02 ms
+
+      if (C_model[i][c] < 0)
+	continue;
+
+      // sample a corresponding obs point
       C_obs[i][c] = sample_obs_correspondence_given_model_pose(X[i], Q[i], C_model[i][c], pcd_model, obs_fxyzn, obs_xyzn_index, &obs_xyzn_params, params);  // + .18 ms
 
       // compute max likelihood model pose given the point correspondences
@@ -1697,12 +1716,24 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     t0 = get_time_ms();
 
     // score hypotheses
-    for (i = 0; i < num_samples * branching_factor; i++)
-      W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);  // + .56 ms
+    for (i = 0; i < num_samples * branching_factor; i++) {
+      if (C_model[i][c] >= 0)
+	W[i] = model_placement_score(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params);  // + .56 ms
+      else
+	W[i] = MIN_SCORE;
+    }
 
     // sort samples by weight and prune branches
     //sort_pose_samples(X, Q, W, C_obs, C_model, C_issift, num_samples * branching_factor, params->num_correspondences);
     sort_pose_samples(X, Q, W, C_obs, C_model, num_samples * branching_factor, params->num_correspondences);
+
+    //dbug
+    for (i = 0; i < num_samples; i++) {
+      if (W[i] == MIN_SCORE) {
+	printf("WARNING: W[%d] == MIN_SCORE --> Setting num_samples = %d\n", i, i);
+	num_samples = i;
+      }
+    }
 
     //dbug
     printf("Scored and sorted c=%d poses in %.3f seconds\n", c+1, (get_time_ms() - t0) / 1000.0);  //dbug
@@ -1728,19 +1759,29 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
 
   // align samples, cluster poses, re-weight, sort, and remove low-weight samples
-  for (i = 0; i < num_samples; i++)
-    align_model_icp_dense(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, params);
-  if (params->pose_clustering)
-    num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
-  for (i = 0; i < num_samples; i++)
-    W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params, num_score_trials);
-  sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
-  num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
+  if (params->do_final_icp) {
+    for (i = 0; i < num_samples; i++)
+      align_model_icp_dense(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, params);
+    if (params->pose_clustering)
+      num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
+    for (i = 0; i < num_samples; i++)
+      W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params, num_score_trials);
+    sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+    num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
+  }
 
   //dbug
   printf("Scored and sorted final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);
   if (have_true_pose)
     print_good_poses_verbose(true_pose, X, Q, W, w_sigma_multi, num_samples);
+
+  /*dbug
+  params->verbose = 1;
+  for (i = 0; i < num_samples; i++) {
+    printf("\nsample %d:\n", i);
+    model_placement_score_multi(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, obs_xyzn, params, num_score_trials);
+  }
+  */
 
   // cleanup
   free(model_pmf);

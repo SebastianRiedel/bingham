@@ -1,4 +1,4 @@
-function plot_pcd(pcd, style, options)
+function plot_pcd(pcd, style, options, style1, style2)
 % plot_pcd(pcd)
 
 if nargin < 2
@@ -9,7 +9,12 @@ X = pcd.X;
 Y = pcd.Y;
 Z = pcd.Z;
 
-plot3(X, Y, Z, style); %, 'MarkerSize', 20);
+if nargin < 5
+    plot3(X, Y, Z, style);
+else
+    plot3(X, Y, Z, style, style1, style2);
+end
+
 
 LINE_LENGTH_RATIO = .2; %.1;
 LINE_SKIP_RATE = 5; %10;
