@@ -73,6 +73,10 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%d", &params->do_icp);
       }
+      else if (!wordcmp(s, "do_final_icp", "\t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%d", &params->do_final_icp);
+      }
       else if (!wordcmp(s, "dispersion_weight", "\t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%d", &params->dispersion_weight);
