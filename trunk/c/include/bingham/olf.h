@@ -67,6 +67,7 @@ extern "C" {
     double **Q;
     double *W;
     int n;
+    double **vis_probs;  //dbug
   } olf_pose_samples_t;
 
   typedef struct {
@@ -94,7 +95,8 @@ extern "C" {
   typedef struct {
     pcd_t *fg_pcd;
     pcd_t *sift_pcd;
-    range_image_t *range_image;
+    pcd_t *bg_pcd;
+    //range_image_t *range_image;
   } olf_obs_t;
 
   typedef struct {
@@ -117,6 +119,8 @@ extern "C" {
     double surfwidth_weight;
     double surfdist_thresh;
     double surfwidth_thresh;
+    double surfdist_sigma;
+    double surfwidth_sigma;
     double fsurf_sigma;
     double range_sigma;
     double range_weight;
@@ -126,6 +130,8 @@ extern "C" {
     double f_sigma;
     double lab_sigma;
     double xyz_sigma;
+    double vis_weight;
+    double f_weight;
   } scope_params_t;
 
 

@@ -113,6 +113,14 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->surfwidth_thresh);
       }
+      else if (!wordcmp(s, "surfdist_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->surfdist_sigma);
+      }
+      else if (!wordcmp(s, "surfwidth_sigma", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->surfwidth_sigma);
+      }
       else if (!wordcmp(s, "fsurf_sigma", " \t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->fsurf_sigma);
@@ -153,6 +161,14 @@ void load_params(scope_params_t *params, char *param_file)
 	s = sword(s, " \t", 1);
 	sscanf(s, "%lf", &params->xyz_sigma);
       }
+      else if (!wordcmp(s, "vis_weight", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->vis_weight);
+      }
+      else if (!wordcmp(s, "f_weight", " \t\n")) {
+	s = sword(s, " \t", 1);
+	sscanf(s, "%lf", &params->f_weight);
+      }
       else {
 	fprintf(stderr, "Error: bad parameter ''%s'' at line %d of %s\n", s, cnt, param_file);
 	exit(1);
@@ -177,7 +193,8 @@ int main(int argc, char *argv[])
   }
 
   olf_obs_t obs;
-  obs.range_image = pcd_to_range_image(load_pcd(argv[1]), 0, M_PI/1000.0);
+  //obs.range_image = pcd_to_range_image(load_pcd(argv[1]), 0, M_PI/1000.0);
+  obs.bg_pcd = load_pcd(argv[1]);
   obs.fg_pcd = load_pcd(argv[2]);
   obs.sift_pcd = load_pcd(argv[3]);
 
@@ -210,6 +227,7 @@ int main(int argc, char *argv[])
   double **Q = poses->Q;
   double *W = poses->W;
   int n = poses->n;
+  double **vis_probs = poses->vis_probs; //dbug
   /*
   for (n = 1; n < poses->n; n++)
     if (W[n] < .01 * W[0])
@@ -232,6 +250,17 @@ int main(int argc, char *argv[])
   for (i = 0; i < n; i++)
     fprintf(f, "%f ", W[i]);
   fprintf(f, "];\n");
+
+  //dbug
+  fprintf(f, "vis_probs = [");
+  int j;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < model.obj_pcd->num_points; j++)
+      fprintf(f, "%f ", vis_probs[i][j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
 
   fclose(f);
 
