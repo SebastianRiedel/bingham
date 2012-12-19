@@ -10,6 +10,13 @@ pcd2.X = V(1,:)';
 pcd2.Y = V(2,:)';
 pcd2.Z = V(3,:)';
 
+if isfield(pcd, 'VX')
+    V = R*[pcd.VX' ; pcd.VY' ; pcd.VZ'];
+    pcd2.VX = V(1,:)';
+    pcd2.VY = V(2,:)';
+    pcd2.VZ = V(3,:)';
+end
+
 if isfield(pcd, 'NX')
     V = R*[pcd.NX' ; pcd.NY' ; pcd.NZ'];
     pcd2.NX = V(1,:)';

@@ -8,6 +8,9 @@ ch_cluster = find(strcmp(columns, 'cluster'));
 ch_x = find(strcmp(columns, 'x'));
 ch_y = find(strcmp(columns, 'y'));
 ch_z = find(strcmp(columns, 'z'));
+ch_vx = find(strcmp(columns, 'vx'));
+ch_vy = find(strcmp(columns, 'vy'));
+ch_vz = find(strcmp(columns, 'vz'));
 ch_pfh = find(strncmp(columns, 'f', 1));
 ch_pfh_small = find(strncmp(columns, 'sf', 2));
 ch_sift = find(strncmp(columns, 'sift', 4));
@@ -40,6 +43,15 @@ if ~isempty(ch_y)
 end
 if ~isempty(ch_z)
    pcd.Z = data(:, ch_z);
+end
+if ~isempty(ch_vx)
+   pcd.VX = data(:, ch_vx);
+end
+if ~isempty(ch_vy)
+   pcd.VY = data(:, ch_vy);
+end
+if ~isempty(ch_vz)
+   pcd.VZ = data(:, ch_vz);
 end
 if ~isempty(ch_pfh)
    pcd.F = data(:, ch_pfh);
