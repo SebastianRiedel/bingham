@@ -12,7 +12,7 @@ end
 
 D = sqrt(sum(P.^2,2));
 X = atan2(P(:,1), P(:,3));
-Y = asin(P(:,2)./D);
+Y = acos(P(:,2)./D);
 
 C = ceil(([X,Y] - repmat(RI.min, [length(X),1]))/RI.res);
 mask = logical((C(:,1)>0).*(C(:,2)>0).*(C(:,1)<=size(RI.image,1)).*(C(:,2)<=size(RI.image,2)));

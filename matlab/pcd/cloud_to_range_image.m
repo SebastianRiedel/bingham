@@ -24,7 +24,9 @@ P = cloud - repmat(origin, [size(cloud,1) 1]);
 if length(viewpoint)==7
     rot_mat = quaternionToRotationMatrix(qinv(viewpoint(4:7)));
     P = P*rot_mat';
-else
+    
+elseif norm(origin) > .0001  %dbug: move this outside of cloud_to_range_image!!!
+    
     % get a rotation matrix that moves the cloud directly above the viewpoint (on the z-axis)
 %     a = acos(origin(3));
 %     if (abs(a) > .01)

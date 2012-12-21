@@ -45,6 +45,19 @@ void load_params(scope_params_t *params, char *param_file)
     char *s = sbuf;
     if (fgets(s, 1024, f)) {
       cnt++;
+      
+      // remove comments
+      char *comment_pos = strchr(s, '#');
+      if (comment_pos)
+	*comment_pos = '\0';
+
+      // skip leading whitespace
+      s += strspn(s, " \t");
+
+      // skip empty lines
+      if (strlen(s) == 0)
+	continue;
+
       if (!wordcmp(s, "num_samples", " \t\n")) {
 	s = sword(s, " \t", 1);
 	sscanf(s, "%d", &params->num_samples);
@@ -183,12 +196,12 @@ int main(int argc, char *argv[])
 {
   short have_true_pose = 0;
   simple_pose_t true_pose;
-  if (argc < 8) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <param_file> <samples_output>\n", argv[0]);
+  if (argc < 9) {
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <pcd_model_range_edges> <param_file> <samples_output>\n", argv[0]);
     printf("or\n");
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <param_file> <samples_output> <ground_truth_folder>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_sift> <pcd_model_range_edges> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
     return 1;
-  } else if (argc == 9) {
+  } else if (argc == 10) {
     have_true_pose = 1;
   }
 
@@ -201,15 +214,16 @@ int main(int argc, char *argv[])
   olf_model_t model;
   model.obj_pcd = load_pcd(argv[4]);
   model.sift_pcd = load_pcd(argv[5]);
+  model.range_edges_pcd = load_pcd(argv[6]);
 
   scope_params_t params;
-  load_params(&params, argv[6]);
+  load_params(&params, argv[7]);
 
   if (have_true_pose) {
-    load_true_pose(argv[8], &true_pose);
+    load_true_pose(argv[9], &true_pose);
   }
 
-  FILE *f = fopen(argv[7], "w");
+  FILE *f = fopen(argv[8], "w");
   if (f == NULL) {
     printf("Can't open %s for writing\n", argv[2]);
     return 1;

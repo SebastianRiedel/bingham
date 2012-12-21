@@ -24,6 +24,9 @@ extern "C" {
     // data pointers
     double *pc1;
     double *pc2;
+    double *range_edge;
+    double *curv_edge;
+    double *img_edge;
 
     // transposed data
     double **points;  // x_i: points[0][i], y_i: points[1][i], 
@@ -90,6 +93,7 @@ extern "C" {
   typedef struct {
     pcd_t *obj_pcd;
     pcd_t *sift_pcd;
+    pcd_t *range_edges_pcd;
   } olf_model_t;
 
   typedef struct {
