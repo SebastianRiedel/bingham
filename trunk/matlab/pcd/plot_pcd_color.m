@@ -1,11 +1,15 @@
-function plot_pcd_color(pcd, grayscale, colormap)
+function plot_pcd_color(pcd, grayscale, colormap, point_size)
 
 if nargin < 2
     grayscale = 0;
 end
 
-if nargin < 3
+if nargin < 3 || isempty(colormap)
     colormap = repmat((0:256)'/256, [1,3]);
+end
+
+if nargin < 4
+    point_size = 10;
 end
 
 % cluster points into color buckets
@@ -27,12 +31,12 @@ if grayscale
     for i=0:256
         mask = (BW==i);
         if max(mask)>0
-            plot3(pcd.X(mask), pcd.Y(mask), pcd.Z(mask), '.', 'Color', colormap(i+1,:));
+            plot3(pcd.X(mask), pcd.Y(mask), pcd.Z(mask), '.', 'Color', colormap(i+1,:), 'MarkerSize', point_size);
         end
     end
 else
     for i=1:n
-        plot3(pcd.X(i), pcd.Y(i), pcd.Z(i), '.', 'Color', [pcd.R(i), pcd.G(i), pcd.B(i)]/256);
+        plot3(pcd.X(i), pcd.Y(i), pcd.Z(i), '.', 'Color', [pcd.R(i), pcd.G(i), pcd.B(i)]/256, 'MarkerSize', point_size);
     end
 end
 

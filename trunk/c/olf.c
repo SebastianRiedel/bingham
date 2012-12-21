@@ -79,7 +79,9 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_sift128 = pcd_channel(pcd, "sift128");
   int ch_surfdist = pcd_channel(pcd, "surfdist");
   int ch_surfwidth = pcd_channel(pcd, "surfwidth");
-
+  int ch_range_edge = pcd_channel(pcd, "range_edge");
+  int ch_curv_edge = pcd_channel(pcd, "curv_edge");
+  int ch_img_edge = pcd_channel(pcd, "img_edge");
 
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
@@ -121,10 +123,6 @@ static void pcd_add_data_pointers(pcd_t *pcd)
       pcd->principal_curvatures[i][2] = pcd->data[ch_pcz][i];
     }
   }
-  if (ch_pc1>=0 && ch_pc2>=0) {
-    pcd->pc1 = pcd->data[ch_pc1];
-    pcd->pc2 = pcd->data[ch_pc2];
-  }
   if (ch_f1>=0 && ch_f33>=0) {
     pcd->shape_length = 33;
     pcd->shapes = new_matrix2(num_points, pcd->shape_length);
@@ -147,6 +145,19 @@ static void pcd_add_data_pointers(pcd_t *pcd)
       pcd->sdw[i][1] = pcd->data[ch_surfwidth][i];
     }
   }
+
+  // data pointers
+  if (ch_pc1>=0 && ch_pc2>=0) {
+    pcd->pc1 = pcd->data[ch_pc1];
+    pcd->pc2 = pcd->data[ch_pc2];
+  }
+  if (ch_range_edge>=0)
+    pcd->range_edge = pcd->data[ch_range_edge];
+  if (ch_curv_edge>=0)
+    pcd->curv_edge = pcd->data[ch_curv_edge];
+  if (ch_img_edge>=0)
+    pcd->img_edge = pcd->data[ch_img_edge];
+
 
   // add quaternion orientation features
   if (ch_nx>=0 && ch_ny>=0 && ch_nz>=0 && ch_pcx>=0 && ch_pcy>=0 && ch_pcz>=0) {
@@ -560,6 +571,28 @@ void range_image_find_nn(int *nn_idx, double *nn_d2, double **query_xyz, double 
 }
 
 
+int **compute_range_image_edges(range_image_t *range_image, double dthresh)
+{
+  int x,y;
+  int w = range_image->w;
+  int h = range_image->h;
+
+  int **E = new_matrix2i(w,h);
+  double **RI = range_image->image;
+
+  for (x = 1; x < w-1; x++) {
+    for (y = 1; y < h-1; y++) {
+      
+      double r = RI[x][y];
+
+      //if (r 
+    }
+  }
+
+  return E;
+}
+
+
 double *compute_model_saliency(pcd_t *pcd_model)
 {
   double epsilon = 1e-50;
@@ -799,6 +832,7 @@ double **get_sub_cloud_fpfh(pcd_t *pcd, int *idx, int n)
   return F;
 }
 
+/*
 double **get_sub_cloud_sdw(pcd_t *pcd, int *idx, int n, scope_params_t *params)
 {
   double surfdist_thresh = params->surfdist_thresh;
@@ -815,6 +849,7 @@ double **get_sub_cloud_sdw(pcd_t *pcd, int *idx, int n, scope_params_t *params)
 
   return sdw;
 }
+*/
 
 double **get_sub_cloud_lab(pcd_t *pcd, int *idx, int n)
 {
@@ -856,6 +891,7 @@ double **get_fxyzn_features(double **fpfh, double **points, double **normals, in
   return fxyzn;
 }
 
+/*
 float **get_fsurf_features(double **fpfh, double **sdw, int n, int fpfh_length, scope_params_t *params)
 {
   int i, j;
@@ -882,6 +918,7 @@ float **get_fsurf_features(double **fpfh, double **sdw, int n, int fpfh_length, 
 
   return fsurf;
 }
+*/
 
 double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t *params)
 {
@@ -915,6 +952,7 @@ double compute_fpfh_score(double **fpfh, int *nn_idx, double *vis_prob, int n, p
   return params->f_weight * score;
 }
 
+/*
 double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd_t *pcd_obs, scope_params_t *params)
 {
   double surfdist_thresh = params->surfdist_thresh;
@@ -937,6 +975,7 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
 
   return score;
 }
+*/
 
 double compute_lab_score(double **lab, int *nn_idx, double *vis_prob, int n, pcd_t *pcd_obs, scope_params_t *params)
 {
@@ -982,7 +1021,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   double **cloud = get_sub_cloud_at_pose(pcd_model, idx, num_validation_points, x, q);
   double **cloud_normals = get_sub_cloud_normals_rotated(pcd_model, idx, num_validation_points, q);
   //double **cloud_f = get_sub_cloud_fpfh(pcd_model, idx, num_validation_points);
-  double **cloud_sdw = get_sub_cloud_sdw(pcd_model, idx, num_validation_points, params);
+  //double **cloud_sdw = get_sub_cloud_sdw(pcd_model, idx, num_validation_points, params);
   double **cloud_lab = get_sub_cloud_lab(pcd_model, idx, num_validation_points);
   double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
 
@@ -1008,14 +1047,14 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
 
   double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
   //double f_score = compute_fpfh_score(cloud_f, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
-  double sdw_score = compute_sdw_score(cloud_sdw, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
+  //double sdw_score = compute_sdw_score(cloud_sdw, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   double lab_score = compute_lab_score(cloud_lab, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params);
 
-  double score = xyzn_score + sdw_score + lab_score + vis_score;
+  double score = xyzn_score + lab_score + vis_score;  //+ sdw_score 
 
   if (params->verbose) {
-    printf("score_comp = (%f, %f, %f, %f)\n", xyzn_score, sdw_score, lab_score, vis_score);
+    printf("score_comp = (%f, %f, %f)\n", xyzn_score, lab_score, vis_score);
     printf("score = %f\n", score);
   }
 
@@ -1023,7 +1062,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_
   free_matrix2(cloud);
   free_matrix2(cloud_normals);
   //free_matrix2(cloud_f);
-  free_matrix2(cloud_sdw);
+  //free_matrix2(cloud_sdw);
   free_matrix2(cloud_lab);
   free_matrix2(cloud_xyzn);
 
@@ -1604,8 +1643,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   double **model_xyzn = get_xyzn_features(pcd_model->points, pcd_model->normals, pcd_model->num_points, params);
   double **obs_fxyzn = get_fxyzn_features(pcd_obs->shapes, pcd_obs->points, pcd_obs->normals, pcd_obs->num_points, pcd_obs->shape_length, params);
   double **model_fxyzn = get_fxyzn_features(pcd_model->shapes, pcd_model->points, pcd_model->normals, pcd_model->num_points, pcd_model->shape_length, params);
-  float **obs_fsurf = get_fsurf_features(pcd_obs->shapes, pcd_obs->sdw, pcd_obs->num_points, pcd_obs->shape_length, params);
-  float **model_fsurf = get_fsurf_features(pcd_model->shapes, pcd_model->sdw, pcd_model->num_points, pcd_model->shape_length, params);
+  //float **obs_fsurf = get_fsurf_features(pcd_obs->shapes, pcd_obs->sdw, pcd_obs->num_points, pcd_obs->shape_length, params);
+  //float **model_fsurf = get_fsurf_features(pcd_model->shapes, pcd_model->sdw, pcd_model->num_points, pcd_model->shape_length, params);
 
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
@@ -1617,7 +1656,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   struct FLANNParameters obs_xyzn_params = flann_params_single;
   struct FLANNParameters model_xyz_params = flann_params_single;
   //struct FLANNParameters model_xyzn_params = flann_params_single;
-  struct FLANNParameters model_fsurf_params = flann_params;
+  //struct FLANNParameters model_fsurf_params = flann_params;
+  struct FLANNParameters model_f_params = flann_params;
 
   printf("Building FLANN indices\n");
 
@@ -1626,7 +1666,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_index_t obs_xyzn_index = flann_build_index_double(obs_xyzn[0], pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
   flann_index_t model_xyz_index = flann_build_index_double(pcd_model->points[0], pcd_model->num_points, 3, &speedup, &model_xyz_params);
   //flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
-  flann_index_t model_fsurf_index = flann_build_index_float(model_fsurf[0], pcd_model->num_points, shape_length + 2, &speedup, &model_fsurf_params);
+  //flann_index_t model_fsurf_index = flann_build_index_float(model_fsurf[0], pcd_model->num_points, shape_length + 2, &speedup, &model_fsurf_params);
+  flann_index_t model_f_index = flann_build_index_double(pcd_model->shapes[0], pcd_model->num_points, shape_length, &speedup, &model_f_params);
 
   //dbug
   double t0_scope = get_time_ms();
@@ -1662,11 +1703,14 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
       C_obs[i][0] = irand(pcd_obs->num_points);
       int nn_idx[params->knn];
-      float nn_d2[params->knn];
-      flann_find_nearest_neighbors_index_float(model_fsurf_index, obs_fsurf[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_fsurf_params);
+      //float nn_d2[params->knn];
+      double nn_d2[params->knn];
+      //flann_find_nearest_neighbors_index_float(model_fsurf_index, obs_fsurf[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_fsurf_params);
+      flann_find_nearest_neighbors_index_double(model_f_index, pcd_obs->shapes[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_f_params);
       double p[params->knn];
       for (j = 0; j < params->knn; j++)
-	p[j] = exp(-.5*nn_d2[j] / (params->fsurf_sigma * params->fsurf_sigma));
+	p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
+	//p[j] = exp(-.5*nn_d2[j] / (params->fsurf_sigma * params->fsurf_sigma));
       normalize_pmf(p, p, params->knn);
       j = pmfrand(p, params->knn);
       C_model[i][0] = nn_idx[j];
@@ -1856,12 +1900,13 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   free_matrix2(model_xyzn);
   free_matrix2(obs_fxyzn);
   free_matrix2(model_fxyzn);
-  free_matrix2f(obs_fsurf);
-  free_matrix2f(model_fsurf);
+  //free_matrix2f(obs_fsurf);
+  //free_matrix2f(model_fsurf);
   flann_free_index(obs_xyzn_index, &obs_xyzn_params);
   flann_free_index(model_xyz_index, &model_xyz_params);
   //flann_free_index(model_xyzn_index, &model_xyzn_params);
-  flann_free_index(model_fsurf_index, &model_fsurf_params);
+  //flann_free_index(model_fsurf_index, &model_fsurf_params);
+  flann_free_index(model_f_index, &model_f_params);
   free_matrix2i(C_obs);
   free_matrix2i(C_model);
   //free_matrix2i(C_issift);
