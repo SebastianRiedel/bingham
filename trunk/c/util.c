@@ -1100,14 +1100,24 @@ void randperm(int *x, int n, int d)
     return;
   }
   
-  for (i = 0; i < d; i++) {
-    while (1) {
-      x[i] = rand() % n;
-      for (j = 0; j < i; j++)
-	if (x[j] == x[i])
+  if (d > sqrt(n)) {
+    double r[n];
+    int idx[n];
+    for (i = 0; i < n; i++)
+      r[i] = frand();
+    sort_indices(r, idx, n);
+    memcpy(x, idx, d*sizeof(int));
+  }
+  else {
+    for (i = 0; i < d; i++) {
+      while (1) {
+	x[i] = rand() % n;
+	for (j = 0; j < i; j++)
+	  if (x[j] == x[i])
+	    break;
+	if (j == i)  // x[i] is unique
 	  break;
-      if (j == i)  // x[i] is unique
-	break;
+      }
     }
   }
 }
@@ -2594,7 +2604,8 @@ void mink(double *x, int *idx, int n, int k)
     idx[i] = idx2[i];
 }
 
-short double_is_equal(double a, double b) {
+short double_is_equal(double a, double b)
+{
   return fabs(a - b) < 0.00001;
 }
 
