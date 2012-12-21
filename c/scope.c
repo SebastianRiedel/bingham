@@ -49,139 +49,97 @@ void load_params(scope_params_t *params, char *param_file)
       // remove comments
       char *comment_pos = strchr(s, '#');
       if (comment_pos)
-	*comment_pos = '\0';
+	*comment_pos = '\n';
 
       // skip leading whitespace
       s += strspn(s, " \t");
 
       // skip empty lines
-      if (strlen(s) == 0)
+      if (*s == '\n')
 	continue;
 
-      if (!wordcmp(s, "num_samples", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->num_samples);
-      }
-      else if (!wordcmp(s, "num_samples_init", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->num_samples_init);
-      }
-      else if (!wordcmp(s, "num_correspondences", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->num_correspondences);
-      }
-      else if (!wordcmp(s, "knn", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->knn);
-      }
-      else if (!wordcmp(s, "num_validation_points", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->num_validation_points);
-      }
-      else if (!wordcmp(s, "use_range_image", "\t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->use_range_image);
-      }
-      else if (!wordcmp(s, "do_icp", "\t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->do_icp);
-      }
-      else if (!wordcmp(s, "do_final_icp", "\t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->do_final_icp);
-      }
-      else if (!wordcmp(s, "dispersion_weight", "\t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->dispersion_weight);
-      }
-      else if (!wordcmp(s, "branching_factor", "\t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->branching_factor);
-      }
-      else if (!wordcmp(s, "sift_dthresh", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->sift_dthresh);
-      }
-      else if (!wordcmp(s, "xyz_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->xyz_weight);
-      }
-      else if (!wordcmp(s, "normal_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->normal_weight);
-      }
-      else if (!wordcmp(s, "surfdist_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfdist_weight);
-      }
-      else if (!wordcmp(s, "surfwidth_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfwidth_weight);
-      }
-      else if (!wordcmp(s, "surfdist_thresh", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfdist_thresh);
-      }
-      else if (!wordcmp(s, "surfwidth_thresh", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfwidth_thresh);
-      }
-      else if (!wordcmp(s, "surfdist_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfdist_sigma);
-      }
-      else if (!wordcmp(s, "surfwidth_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->surfwidth_sigma);
-      }
-      else if (!wordcmp(s, "fsurf_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->fsurf_sigma);
-      }
-      else if (!wordcmp(s, "L_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->L_weight);
-      }
-      else if (!wordcmp(s, "range_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->range_sigma);
-      }
-      else if (!wordcmp(s, "range_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->range_weight);
-      }
-      else if (!wordcmp(s, "pose_clustering", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%d", &params->pose_clustering);
-      }
-      else if (!wordcmp(s, "x_cluster_thresh", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->x_cluster_thresh);
-      }
-      else if (!wordcmp(s, "q_cluster_thresh", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->q_cluster_thresh);
-      }
-      else if (!wordcmp(s, "f_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->f_sigma);
-      }
-      else if (!wordcmp(s, "lab_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->lab_sigma);
-      }
-      else if (!wordcmp(s, "xyz_sigma", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->xyz_sigma);
-      }
-      else if (!wordcmp(s, "vis_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->vis_weight);
-      }
-      else if (!wordcmp(s, "f_weight", " \t\n")) {
-	s = sword(s, " \t", 1);
-	sscanf(s, "%lf", &params->f_weight);
-      }
+      char *name = s;
+      char *value = sword(s, " \t", 1);
+
+      if (!wordcmp(name, "num_samples", " \t\n"))
+	sscanf(value, "%d", &params->num_samples);
+      else if (!wordcmp(name, "num_samples_init", " \t\n"))
+	sscanf(value, "%d", &params->num_samples_init);
+      else if (!wordcmp(name, "num_correspondences", " \t\n"))
+	sscanf(value, "%d", &params->num_correspondences);
+      else if (!wordcmp(name, "branching_factor", "\t\n"))
+	sscanf(value, "%d", &params->branching_factor);
+      else if (!wordcmp(name, "knn", " \t\n"))
+	sscanf(value, "%d", &params->knn);
+      else if (!wordcmp(name, "num_validation_points", " \t\n"))
+	sscanf(value, "%d", &params->num_validation_points);
+      else if (!wordcmp(name, "use_range_image", "\t\n"))
+	sscanf(value, "%d", &params->use_range_image);
+      else if (!wordcmp(name, "do_icp", "\t\n"))
+	sscanf(value, "%d", &params->do_icp);
+      else if (!wordcmp(name, "do_final_icp", "\t\n"))
+	sscanf(value, "%d", &params->do_final_icp);
+
+      else if (!wordcmp(name, "dispersion_weight", "\t\n"))
+	sscanf(value, "%d", &params->dispersion_weight);
+      else if (!wordcmp(name, "sift_dthresh", " \t\n"))
+	sscanf(value, "%lf", &params->sift_dthresh);
+      else if (!wordcmp(name, "xyz_weight", " \t\n"))
+	sscanf(value, "%lf", &params->xyz_weight);
+      else if (!wordcmp(name, "normal_weight", " \t\n"))
+	sscanf(value, "%lf", &params->normal_weight);
+      else if (!wordcmp(name, "L_weight", " \t\n"))
+	sscanf(value, "%lf", &params->L_weight);
+      else if (!wordcmp(name, "range_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->range_sigma);
+      else if (!wordcmp(name, "range_weight", " \t\n"))
+	sscanf(value, "%lf", &params->range_weight);
+      else if (!wordcmp(name, "f_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->f_sigma);
+      else if (!wordcmp(name, "lab_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->lab_sigma);
+      else if (!wordcmp(name, "xyz_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->xyz_sigma);
+      else if (!wordcmp(name, "vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->vis_weight);
+      else if (!wordcmp(name, "f_weight", " \t\n"))
+	sscanf(value, "%lf", &params->f_weight);
+
+      else if (!wordcmp(name, "pose_clustering", " \t\n"))
+	sscanf(value, "%d", &params->pose_clustering);
+      else if (!wordcmp(name, "x_cluster_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->x_cluster_thresh);
+      else if (!wordcmp(name, "q_cluster_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->q_cluster_thresh);
+
+      else if (!wordcmp(name, "range_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->range_edge_weight);
+      else if (!wordcmp(name, "curv_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->curv_edge_weight);
+      else if (!wordcmp(name, "img_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->img_edge_weight);
+      else if (!wordcmp(name, "edge_blur", " \t\n"))
+	sscanf(value, "%d", &params->edge_blur);
+      else if (!wordcmp(name, "edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->edge_weight);
+
+      /*
+      else if (!wordcmp(name, "surfdist_weight", " \t\n"))
+	sscanf(value, "%lf", &params->surfdist_weight);
+      else if (!wordcmp(name, "surfwidth_weight", " \t\n"))
+	sscanf(value, "%lf", &params->surfwidth_weight);
+      else if (!wordcmp(name, "surfdist_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->surfdist_thresh);
+      else if (!wordcmp(name, "surfwidth_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->surfwidth_thresh);
+      else if (!wordcmp(name, "surfdist_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->surfdist_sigma);
+      else if (!wordcmp(name, "surfwidth_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->surfwidth_sigma);
+      else if (!wordcmp(name, "fsurf_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->fsurf_sigma);
+      */
+
       else {
 	fprintf(stderr, "Error: bad parameter ''%s'' at line %d of %s\n", s, cnt, param_file);
 	exit(1);

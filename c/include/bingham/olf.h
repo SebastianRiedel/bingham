@@ -29,13 +29,14 @@ extern "C" {
     double *img_edge;
 
     // transposed data
-    double **points;  // x_i: points[0][i], y_i: points[1][i], 
+    double **points;
+    double **views;
     double **colors;
     double **normals;
     double **principal_curvatures;
     double **shapes;
     double **sift;
-    double **sdw;
+    //double **sdw;
 
     // computed data
     int *clusters;
@@ -66,6 +67,15 @@ extern "C" {
 
 
   typedef struct {
+    pcd_t *pcd;      // must be sorted by viewpoint!
+    int num_views;
+    double **views;  // Nx3 matrix of the unique viewpoints
+    int *view_idx;   // view_idx[i] = index of first pcd point with views[i] as its viewpoint
+    int *view_cnt;   // view_cnt[i] = number of pcd points with views[i] as their viewpoint
+  } multiview_pcd_t;
+
+
+  typedef struct {
     double **X;
     double **Q;
     double *W;
@@ -73,10 +83,12 @@ extern "C" {
     double **vis_probs;  //dbug
   } olf_pose_samples_t;
 
+
   typedef struct {
     double X[3];
     double Q[4];
   } simple_pose_t;
+
 
 
   pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
@@ -84,7 +96,7 @@ extern "C" {
   int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
   int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
 
-  range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res);
+  range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
 
 
 
@@ -103,39 +115,55 @@ extern "C" {
     //range_image_t *range_image;
   } olf_obs_t;
 
-  typedef struct {
+
+  typedef struct {  // scope_params_t
+
+    // GENERAL PARAMS
     int verbose;
-    int num_samples;
     int num_samples_init;
+    int num_samples;
     int num_correspondences;
-    int knn;
+    int branching_factor;
     int num_validation_points;
+    int knn;
     int use_range_image;
     int do_icp;
     int do_final_icp;
-    int branching_factor;
+
+    // WEIGHT / SIGMA PARAMS
     int dispersion_weight;
-    double sift_dthresh;
     double xyz_weight;
     double normal_weight;
-    double L_weight;
-    double surfdist_weight;
-    double surfwidth_weight;
-    double surfdist_thresh;
-    double surfwidth_thresh;
-    double surfdist_sigma;
-    double surfwidth_sigma;
-    double fsurf_sigma;
     double range_sigma;
     double range_weight;
-    int pose_clustering;
-    double x_cluster_thresh;
-    double q_cluster_thresh;
+    double sift_dthresh;
+    double L_weight;
     double f_sigma;
     double lab_sigma;
     double xyz_sigma;
     double vis_weight;
     double f_weight;
+    double edge_weight;
+
+    // POSE CLUSTERING PARAMS
+    int pose_clustering;
+    double x_cluster_thresh;
+    double q_cluster_thresh;
+
+    // EDGE IMAGE PARAMS
+    double range_edge_weight;
+    double curv_edge_weight;
+    double img_edge_weight;
+    int edge_blur;
+
+    //double surfdist_weight;
+    //double surfwidth_weight;
+    //double surfdist_thresh;
+    //double surfwidth_thresh;
+    //double surfdist_sigma;
+    //double surfwidth_sigma;
+    //double fsurf_sigma;
+
   } scope_params_t;
 
 
