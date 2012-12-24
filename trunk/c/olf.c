@@ -1935,7 +1935,7 @@ void align_model_edges(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *
 
   double **P2 = new_matrix2(n,3);
 
-  double step = 10;  // step size in gradient ascent
+  double step = .01;  // step size in gradient ascent
   
   int i, j, iter;
   for (iter = 0; iter < max_iter; iter++) {
@@ -1992,10 +1992,13 @@ void align_model_edges(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *
     for (j = 0; j < 3; j++) {
       // take a step in the direction of the gradient
       double x2[3], q2[4], dxq[7];
+      normalize(G, G, 7);
       mult(dxq, G, step*step_mult[j], 7);
       add(x2, x, &dxq[0], 3);
       add(q2, q, &dxq[3], 4);
       normalize(q2, q2, 4);
+
+      //printf("x2 = [%f, %f, %f], q2 = [%f, %f, %f]\n", x2[0], x2[1], x2[2], q2[0], q2[1], q2[2], q2[3]); //dbug
 
       // evaluate the score
       transform_cloud(P2, P, n, x2, q2);
@@ -2013,13 +2016,17 @@ void align_model_edges(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *
       }
     }
 
+    //printf("best_score = %f, current_score = %f\n", best_score, current_score); //dbug
+
     // termination criterion
-    if (best_score <= current_score)
-      break;
+    //if (best_score <= current_score)
+    //  break;
 
     memcpy(x, best_x, 3*sizeof(double));
     memcpy(q, best_q, 4*sizeof(double));
     step = best_step;
+
+    printf("iter = %d, best_score > current_score, step = %f\n", iter, step); //dbug
   }
 
 
@@ -2426,8 +2433,8 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
       align_model_icp_dense(X[i], Q[i], pcd_model, pcd_obs, obs_range_image, obs_fg_range_image, params, 10, 500);
 
     // align edges
-    //for (i = 0; i < num_samples; i++)
-    //  align_model_edges(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 20);
+    for (i = 0; i < num_samples; i++)
+      align_model_edges(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 20);
 
     // re-weight with full models
     params->num_validation_points = 0;
