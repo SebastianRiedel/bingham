@@ -112,9 +112,12 @@ void reorderi(int *y, int *x, int *idx, int n);                       /* reorder
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
-double **new_identity_matrix2(int n);                                /* create a new n-by-n 2d indetity matrix of doubles */
-int **new_identity_matrix2i(int n);                                  /* create a new n-by-n 2d indetity matrix of ints */
-void add_matrix_row(double **X, int n, int m);                             /* reallocate memory in order to add another matrix row */
+double **new_matrix2_data(int n, int m, double *data);                      /* create a new n-by-m 2d matrix of doubles */
+float **new_matrix2f_data(int n, int m, float *data);                       /* create a new n-by-m 2d matrix of floats */
+int **new_matrix2i_data(int n, int m, int *data);                           /* create a new n-by-m 2d matrix of ints */
+double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
+int **new_identity_matrix2i(int n);                                         /* create a new n-by-n 2d indetity matrix of ints */
+void add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
@@ -132,6 +135,7 @@ void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* m
 void matrix_sub(double **Z, double **X, double **Y, int n, int m);          /* matrix subtaction, Z = X-Y */
 void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
 void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* matrix-vector multiplication, y = A*x */
+void vec_matrix_mult(double *y, double *x, double **A, int n, int m);       /* vector-matrix multiplication, y = x*A */
 void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);     /* element-wise multiplication, Z[i][j] = X[i][j] * Y[i][j] */
 void matrix_pow(double **Y, double **X, int n, int m, double pw);           /* taking every element of a matrix to the power of pw */ 
 void matrix_sum(double y[], double **X, int n, int m);                      /* sums the columns of the matrix */

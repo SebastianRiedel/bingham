@@ -1316,6 +1316,30 @@ int **new_matrix2i(int n, int m)
   return X;
 }
 
+// create a new n-by-m 2d matrix of doubles
+double **new_matrix2_data(int n, int m, double *data)
+{
+  double **X = new_matrix2(n,m);
+  memcpy(X[0], data, n*m*sizeof(double));
+  return X;
+}
+
+// create a new n-by-m 2d matrix of floats
+float **new_matrix2f_data(int n, int m, float *data)
+{
+  float **X = new_matrix2f(n,m);
+  memcpy(X[0], data, n*m*sizeof(float));
+  return X;
+}
+
+// create a new n-by-m 2d matrix of ints
+int **new_matrix2i_data(int n, int m, int *data)
+{
+  int **X = new_matrix2i(n,m);
+  memcpy(X[0], data, n*m*sizeof(int));
+  return X;
+}
+
 void add_matrix_row(double **X, int n, int m) {
   printf("DANGER! Reallocating matrix rows is not tested yet!\n");
   double *raw = X[0];
@@ -1593,6 +1617,28 @@ void matrix_vec_mult(double *y, double **A, double *x, int n, int m)
   else
     for (i = 0; i < n; i++)
       y[i] = dot(A[i], x, m);
+}
+
+// vector-matrix multiplication, y = x*A
+void vec_matrix_mult(double *y, double *x, double **A, int n, int m)
+{
+  int i, j;
+  if (y == x) {
+    double z[n];
+    memcpy(z, x, n*sizeof(double));
+    for (j = 0; j < m; j++) {
+      y[j] = 0;
+      for (i = 0; i < n; i++)
+	y[j] += z[i]*A[i][j];
+    }
+  }
+  else {
+    for (j = 0; j < m; j++) {
+      y[j] = 0;
+      for (i = 0; i < n; i++)
+	y[j] += x[i]*A[i][j];
+    }
+  }
 }
 
 // matrix element-wise multiplication

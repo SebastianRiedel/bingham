@@ -233,6 +233,33 @@ int main(int argc, char *argv[])
   }
   fprintf(f, "];\n");
 
+  //dbug
+  extern double **obs_edge_image_;
+  extern int obs_edge_image_width_;
+  extern int obs_edge_image_height_;
+  fprintf(f, "obs_edge_image = [");
+  for (i = 0; i < obs_edge_image_width_ * obs_edge_image_height_; i++)
+    fprintf(f, "%f ", obs_edge_image_[0][i]);
+  fprintf(f, "];\n");
+  fprintf(f, "obs_edge_image = reshape(obs_edge_image, [%d,%d]);\n\n", obs_edge_image_height_, obs_edge_image_width_);
+
+  //dbug
+  extern double **range_edge_points_;
+  extern int **range_edge_pixels_;
+  extern double *range_edge_vis_prob_;
+  extern int num_range_edge_points_;
+  fprintf(f, "range_edge_points = [");
+  for (i = 0; i < num_range_edge_points_; i++)
+    fprintf(f, "%f %f %f ; ", range_edge_points_[i][0], range_edge_points_[i][1], range_edge_points_[i][2]);
+  fprintf(f, "];\n");
+  fprintf(f, "range_edge_pixels = [");
+  for (i = 0; i < num_range_edge_points_; i++)
+    fprintf(f, "%d %d ; ", range_edge_pixels_[i][0] + 1, range_edge_pixels_[i][1] + 1);
+  fprintf(f, "];\n");
+  fprintf(f, "range_edge_vis_prob = [");
+  for (i = 0; i < num_range_edge_points_; i++)
+    fprintf(f, "%f ", range_edge_vis_prob_[i]);
+  fprintf(f, "];\n");
 
   fclose(f);
 
