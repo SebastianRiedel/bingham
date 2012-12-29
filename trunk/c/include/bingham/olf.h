@@ -63,6 +63,9 @@ extern "C" {
     int h;
     double **image;  // stored column-wise: image[x][y]
     int **idx;
+    double ***points;   // average point in each cell
+    double ***normals;  // average normal in each cell
+    int **cnt;          // number of points in each cell
   } range_image_t;
 
 
@@ -81,6 +84,7 @@ extern "C" {
     double *W;
     int n;
     double **vis_probs;  //dbug
+    double **xyz_dists;  //dbug
   } olf_pose_samples_t;
 
 
@@ -144,6 +148,7 @@ extern "C" {
     double vis_weight;
     double f_weight;
     double edge_weight;
+    double normal_sigma;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;

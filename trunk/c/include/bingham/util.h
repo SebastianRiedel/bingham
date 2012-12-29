@@ -109,6 +109,8 @@ void reversei(int *y, int *x, int n);                                 /* reverse
 void reorder(double *y, double *x, int *idx, int n);                  /* reorder an array of doubles (safe for x==y) */
 void reorderi(int *y, int *x, int *idx, int n);                       /* reorder an array of ints (safe for x==y) */
 
+double ***new_matrix3(int n, int m, int p);                                 /* create a new n-by-m-by-p 3d matrix of doubles */
+void free_matrix3(double ***X);                                             /* free a 3d matrix of doubles */
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */

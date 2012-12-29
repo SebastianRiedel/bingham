@@ -1272,6 +1272,27 @@ double acgpdf_pcs(double *x, double *z, double **V, int d)
 }
 
 
+// create a new n-by-m-by-p 3d matrix of doubles
+double ***new_matrix3(int n, int m, int p)
+{
+  if (n*m*p == 0) return NULL;
+  int i;
+  double **X2 = new_matrix2(n*m, p);
+  double ***X;
+  safe_malloc(X, n, double**);
+  for (i = 0; i < n; i++)
+    X[i] = X2 + m*i;
+
+  return X;
+}
+
+// free a 3d matrix
+void free_matrix3(double ***X)
+{
+  free_matrix2(X[0]);
+  free(X);
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {

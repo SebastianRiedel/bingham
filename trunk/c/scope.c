@@ -104,6 +104,8 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->vis_weight);
       else if (!wordcmp(name, "f_weight", " \t\n"))
 	sscanf(value, "%lf", &params->f_weight);
+      else if (!wordcmp(name, "normal_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->normal_sigma);
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
 	sscanf(value, "%d", &params->pose_clustering);
@@ -200,6 +202,7 @@ int main(int argc, char *argv[])
   double *W = poses->W;
   int n = poses->n;
   double **vis_probs = poses->vis_probs; //dbug
+  double **xyz_dists = poses->xyz_dists; //dbug
   /*
   for (n = 1; n < poses->n; n++)
     if (W[n] < .01 * W[0])
@@ -229,6 +232,15 @@ int main(int argc, char *argv[])
   for (i = 0; i < n; i++) {
     for (j = 0; j < model.obj_pcd->num_points; j++)
       fprintf(f, "%f ", vis_probs[i][j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
+  //dbug
+  fprintf(f, "xyz_dists = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < model.obj_pcd->num_points; j++)
+      fprintf(f, "%f ", xyz_dists[i][j]);
     fprintf(f, "; ");
   }
   fprintf(f, "];\n");
