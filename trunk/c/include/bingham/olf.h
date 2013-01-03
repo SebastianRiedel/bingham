@@ -36,6 +36,7 @@ extern "C" {
     double **principal_curvatures;
     double **shapes;
     double **sift;
+    double **ved;
     //double **sdw;
 
     // computed data
@@ -46,7 +47,8 @@ extern "C" {
     // data sizes
     int shape_length;
     int sift_length;
-    int sdw_length;
+    int ved_length;
+    //int sdw_length;
 
     //kdtree_t *points_kdtree;
     //pcd_balls_t *balls;
@@ -83,8 +85,15 @@ extern "C" {
     double **Q;
     double *W;
     int n;
-    double **vis_probs;  //dbug
-    double **xyz_dists;  //dbug
+
+    //dbug
+    double **vis_probs;
+    double **xyz_dists;
+    double **normal_dists;
+    int **range_edge_pixels;
+    double **range_edge_vis_prob;
+    int *num_range_edge_points;
+
   } olf_pose_samples_t;
 
 
@@ -108,6 +117,7 @@ extern "C" {
 
   typedef struct {
     pcd_t *obj_pcd;
+    pcd_t *fpfh_pcd;
     pcd_t *sift_pcd;
     pcd_t *range_edges_pcd;
   } olf_model_t;
@@ -119,6 +129,12 @@ extern "C" {
     //range_image_t *range_image;
   } olf_obs_t;
 
+
+  typedef struct {
+    double range_sigma;
+    double normal_sigma;
+    double lab_sigma[3];
+  } scope_noise_model_t;
 
   typedef struct {  // scope_params_t
 
@@ -138,17 +154,23 @@ extern "C" {
     int dispersion_weight;
     double xyz_weight;
     double normal_weight;
-    double range_sigma;
     double range_weight;
     double sift_dthresh;
-    double L_weight;
     double f_sigma;
-    double lab_sigma;
     double xyz_sigma;
-    double vis_weight;
+    double vis_thresh;
     double f_weight;
-    double edge_weight;
+
+    double range_sigma;
     double normal_sigma;
+    double lab_sigma;
+    double score_xyz_weight;
+    double score_normal_weight;
+    double score_edge_weight;
+    double score_L_weight;
+    double score_A_weight;
+    double score_B_weight;
+    double score_vis_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
