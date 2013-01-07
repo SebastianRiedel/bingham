@@ -1754,7 +1754,52 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 double compute_segment_score(double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params, double *vis_prob, int n,
 			     range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
 {
-  return 0.0;  //stub
+  int w = obs_range_image->w;
+  int h = obs_range_image->h;
+  
+  double score = 0.0;
+  int i, xi, yi;
+  for (i = 0; i < n; i++) {
+    if (vis_prob[i] > .1 && range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i])) {
+      
+      // shoot a ray from (xi,yi) in a random direction
+      double theta = 2*M_PI*frand();
+      double rx = cos(theta);
+      double ry = sin(theta);
+
+      // at each cell along the ray, stop with prob. = exp(obs_edge_image[xi][yi])
+      int xi2 = xi;
+      int yi2 = yi;
+      double x = xi + .5;
+      double y = yi + .5;
+      while (1) {
+	if (frand() < exp(obs_edge_image[xi2][yi2]))
+	  break;
+	x += rx;
+	y += ry;
+	if (x < 0 || y < 0 || x >= w || y >= h)
+	  break;
+	xi2 = floor(x);
+	yi2 = floor(y);
+      }
+
+      // pick a random observed point along the ray
+      double r = frand();
+      int cx = floor(r*xi + (1-r)*xi2);
+      int cy = floor(r*yi + (1-r)*yi2);
+      if (obs_range_image->cnt[cx][cy] > 0) {
+
+	// transform observed point into model coordinates
+	
+
+	// find the xyz-distance to the closest model point
+	//flann_find_nearest_neighbors_index_double
+      }
+
+    }
+  }
+
+  return score;
 }
 
 
