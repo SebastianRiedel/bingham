@@ -130,6 +130,8 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score_B_weight);
       else if (!wordcmp(name, "score_vis_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score_vis_weight);
+      else if (!wordcmp(name, "score_occ_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score_occ_edge_weight);
 
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
@@ -230,6 +232,8 @@ int main(int argc, char *argv[])
   int **range_edge_pixels = poses->range_edge_pixels;
   double **range_edge_vis_prob = poses->range_edge_vis_prob;
   int *num_range_edge_points = poses->num_range_edge_points;
+  int **occ_edge_pixels = poses->occ_edge_pixels;
+  int *num_occ_edge_points = poses->num_occ_edge_points;
 
   /*
   for (n = 1; n < poses->n; n++)
@@ -313,6 +317,14 @@ int main(int argc, char *argv[])
     fprintf(f, "range_edge_vis_prob{%d} = [", i+1);
     for (j = 0; j < num_range_edge_points[i]; j++)
       fprintf(f, "%f ", range_edge_vis_prob[i][j]);
+    fprintf(f, "];\n");
+  }
+
+  fprintf(f, "occ_edge_pixels = {};\n");
+  for (i = 0; i < n; i++) {
+    fprintf(f, "occ_edge_pixels{%d} = [", i+1);
+    for (j = 0; j < num_occ_edge_points[i]; j++)
+      fprintf(f, "%d %d ; ", occ_edge_pixels[i][2*j] + 1, occ_edge_pixels[i][2*j+1] + 1);
     fprintf(f, "];\n");
   }
 

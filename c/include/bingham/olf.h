@@ -93,6 +93,8 @@ extern "C" {
     int **range_edge_pixels;
     double **range_edge_vis_prob;
     int *num_range_edge_points;
+    int **occ_edge_pixels;
+    int *num_occ_edge_points;
 
   } olf_pose_samples_t;
 
@@ -171,6 +173,7 @@ extern "C" {
     double score_A_weight;
     double score_B_weight;
     double score_vis_weight;
+    double score_occ_edge_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
