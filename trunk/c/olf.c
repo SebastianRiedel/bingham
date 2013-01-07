@@ -1557,72 +1557,10 @@ double compute_vis_score(double *vis_prob, int n, scope_params_t *params)
 
 
 //dbug
-double *x_true_, *q_true_;
-int is_great_pose(double *x, double *q)
-{
-  double dx[3];
-  sub(dx, x, x_true_, 3);
-  double cos_dq = fabs(dot(q, q_true_, 4));
-  cos_dq = MIN(cos_dq, 1.0);
-  double dq = acos(cos_dq);
-  return (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
-}
+int **occ_edge_pixels_ = NULL;
+int num_occ_edge_points_;
 
-//dbug
-double **range_edge_points_ = NULL;
-int **range_edge_pixels_ = NULL;
-double *range_edge_vis_prob_ = NULL;
-int num_range_edge_points_;
-
-
-double compute_edge_score(double **P, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
-{
-  if (n == 0)
-    return 0.0;
-
-  // compute visibility of sampled model edges
-  int vis_pixel_radius = 2;
-  double vis_prob[n];
-  int i;
-  for (i = 0; i < n; i++)
-    vis_prob[i] = compute_visibility_prob(P[i], NULL, obs_range_image, params->vis_thresh, vis_pixel_radius);
-  double vis_pmf[n];
-  normalize_pmf(vis_pmf, vis_prob, n);
-
-  //dbug
-  if (params->verbose) {
-    if (range_edge_points_ == NULL) {
-      range_edge_points_ = new_matrix2(10000, 3);
-      range_edge_pixels_ = new_matrix2i(10000, 2);
-      safe_calloc(range_edge_vis_prob_, 10000, double);
-    }
-    matrix_copy(range_edge_points_, P, n, 3);
-    memset(range_edge_pixels_[0], 0, n*2*sizeof(int));
-    num_range_edge_points_ = n;
-    memcpy(range_edge_vis_prob_, vis_prob, n*sizeof(double));
-  }
-
-  // compute obs_edge_image score for sampled model edges
-  double score = 0;
-  int xi,yi;
-  for (i = 0; i < n; i++) {
-    if (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i])) {
-      score += vis_pmf[i] * obs_edge_image[xi][yi];
-
-      //dbug
-      if (params->verbose) {
-	range_edge_pixels_[i][0] = xi;
-	range_edge_pixels_[i][1] = yi;
-      }
-    }
-  }
-  double vis_score = params->score_vis_weight * log(sum(vis_prob, n) / (double) n);
-
-  return params->score_edge_weight * (vis_score + score);
-}
-
-
-int **compute_occ_edges(int *num_occ_edges, double **cloud, double *vis_prob, int n, range_image_t *obs_range_image)
+int **compute_occ_edges(int *num_occ_edges, double **cloud, double *vis_prob, int n, range_image_t *obs_range_image, scope_params_t *params)
 {
   // create vis_prob image, V
   int i;
@@ -1645,28 +1583,35 @@ int **compute_occ_edges(int *num_occ_edges, double **cloud, double *vis_prob, in
     }
   }
 
-  //TODO: downsample vis_prob matrix, fill <.5 and >.5 connected components, then check for bigger discontinuities (like >.75 to <.25)
+  // downsample vis_prob sub matrix (loses a row or column if w2 or h2 is odd)
+  double **V2 = get_sub_matrix(V, x0, y0, x1, y1);
+  int w2 = (x1-x0+1)/2;
+  int h2 = (y1-y0+1)/2;
+  int x,y;
+  for (x = 0; x < w2; x++) {
+    for (y = 0; y < h2; y++) {
+      double v2 = MAX(V2[2*x][2*y], V2[2*x+1][2*y]);
+      v2 = MAX(v2, V2[2*x][2*y+1]);
+      V2[x][y] = MAX(v2, V2[2*x+1][2*y+1]);
+    }
+  }
 
   // dilate vis_prob sub matrix
-  double **V2 = get_sub_matrix(V, x0, y0, x1, y1);
-  int w2 = x1-x0+1, h2 = y1-y0+1;
-  matrix_copy(V, V2, w2, h2);
-  //dilate_matrix(V, V2, w2, h2);
+  dilate_matrix(V, V2, w2, h2);
   //dilate_matrix(V2, V, w2, h2);
   //dilate_matrix(V, V2, w2, h2);
   //dilate_matrix(V2, V, w2, h2);
   //dilate_matrix(V, V2, w2, h2);
 
   // compute edges where vis_prob crosses .5 threshold
-  int x,y;
   int px[n], py[n], cnt=0;
   for (x = 0; x < w2-1; x++) {
     for (y = 0; y < h2-1; y++) {
       if (V[x][y] >= .5) {
 	if ((x > 0 && V[x-1][y] > 0.0 && V[x-1][y] < .5) || (x < w2-1 && V[x+1][y] > 0.0 && V[x+1][y] < .5) ||
 	    (y > 0 && V[x][y-1] > 0.0 && V[x][y-1] < .5) || (y < h2-1 && V[x][y+1] > 0.0 && V[x][y+1] < .5)) {
-	  px[cnt] = x0 + x;
-	  py[cnt++] = y0 + y;
+	  px[cnt] = x0 + 2*x;
+	  py[cnt++] = y0 + 2*y;
 	}
       }
     }
@@ -1681,15 +1626,22 @@ int **compute_occ_edges(int *num_occ_edges, double **cloud, double *vis_prob, in
     occ_edges[i][1] = py[i];
   }
 
+  //dbug
+  if (params->verbose) {
+    if (occ_edge_pixels_ != NULL)
+      free_matrix2i(occ_edge_pixels_);
+    occ_edge_pixels_ = new_matrix2i(cnt, 2);
+    memcpy(occ_edge_pixels_[0], occ_edges[0], 2*cnt*sizeof(int));
+    num_occ_edge_points_ = cnt;
+  }
+
   *num_occ_edges = cnt;
   return occ_edges;
 }
 
 
 
-int **occ_edge_pixels_ = NULL;
-int num_occ_edge_points_;
-
+/*
 double compute_occ_edge_score(double **cloud, double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
 {
   int i;
@@ -1717,6 +1669,87 @@ double compute_occ_edge_score(double **cloud, double *vis_prob, int n, range_ima
 
   return params->score_occ_edge_weight * score;
 }
+*/
+
+
+//dbug
+double *x_true_, *q_true_;
+int is_great_pose(double *x, double *q)
+{
+  double dx[3];
+  sub(dx, x, x_true_, 3);
+  double cos_dq = fabs(dot(q, q_true_, 4));
+  cos_dq = MIN(cos_dq, 1.0);
+  double dq = acos(cos_dq);
+  return (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
+}
+
+//dbug
+double **range_edge_points_ = NULL;
+int **range_edge_pixels_ = NULL;
+double *range_edge_vis_prob_ = NULL;
+int num_range_edge_points_;
+
+double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
+{
+  if (n == 0)
+    return 0.0;
+
+  // compute visibility of sampled model edges
+  int vis_pixel_radius = 2;
+  double vis_prob[n];
+  int i;
+  for (i = 0; i < n; i++)
+    vis_prob[i] = compute_visibility_prob(P[i], NULL, obs_range_image, params->vis_thresh, vis_pixel_radius);
+  double vis_pmf[n];
+  normalize_pmf(vis_pmf, vis_prob, n);
+
+  // compute obs_edge_image score for sampled model edges
+  double score = 0;
+  int xi,yi;
+  for (i = 0; i < n; i++) {
+    if (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i])) {
+      score += vis_pmf[i] * obs_edge_image[xi][yi];
+
+      //dbug
+      if (params->verbose) {
+	range_edge_pixels_[i][0] = xi;
+	range_edge_pixels_[i][1] = yi;
+      }
+    }
+  }
+  double vis_score = params->score_vis_weight * log(sum(vis_prob, n) / (double) n);
+
+  //dbug
+  if (params->verbose) {
+    if (range_edge_points_ == NULL) {
+      range_edge_points_ = new_matrix2(10000, 3);
+      range_edge_pixels_ = new_matrix2i(10000, 2);
+      safe_calloc(range_edge_vis_prob_, 10000, double);
+    }
+    matrix_copy(range_edge_points_, P, n, 3);
+    memset(range_edge_pixels_[0], 0, n*2*sizeof(int));
+    num_range_edge_points_ = n;
+    memcpy(range_edge_vis_prob_, vis_prob, n*sizeof(double));
+  }
+
+  // add occlusion edges to score
+  if (num_occ_edges > 0) {
+
+    double occ_score = 0.0;
+    for (i = 0; i < num_occ_edges; i++) {
+      int x = occ_edges[i][0];
+      int y = occ_edges[i][1];
+      occ_score += obs_edge_image[x][y];
+    }
+    occ_score /= (double) num_occ_edges;
+    double occ_weight = params->score_occ_edge_weight * num_occ_edges;
+    score = (n*score + occ_weight*occ_score) / (double)(n + occ_weight);
+  }
+
+  return params->score_edge_weight * (vis_score + score);
+}
+
 
 double compute_segment_score(double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params, double *vis_prob, int n,
 			     range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
@@ -1786,24 +1819,37 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   //double sdw_score = compute_sdw_score(cloud_sdw, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   //double lab_score = compute_lab_score(cloud_lab, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
 
-  int n = params->num_validation_points;
-  double **P = get_range_edge_points(&n, x, q, range_edges_model, obs_range_image);
-  transform_cloud(P, P, n, x, q);
-  double edge_score = (obs_edge_image == NULL ? 0.0 : compute_edge_score(P, n, obs_range_image, obs_edge_image, params));
-  free_matrix2(P);
 
-  double occ_edge_score = 0;
+  //TODO: move this to compute_edge_score()
+
+  double edge_score = 0.0;
+  if (obs_edge_image) {
+    int n = params->num_validation_points;
+    double **P = get_range_edge_points(&n, x, q, range_edges_model, obs_range_image);
+    transform_cloud(P, P, n, x, q);
+    if (params->num_validation_points == 0) {
+      int num_occ_edges;
+      int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_range_image, params);
+      edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_range_image, obs_edge_image, params);
+      free_matrix2i(occ_edges);
+    }
+    else
+      edge_score = compute_edge_score(P, n, NULL, 0, obs_range_image, obs_edge_image, params);
+    free_matrix2(P);
+  }
+
+  //double occ_edge_score = 0;
   double segment_score = 0;
   if (params->num_validation_points == 0) {
-    occ_edge_score = compute_occ_edge_score(cloud, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
+    //occ_edge_score = compute_occ_edge_score(cloud, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
     segment_score = compute_segment_score(cloud, model_xyz_index, model_xyz_params, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
   }
 
   //double score = xyzn_score + edge_score + lab_score + vis_score;  //+ sdw_score 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + occ_edge_score + segment_score;  //+ sdw_score 
+  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score;  //+ sdw_score 
 
   if (params->verbose) {
-    printf("score_comp = (%f, %f, %f, %f, %f, %f, %f)\n", xyz_score, normal_score, edge_score, lab_score, vis_score, occ_edge_score, segment_score);
+    printf("score_comp = (%f, %f, %f, %f, %f, %f)\n", xyz_score, normal_score, edge_score, lab_score, vis_score, segment_score);
     printf("score = %f\n", score);
   }
 
@@ -2588,7 +2634,7 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
       transform_cloud(P2, P, num_edge_points, x2, q2);
 
       // evaluate the score
-      edge_score = compute_edge_score(P2, num_edge_points, obs_range_image, obs_edge_image, params);
+      edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image, params);
       double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image, params);
       double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image, params);
       double score = edge_score + xyz_score + normal_score;
