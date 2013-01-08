@@ -132,6 +132,8 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score_vis_weight);
       else if (!wordcmp(name, "score_occ_edge_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score_occ_edge_weight);
+      else if (!wordcmp(name, "score_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score_segment_weight);
 
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
