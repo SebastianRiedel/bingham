@@ -1751,13 +1751,22 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 }
 
 
-double compute_segment_score(double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params, double *vis_prob, int n,
-			     range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
+double compute_segment_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
+			     double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
 {
+  double range_sigma = params->range_sigma;
+  double dmax = 2*range_sigma;
+
   int w = obs_range_image->w;
   int h = obs_range_image->h;
   
+  double q_inv[4];
+  quaternion_inverse(q_inv, q);
+  double **R_inv = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R_inv, q_inv);
+
   double score = 0.0;
+  int cnt = 0;
   int i, xi, yi;
   for (i = 0; i < n; i++) {
     if (vis_prob[i] > .1 && range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i])) {
@@ -1770,17 +1779,17 @@ double compute_segment_score(double **cloud, flann_index_t model_xyz_index, stru
       // at each cell along the ray, stop with prob. = exp(obs_edge_image[xi][yi])
       int xi2 = xi;
       int yi2 = yi;
-      double x = xi + .5;
-      double y = yi + .5;
+      double xf = xi + .5;
+      double yf = yi + .5;
       while (1) {
 	if (frand() < exp(obs_edge_image[xi2][yi2]))
 	  break;
-	x += rx;
-	y += ry;
-	if (x < 0 || y < 0 || x >= w || y >= h)
+	xf += rx;
+	yf += ry;
+	if (xf < 0 || yf < 0 || xf >= w || yf >= h)
 	  break;
-	xi2 = floor(x);
-	yi2 = floor(y);
+	xi2 = floor(xf);
+	yi2 = floor(yf);
       }
 
       // pick a random observed point along the ray
@@ -1790,16 +1799,27 @@ double compute_segment_score(double **cloud, flann_index_t model_xyz_index, stru
       if (obs_range_image->cnt[cx][cy] > 0) {
 
 	// transform observed point into model coordinates
-	
+	double p[3];
+	sub(p, obs_range_image->points[cx][cy], x, 3);
+	matrix_vec_mult(p, R_inv, p, 3, 3);
 
 	// find the xyz-distance to the closest model point
-	//flann_find_nearest_neighbors_index_double
-      }
+	int nn_idx;
+	double nn_d2;
+	flann_find_nearest_neighbors_index_double(model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, model_xyz_params);
 
+	// add score
+	double d = MIN(sqrt(nn_d2), dmax);
+	score += log(normpdf(d, 0, range_sigma));
+	cnt++;
+      }
     }
   }
+  score /= (double)cnt;
 
-  return score;
+  free_matrix2(R_inv);
+
+  return params->score_segment_weight * score;
 }
 
 
@@ -1887,7 +1907,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   double segment_score = 0;
   if (params->num_validation_points == 0) {
     //occ_edge_score = compute_occ_edge_score(cloud, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
-    segment_score = compute_segment_score(cloud, model_xyz_index, model_xyz_params, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
+    segment_score = compute_segment_score(x, q, cloud, model_xyz_index, model_xyz_params, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
   }
 
   //double score = xyzn_score + edge_score + lab_score + vis_score;  //+ sdw_score 
@@ -2639,7 +2659,7 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
     double G_edge[7], G_xyzn[7], G[7];
     double edge_score = edge_score_gradient(G_edge, x, q, P, num_edge_points, obs_range_image, obs_edge_image, params);
     double xyzn_score = xyzn_score_gradient(G_xyzn, x, q, cloud, normals, noise_models, num_surface_points, obs_range_image, params);
-    double current_score = edge_score + xyzn_score;
+    //double current_score = edge_score + xyzn_score;
     add(G, G_edge, G_xyzn, 7);
 
     //dbug: disable orientation gradients
@@ -2652,7 +2672,7 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
     // line search
     double step_mult[3] = {.6, 1, 1.6};
     double best_score = -10000000.0;
-    double best_step, best_x[3], best_q[4];
+    double best_step=0.0, best_x[3], best_q[4];
     for (j = 0; j < 3; j++) {
       // take a step in the direction of the gradient
       double x2[3], q2[4], dxq[7];

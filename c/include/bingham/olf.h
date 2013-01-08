@@ -174,6 +174,7 @@ extern "C" {
     double score_B_weight;
     double score_vis_weight;
     double score_occ_edge_weight;
+    double score_segment_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
