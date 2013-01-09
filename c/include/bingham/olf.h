@@ -95,6 +95,8 @@ extern "C" {
     int *num_range_edge_points;
     int **occ_edge_pixels;
     int *num_occ_edge_points;
+    double **scores;
+    int num_scores;
 
   } olf_pose_samples_t;
 
