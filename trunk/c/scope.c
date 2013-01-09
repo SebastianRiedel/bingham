@@ -236,6 +236,8 @@ int main(int argc, char *argv[])
   int *num_range_edge_points = poses->num_range_edge_points;
   int **occ_edge_pixels = poses->occ_edge_pixels;
   int *num_occ_edge_points = poses->num_occ_edge_points;
+  double **scores = poses->scores;
+  int num_scores = poses->num_scores;
 
   /*
   for (n = 1; n < poses->n; n++)
@@ -329,6 +331,14 @@ int main(int argc, char *argv[])
       fprintf(f, "%d %d ; ", occ_edge_pixels[i][2*j] + 1, occ_edge_pixels[i][2*j+1] + 1);
     fprintf(f, "];\n");
   }
+
+  fprintf(f, "scores = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < num_scores; j++)
+      fprintf(f, "%f ", scores[i][j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
 
   fclose(f);
 
