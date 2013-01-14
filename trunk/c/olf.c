@@ -2134,7 +2134,7 @@ void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int
     if (great_pose)
       great_pose_idx[(*num_great_poses)++] = i;
     if (perfect_pose)
-      great_pose_idx[(*num_perfect_poses)++] = i;
+      perfect_pose_idx[(*num_perfect_poses)++] = i;
   }
 }
 
@@ -2876,6 +2876,8 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
 void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
 			  range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int max_iter, int num_points)
 {
+  //double t0 = get_time_ms();  //dbug
+
   // compute model edge points
   int num_edge_points = num_points;
   double **P = get_range_edge_points(&num_edge_points, x, q, range_edges_model, obs_range_image);
@@ -2892,6 +2894,10 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
   double **cloud2 = new_matrix2(num_surface_points, 3);
   double **normals2 = new_matrix2(num_surface_points, 3);
 
+  //dbug
+  //printf("break 1, %.2f ms\n", get_time_ms() - t0);
+  //t0 = get_time_ms();
+
   double step = .01;  // step size in gradient ascent
   int i, j, iter;
   for (iter = 0; iter < max_iter; iter++) {
@@ -2899,12 +2905,20 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
     // compute noise models
     scope_noise_model_t *noise_models = get_noise_models(x, q, idx, num_surface_points, pcd_model, range_edges_model);
 
+    //dbug
+    //printf("break 1.5, %.2f ms\n", get_time_ms() - t0);
+    //t0 = get_time_ms();
+
     // compute score and its gradient w.r.t. model pose
     double G_edge[7], G_xyzn[7], G[7];
     double edge_score = edge_score_gradient(G_edge, x, q, P, num_edge_points, obs_range_image, obs_edge_image, params);
     double xyzn_score = xyzn_score_gradient(G_xyzn, x, q, cloud, normals, noise_models, num_surface_points, obs_range_image, params);
     //double current_score = edge_score + xyzn_score;
     add(G, G_edge, G_xyzn, 7);
+
+    //dbug
+    //printf("break 2, %.2f ms\n", get_time_ms() - t0);
+    //t0 = get_time_ms();
 
     //dbug: disable orientation gradients
     //G[3] = G[4] = G[5] = G[6] = 0;
@@ -2918,6 +2932,9 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
     double best_score = -10000000.0;
     double best_step=0.0, best_x[3], best_q[4];
     for (j = 0; j < 3; j++) {
+
+      //double t1 = get_time_ms();  //dbug
+
       // take a step in the direction of the gradient
       double x2[3], q2[4], dxq[7];
       normalize(G, G, 7);
@@ -2932,6 +2949,9 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
       transform_cloud(cloud2, cloud, num_surface_points, x2, q2);
       transform_cloud(normals2, normals, num_surface_points, NULL, q2);
 
+      //printf("transform_cloud: %.2f ms\n", get_time_ms() - t1); //dbug
+      //t1 = get_time_ms();  //dbug
+
       // compute p(visibile) for surface points
       double vis_prob[num_surface_points];
       for (i = 0; i < num_surface_points; i++)
@@ -2939,14 +2959,27 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
       double vis_pmf[num_surface_points];
       normalize_pmf(vis_pmf, vis_prob, num_surface_points);
 
+      //printf("vis_prob: %.2f ms\n", get_time_ms() - t1); //dbug
+      //t1 = get_time_ms();  //dbug
+
       // transform edge points
       transform_cloud(P2, P, num_edge_points, x2, q2);
 
+      //printf("transform edge points: %.2f ms\n", get_time_ms() - t1); //dbug
+      //t1 = get_time_ms();  //dbug
+
       // evaluate the score
       edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image, params, 1);
+      
+      //printf("compute_edge_score: %.2f ms\n", get_time_ms() - t1); //dbug
+      //t1 = get_time_ms();  //dbug
+
       double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, 1);
       double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, 1);
       double score = edge_score + xyz_score + normal_score;
+
+      //printf("xyz/normal scores: %.2f ms\n", get_time_ms() - t1); //dbug
+      //t1 = get_time_ms();  //dbug
 
       if (score > best_score) {
 	best_score = score;
@@ -2954,6 +2987,10 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
 	memcpy(best_q, q2, 4*sizeof(double));
 	best_step = step*step_mult[j];
       }
+
+      //dbug
+      //printf("break 3, %.2f ms\n", get_time_ms() - t0);
+      //t0 = get_time_ms();
     }
 
     //printf("best_score = %f, current_score = %f\n", best_score, current_score); //dbug
@@ -3486,12 +3523,43 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     // align with gradients
     t0 = get_time_ms();
     for (i = 0; i < num_samples; i++)
-      align_model_gradient(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 20, 500);
+      for (j = 0; j < 5; j++)
+	align_model_gradient(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 2, 100);
     printf("Ran gradient alignment on %d samples in %.3f seconds\n", num_samples, (get_time_ms() - t0) / 1000.0);
 
     //dbug: align true pose more with gradients
     //for (j = 0; j < 10; j++)
     //  align_model_gradient(X[0], Q[0], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 20, 500);
+
+    // re-weight (round 3)
+    params->num_validation_points *= 2;
+    for (i = 0; i < num_samples; i++)
+      W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 3);
+    sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+
+    num_samples = MIN(num_samples, 20);  //dbug
+
+    // align with gradients more
+    t0 = get_time_ms();
+    for (i = 0; i < num_samples; i++)
+      for (j = 0; j < 5; j++)
+	align_model_gradient(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 2, 100);
+    printf("Ran gradient alignment on %d samples in %.3f seconds\n", num_samples, (get_time_ms() - t0) / 1000.0);
+
+    // re-weight (round 3)
+    params->num_validation_points *= 2;
+    for (i = 0; i < num_samples; i++)
+      W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 3);
+    sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+
+    num_samples = MIN(num_samples, 10);  //dbug
+
+    // align with gradients more
+    t0 = get_time_ms();
+    for (i = 0; i < num_samples; i++) 
+      for (j = 0; j < 5; j++)
+	align_model_gradient(X[i], Q[i], pcd_model, range_edges_model, obs_range_image, obs_edge_image, params, 20, 1000);
+    printf("Ran gradient alignment on %d samples in %.3f seconds\n", num_samples, (get_time_ms() - t0) / 1000.0);
 
     // re-weight with full models
     t0 = get_time_ms();
