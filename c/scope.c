@@ -116,24 +116,47 @@ void load_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "lab_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->lab_sigma);
 
-      else if (!wordcmp(name, "score_xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_xyz_weight);
-      else if (!wordcmp(name, "score_normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_normal_weight);
-      else if (!wordcmp(name, "score_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_edge_weight);
-      else if (!wordcmp(name, "score_L_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_L_weight);
-      else if (!wordcmp(name, "score_A_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_A_weight);
-      else if (!wordcmp(name, "score_B_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_B_weight);
-      else if (!wordcmp(name, "score_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_vis_weight);
-      else if (!wordcmp(name, "score_occ_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_occ_edge_weight);
-      else if (!wordcmp(name, "score_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score_segment_weight);
+      else if (!wordcmp(name, "score2_xyz_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_xyz_weight);
+      else if (!wordcmp(name, "score2_normal_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_normal_weight);
+      else if (!wordcmp(name, "score2_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_vis_weight);
+      else if (!wordcmp(name, "score2_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_segment_weight);
+      else if (!wordcmp(name, "score2_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_edge_weight);
+      else if (!wordcmp(name, "score2_edge_occ_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_edge_occ_weight);
+      else if (!wordcmp(name, "score2_edge_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_edge_vis_weight);
+      else if (!wordcmp(name, "score2_L_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_L_weight);
+      else if (!wordcmp(name, "score2_A_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_A_weight);
+      else if (!wordcmp(name, "score2_B_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_B_weight);
+
+      else if (!wordcmp(name, "score3_xyz_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_xyz_weight);
+      else if (!wordcmp(name, "score3_normal_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_normal_weight);
+      else if (!wordcmp(name, "score3_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_vis_weight);
+      else if (!wordcmp(name, "score3_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_segment_weight);
+      else if (!wordcmp(name, "score3_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_edge_weight);
+      else if (!wordcmp(name, "score3_edge_occ_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_edge_occ_weight);
+      else if (!wordcmp(name, "score3_edge_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_edge_vis_weight);
+      else if (!wordcmp(name, "score3_L_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_L_weight);
+      else if (!wordcmp(name, "score3_A_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_A_weight);
+      else if (!wordcmp(name, "score3_B_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_B_weight);
 
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
@@ -227,15 +250,6 @@ int main(int argc, char *argv[])
   double *W = poses->W;
   int n = poses->n;
 
-  //dbug
-  double **vis_probs = poses->vis_probs;
-  double **xyz_dists = poses->xyz_dists;
-  double **normal_dists = poses->normal_dists;
-  int **range_edge_pixels = poses->range_edge_pixels;
-  double **range_edge_vis_prob = poses->range_edge_vis_prob;
-  int *num_range_edge_points = poses->num_range_edge_points;
-  int **occ_edge_pixels = poses->occ_edge_pixels;
-  int *num_occ_edge_points = poses->num_occ_edge_points;
   double **scores = poses->scores;
   int num_scores = poses->num_scores;
 
@@ -247,7 +261,7 @@ int main(int argc, char *argv[])
   */
 
   fprintf(f, "X = [");
-  int i;
+  int i, j;
   for (i = 0; i < n; i++)
     fprintf(f, "%f, %f, %f;  ", X[i][0], X[i][1], X[i][2]);
   fprintf(f, "];\n");
@@ -262,9 +276,55 @@ int main(int argc, char *argv[])
     fprintf(f, "%f ", W[i]);
   fprintf(f, "];\n");
 
+  if (scores) {
+    fprintf(f, "scores = [");
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < num_scores; j++)
+	fprintf(f, "%f ", scores[i][j]);
+      fprintf(f, "; ");
+    }
+    fprintf(f, "];\n");
+  }
+
+
+  //**************************************************
+
+  //dbug
+  if (poses->C_obs) {
+    fprintf(f, "C_obs = [");
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < params.num_correspondences; j++)
+	fprintf(f, "%d ", 1 + poses->C_obs[i][j]);
+      fprintf(f, "; ");
+    }
+    fprintf(f, "];\n");
+  }
+  if (poses->C_model) {
+    fprintf(f, "C_model = [");
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < params.num_correspondences; j++)
+	fprintf(f, "%d ", 1 + poses->C_model[i][j]);
+      fprintf(f, "; ");
+    }
+    fprintf(f, "];\n");
+  }
+  
+  
+
+  //***************************************************
+
+  //dbug
+  double **vis_probs = poses->vis_probs;
+  double **xyz_dists = poses->xyz_dists;
+  double **normal_dists = poses->normal_dists;
+  int **range_edge_pixels = poses->range_edge_pixels;
+  double **range_edge_vis_prob = poses->range_edge_vis_prob;
+  int *num_range_edge_points = poses->num_range_edge_points;
+  int **occ_edge_pixels = poses->occ_edge_pixels;
+  int *num_occ_edge_points = poses->num_occ_edge_points;
+
   //dbug
   fprintf(f, "vis_probs = [");
-  int j;
   for (i = 0; i < n; i++) {
     for (j = 0; j < model.obj_pcd->num_points; j++)
       fprintf(f, "%f ", vis_probs[i][j]);
@@ -292,6 +352,7 @@ int main(int argc, char *argv[])
 
   //dbug
   extern double **obs_edge_image_;
+  extern double **obs_edge_image_orig_;
   extern int obs_edge_image_width_;
   extern int obs_edge_image_height_;
   fprintf(f, "obs_edge_image = [");
@@ -299,6 +360,11 @@ int main(int argc, char *argv[])
     fprintf(f, "%f ", obs_edge_image_[0][i]);
   fprintf(f, "];\n");
   fprintf(f, "obs_edge_image = reshape(obs_edge_image, [%d,%d]);\n\n", obs_edge_image_height_, obs_edge_image_width_);
+  fprintf(f, "obs_edge_image_orig = [");
+  for (i = 0; i < obs_edge_image_width_ * obs_edge_image_height_; i++)
+    fprintf(f, "%f ", obs_edge_image_orig_[0][i]);
+  fprintf(f, "];\n");
+  fprintf(f, "obs_edge_image_orig = reshape(obs_edge_image_orig, [%d,%d]);\n\n", obs_edge_image_height_, obs_edge_image_width_);
 
   //dbug
   //extern double **range_edge_points_;
@@ -332,13 +398,7 @@ int main(int argc, char *argv[])
     fprintf(f, "];\n");
   }
 
-  fprintf(f, "scores = [");
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < num_scores; j++)
-      fprintf(f, "%f ", scores[i][j]);
-    fprintf(f, "; ");
-  }
-  fprintf(f, "];\n");
+  //*****************************************************/
 
   fclose(f);
 
