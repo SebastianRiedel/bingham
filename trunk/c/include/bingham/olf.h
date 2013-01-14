@@ -87,6 +87,8 @@ extern "C" {
     int n;
 
     //dbug
+    int **C_obs;
+    int **C_model;
     double **vis_probs;
     double **xyz_dists;
     double **normal_dists;
@@ -165,18 +167,34 @@ extern "C" {
     double vis_thresh;
     double f_weight;
 
+    // NOISE MODEL PARAMS
     double range_sigma;
     double normal_sigma;
     double lab_sigma;
-    double score_xyz_weight;
-    double score_normal_weight;
-    double score_edge_weight;
-    double score_L_weight;
-    double score_A_weight;
-    double score_B_weight;
-    double score_vis_weight;
-    double score_occ_edge_weight;
-    double score_segment_weight;
+
+    // SCORE2 PARAMS
+    double score2_xyz_weight;
+    double score2_normal_weight;
+    double score2_vis_weight;
+    double score2_segment_weight;
+    double score2_edge_weight;
+    double score2_edge_vis_weight;
+    double score2_edge_occ_weight;
+    double score2_L_weight;
+    double score2_A_weight;
+    double score2_B_weight;
+
+    // SCORE3 PARAMS
+    double score3_xyz_weight;
+    double score3_normal_weight;
+    double score3_vis_weight;
+    double score3_segment_weight;
+    double score3_edge_weight;
+    double score3_edge_vis_weight;
+    double score3_edge_occ_weight;
+    double score3_L_weight;
+    double score3_A_weight;
+    double score3_B_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
