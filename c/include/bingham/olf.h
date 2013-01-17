@@ -217,6 +217,56 @@ extern "C" {
 
   } scope_params_t;
 
+  typedef struct {
+    pcd_t *pcd_model;
+    pcd_t *fpfh_model;
+    pcd_t *sift_model;
+    multiview_pcd_t *range_edges_model;
+    double *fpfh_model_pmf;
+    double *fpfh_model_cmf;
+    double **model_xyzn;
+    double **fpfh_model_fxyzn;
+    double **fpfh_model_xyzn;
+    struct FLANNParameters model_xyz_params;
+    struct FLANNParameters fpfh_model_f_params;
+    struct FLANNParameters fpfh_model_xyzn_params;
+    flann_index_t model_xyz_index;
+    flann_index_t fpfh_model_f_index;
+    flann_index_t fpfh_model_xyzn_index;
+  } scope_model_data_t;
+
+  typedef struct {
+    pcd_t *pcd_obs;
+    pcd_t *sift_obs;
+    pcd_t *pcd_obs_bg;
+    range_image_t *obs_range_image;
+    range_image_t *obs_fg_range_image;
+    double **obs_edge_image;
+    double **obs_xyzn;
+    double **obs_bg_xyzn;
+    double **obs_fxyzn;
+    struct FLANNParameters obs_xyzn_params;
+    flann_index_t obs_xyzn_index;
+  } scope_obs_data_t;
+
+  enum {C_TYPE_FPFH, C_TYPE_SIFT, C_TYPE_EDGE};
+
+  typedef struct {
+    double x[3];
+    double q[4];
+    bingham_t B;
+    double *c_obs;
+    double *c_model;
+    int *c_type;
+    int nc;
+  } scope_sample_t;
+
+  typedef struct {
+    scope_sample_t *samples;
+    double *W;
+    int num_samples;
+    int num_samples_allocated;
+  } scope_samples_t;
 
   olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
 

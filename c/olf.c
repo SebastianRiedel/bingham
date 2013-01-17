@@ -10,6 +10,113 @@
 
 
 
+//--------------------------- dbug global data ---------------------------//
+
+double **obs_edge_image_;
+int obs_edge_image_width_;
+int obs_edge_image_height_;
+double **obs_edge_image_orig_;
+double mps_xyz_dists_[100000];
+double xyz_score_;
+double mps_normal_dists_[100000];
+double normal_score_;
+double lab_scores_[3];
+double vis_score_;
+int **occ_edge_pixels_ = NULL;
+int num_occ_edge_points_;
+double **range_edge_points_ = NULL;
+int **range_edge_pixels_ = NULL;
+double *range_edge_vis_prob_ = NULL;
+int num_range_edge_points_;
+double edge_score_, edge_vis_score_, edge_occ_score_;
+double segment_score_;
+int mps_idx_[100000];
+double mps_vis_prob_[100000];
+double *x_true_, *q_true_;
+int have_true_pose_ = 0;
+
+int is_good_pose(double *x, double *q)
+{
+  double dx[3];
+  sub(dx, x, x_true_, 3);
+  double cos_dq = fabs(dot(q, q_true_, 4));
+  cos_dq = MIN(cos_dq, 1.0);
+  double dq = acos(cos_dq);
+  return (norm(dx,3) < 0.05) && (dq < M_PI/8.0);
+}
+
+int is_great_pose(double *x, double *q)
+{
+  double dx[3];
+  sub(dx, x, x_true_, 3);
+  double cos_dq = fabs(dot(q, q_true_, 4));
+  cos_dq = MIN(cos_dq, 1.0);
+  double dq = acos(cos_dq);
+  return (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
+}
+
+int is_perfect_pose(double *x, double *q)
+{
+  double dx[3];
+  sub(dx, x, x_true_, 3);
+  double cos_dq = fabs(dot(q, q_true_, 4));
+  cos_dq = MIN(cos_dq, 1.0);
+  double dq = acos(cos_dq);
+  return (norm(dx,3) < 0.015) && (dq < M_PI/24.0);
+}
+
+void get_good_poses(scope_samples_t *S, int good_pose_idx[], int great_pose_idx[], int perfect_pose_idx[],
+		    int *num_good_poses, int *num_great_poses, int *num_perfect_poses)
+{
+  *num_good_poses = 0;
+  *num_great_poses = 0; 
+  *num_perfect_poses = 0;
+  int i;
+  for (i = 0; i < S->num_samples; ++i) {
+    if (is_good_pose(S->samples[i].x, S->samples[i].q))
+      good_pose_idx[(*num_good_poses)++] = i;
+    if (is_great_pose(S->samples[i].x, S->samples[i].q))
+      great_pose_idx[(*num_great_poses)++] = i;
+    if (is_perfect_pose(S->samples[i].x, S->samples[i].q))
+      perfect_pose_idx[(*num_perfect_poses)++] = i;
+  }
+}
+
+void print_good_poses(scope_samples_t *S)
+{
+  int n = S->num_samples;
+  int num_good_poses = 0, num_great_poses = 0, num_perfect_poses = 0;
+  int good_pose_idx[n], great_pose_idx[n], perfect_pose_idx[n];
+  get_good_poses(S, good_pose_idx, great_pose_idx, perfect_pose_idx, &num_good_poses, &num_great_poses, &num_perfect_poses);
+  printf("Found %d/%d good poses, %d/%d great poses, %d/%d perfect poses\n", num_good_poses, n, num_great_poses, n, num_perfect_poses, n);
+}
+
+void print_good_poses_verbose(scope_samples_t *S, double w_sigma)
+{
+  int n = S->num_samples;
+  int num_good_poses = 0, num_great_poses = 0, num_perfect_poses = 0;
+  int good_pose_idx[n], great_pose_idx[n], perfect_pose_idx[n];
+  get_good_poses(S, good_pose_idx, great_pose_idx, perfect_pose_idx, &num_good_poses, &num_great_poses, &num_perfect_poses);
+  printf("Found %d/%d good poses, %d/%d great poses, %d/%d perfect poses\n", num_good_poses, n, num_great_poses, n, num_perfect_poses, n);
+
+  int i;
+  for (i = 0; i < n; i++) {
+    if (ismemberi(i, perfect_pose_idx, num_perfect_poses))
+      printf("*** W[%d] = %.2f +- %.2f\n", i, S->W[i], w_sigma);
+    else if (ismemberi(i, great_pose_idx, num_great_poses))
+      printf("** W[%d] = %.2f +- %.2f\n", i, S->W[i], w_sigma);
+    else if (ismemberi(i, good_pose_idx, num_good_poses))
+      printf("* W[%d] = %.2f +- %.2f\n", i, S->W[i], w_sigma);
+    else
+      printf("W[%d] = %.2f +- %.2f\n", i, S->W[i], w_sigma);
+  }
+}
+
+
+
+
+
+
 
 //---------------------------- STATIC HELPER FUNCTIONS ---------------------------//
 
@@ -790,9 +897,6 @@ void range_image_find_nn(int *nn_idx, double *nn_d2, double **query_xyz, double 
 }
 
 
-//dbug
-double **obs_edge_image_orig_;
-
 
 double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, scope_params_t *params)
 {
@@ -880,175 +984,6 @@ int **compute_range_image_edges(range_image_t *range_image, double dthresh)
 
 
 
-
-double *compute_model_saliency(pcd_t *pcd_model)
-{
-  double epsilon = 1e-50;
-
-  int i;
-  double *model_pmf;
-  int n = pcd_model->num_points;
-  safe_calloc(model_pmf, n, double);
-  for (i = 0; i < pcd_model->num_points; i++) {
-    double pc1 = MAX(pcd_model->pc1[i], epsilon);
-    double pc2 = MAX(pcd_model->pc2[i], epsilon);
-    model_pmf[i] = pc1/pc2 - 1.0;
-    model_pmf[i] = MIN(model_pmf[i], 10);
-  }
-  mult(model_pmf, model_pmf, 1.0/sum(model_pmf, n), n);
-
-  return model_pmf;
-}
-
-
-int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *sift_model, double sift_dthresh)
-{
-  const int sift_len = 128;
-
-  int n1 = sift_obs->num_points;
-  int n2 = sift_model->num_points;
-
-  double **desc1 = sift_obs->sift;  //new_matrix2(n1, sift_len);
-  double **desc2 = sift_model->sift;  //new_matrix2(n2, sift_len);
-  //transpose(desc1, sift_obs->sift, sift_len, n1);
-  //transpose(desc2, sift_model->sift, sift_len, n2);
-
-  int num_matches = 0;
-  int i,j;
-  for (i = 0; i < n1; i++) {
-    double dmin = 100000.0;
-    int jmin = 0;
-    for (j = 0; j < n2; j++) {
-      double d = acos(dot(desc1[i], desc2[j], sift_len));
-      if (d < dmin) {
-	dmin = d;
-	jmin = j;
-      }
-    }
-    if (dmin < sift_dthresh) {
-      obs_idx[num_matches] = i;
-      model_idx[num_matches] = jmin;
-      num_matches++;
-    }
-  }
-
-  //free_matrix2(desc1);
-  //free_matrix2(desc2);
-
-  return num_matches;
-}
-
-
-// assumes B is already allocated
-void olf_to_bingham(bingham_t *B, int idx, pcd_t *pcd)
-{
-  double epsilon = 1e-50;
-
-  double r1[3] = {pcd->normals[idx][0], pcd->normals[idx][1], pcd->normals[idx][2]};
-  double r2[3] = {pcd->principal_curvatures[idx][0], pcd->principal_curvatures[idx][1], pcd->principal_curvatures[idx][2]};
-  double r3[3];
-  cross(r3, r1, r2);
-  double *R[3] = {r1,r2,r3};
-
-  // v1: mode
-  double v1[4];
-  rotation_matrix_to_quaternion(v1, R);
-  quaternion_inverse(v1, v1);
-
-  // B->V[2]: rotation about the normal vector
-  int i;
-  for (i = 0; i < 3; i++) {
-    r2[i] = -r2[i];
-    r3[i] = -r3[i];
-  }
-  rotation_matrix_to_quaternion(B->V[2], R);
-  quaternion_inverse(B->V[2], B->V[2]);
-
-  double **V1 = new_matrix2(4,4);  // v1's projection matrix 
-  outer_prod(V1, v1, v1, 4, 4);
-  mult(V1[0], V1[0], -1, 16);
-  for (i = 0; i < 4; i++)
-    V1[i][i] += 1.0;
-  double **V2 = new_matrix2(4,4);  // B->V[2]'s projection matrix
-  outer_prod(V2, B->V[2], B->V[2], 4, 4);
-  mult(V2[0], V2[0], -1, 16);
-  for (i = 0; i < 4; i++)
-    V2[i][i] += 1.0;
-  double **V12 = new_matrix2(4,4);
-  matrix_mult(V12, V1, V2, 4, 4, 4);
-
-  // find a third orthogonal vector, B->V[1]
-  double v3[4];
-  for (i = 0; i < 4; i++)
-    v3[i] = frand() - 0.5;
-  matrix_vec_mult(B->V[1], V12, v3, 4, 4);
-  normalize(B->V[1], B->V[1], 4);
-
-  double **V3 = V1;  // B->V[1]'s projection matrix
-  outer_prod(V3, B->V[1], B->V[1], 4, 4);
-  mult(V3[0], V3[0], -1, 16);
-  for (i = 0; i < 4; i++)
-    V3[i][i] += 1.0;
-  double **V123 = V2;
-  matrix_mult(V123, V12, V3, 4, 4, 4);
-
-  // find a fourth orthogonal vector, B->V[0]
-  double v4[4];
-  for (i = 0; i < 4; i++)
-    v4[i] = frand() - 0.5;
-  matrix_vec_mult(B->V[0], V123, v4, 4, 4);
-  normalize(B->V[0], B->V[0], 4);
-
-  // compute concentration params
-  double pc1 = MAX(pcd->pc1[idx], epsilon);
-  double pc2 = MAX(pcd->pc2[idx], epsilon);
-  double z3 = MIN(10*(pc1/pc2 - 1), 100);
-  B->Z[0] = -100;
-  B->Z[1] = -100;
-  B->Z[2] = -z3;
-
-  // look up the normalization constant
-  bingham_F(B);
-
-  free_matrix2(V1);
-  free_matrix2(V2);
-  free_matrix2(V12);
-}
-
-
-void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_model, pcd_t *pcd_obs, pcd_t *pcd_model)
-{
-  // compute rotation
-  bingham_t B;
-  bingham_alloc(&B, 4);
-  olf_to_bingham(&B, c_model, pcd_model);
-  int flip = (frand() < .5);
-  double *q_feature_to_world = pcd_obs->quaternions[flip][c_obs];
-  double q_feature_to_model[4], q_model_to_feature[4];
-  double *q_feature_to_model_ptr[1] = {q_feature_to_model};
-
-  bingham_sample(q_feature_to_model_ptr, &B, 1);
-  //bingham_mode(q_feature_to_model, &B);
-
-  quaternion_inverse(q_model_to_feature, q_feature_to_model);
-  quaternion_mult(q, q_feature_to_world, q_model_to_feature);
-  double **R = new_matrix2(3,3);
-  quaternion_to_rotation_matrix(R, q);
-
-  // compute translation
-  double *obs_point = pcd_obs->points[c_obs];
-  double *model_point = pcd_model->points[c_model];
-  double model_point_rot[3];
-  matrix_vec_mult(model_point_rot, R, model_point, 3, 3);
-  sub(x, obs_point, model_point_rot, 3);
-
-  // cleanup
-  free_matrix2(R);
-}
-
-
-
-
  //==============================================================================================//
 
  //-----------------------------------  PCD Helper Functions  -----------------------------------//
@@ -1056,6 +991,44 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
  //==============================================================================================//
 
 
+inline void get_point(double p[3], pcd_t *pcd, int idx)
+{
+  memcpy(p, pcd->points[idx], 3*sizeof(double));
+}
+
+inline void get_normal(double n[3], pcd_t *pcd, int idx)
+{
+  memcpy(n, pcd->normals[idx], 3*sizeof(double));
+}
+
+void orthogonal_vector(double *w, double *v, int n)
+{
+  int i;
+  double w_proj[n];
+  for (i = 0; i < n; i++)
+    w[i] = normrand(0,1);
+  proj(w_proj, w, v, n);
+  sub(w, w, w_proj, n);
+  normalize(w, w, n);
+}
+
+void vector_to_possible_quaternion(double *q, double *v)
+{
+  if (find_first_non_zero(v, 3) == -1) {
+    q[0] = 1;
+    q[1] = q[2] = q[3] = 0;
+    return;
+  }
+
+  double **r = new_matrix2(3, 3);
+  normalize(r[0], v, 3);
+  orthogonal_vector(r[1], r[0], 3);
+  cross(r[2], r[0], r[1]);
+  transpose(r, r, 3, 3);
+  
+  rotation_matrix_to_quaternion(q, r);
+  free_matrix2(r);
+}
 
 void get_validation_points(int *idx, pcd_t *pcd_model, int num_validation_points)
 {
@@ -1325,6 +1298,63 @@ void edge_image_random_walk(int *xi_ptr, int *yi_ptr, double **obs_edge_image, i
 }
 
 
+double *compute_model_saliency(pcd_t *pcd_model)
+{
+  double epsilon = 1e-50;
+
+  int i;
+  double *model_pmf;
+  int n = pcd_model->num_points;
+  safe_calloc(model_pmf, n, double);
+  for (i = 0; i < pcd_model->num_points; i++) {
+    double pc1 = MAX(pcd_model->pc1[i], epsilon);
+    double pc2 = MAX(pcd_model->pc2[i], epsilon);
+    model_pmf[i] = pc1/pc2 - 1.0;
+    model_pmf[i] = MIN(model_pmf[i], 10);
+  }
+  mult(model_pmf, model_pmf, 1.0/sum(model_pmf, n), n);
+
+  return model_pmf;
+}
+
+
+int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *sift_model, double sift_dthresh)
+{
+  const int sift_len = 128;
+
+  int n1 = sift_obs->num_points;
+  int n2 = sift_model->num_points;
+
+  double **desc1 = sift_obs->sift;  //new_matrix2(n1, sift_len);
+  double **desc2 = sift_model->sift;  //new_matrix2(n2, sift_len);
+  //transpose(desc1, sift_obs->sift, sift_len, n1);
+  //transpose(desc2, sift_model->sift, sift_len, n2);
+
+  int num_matches = 0;
+  int i,j;
+  for (i = 0; i < n1; i++) {
+    double dmin = 100000.0;
+    int jmin = 0;
+    for (j = 0; j < n2; j++) {
+      double d = acos(dot(desc1[i], desc2[j], sift_len));
+      if (d < dmin) {
+	dmin = d;
+	jmin = j;
+      }
+    }
+    if (dmin < sift_dthresh) {
+      obs_idx[num_matches] = i;
+      model_idx[num_matches] = jmin;
+      num_matches++;
+    }
+  }
+
+  //free_matrix2(desc1);
+  //free_matrix2(desc2);
+
+  return num_matches;
+}
+
 
 
 
@@ -1426,9 +1456,6 @@ double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t
 }
 */
 
-//dbug
-static double mps_xyz_dists_[100000];
-double xyz_score_;
 
 double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
@@ -1473,10 +1500,6 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   return w * score;
 }
 
-
-//dbug
-static double mps_normal_dists_[100000];
-double normal_score_;
 
 double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
@@ -1579,9 +1602,6 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
 */
 
 
- //dbug
-double lab_scores_[3];
-
 double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
 {
   double scores[3] = {0, 0, 0};
@@ -1650,9 +1670,6 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
 }
 
 
-//dbug
-double vis_score_;
-
 double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round)
 {
   double score = log(sum(vis_prob, n) / (double) n);
@@ -1670,10 +1687,6 @@ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int sc
   return w * score;
 }
 
-
-//dbug
-int **occ_edge_pixels_ = NULL;
-int num_occ_edge_points_;
 
 int **compute_occ_edges(int *num_occ_edges, double **cloud, double *vis_prob, int n, range_image_t *obs_range_image, scope_params_t *params)
 {
@@ -1790,24 +1803,6 @@ double compute_occ_edge_score(double **cloud, double *vis_prob, int n, range_ima
 */
 
 
-//dbug
-double *x_true_, *q_true_;
-int is_great_pose(double *x, double *q)
-{
-  double dx[3];
-  sub(dx, x, x_true_, 3);
-  double cos_dq = fabs(dot(q, q_true_, 4));
-  cos_dq = MIN(cos_dq, 1.0);
-  double dq = acos(cos_dq);
-  return (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
-}
-
-//dbug
-double **range_edge_points_ = NULL;
-int **range_edge_pixels_ = NULL;
-double *range_edge_vis_prob_ = NULL;
-int num_range_edge_points_;
-double edge_score_, edge_vis_score_, edge_occ_score_;
 
 double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
 {
@@ -1890,8 +1885,7 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 
 
 
-//dbug
-double segment_score_;
+
 
 double compute_segment_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
 			     double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
@@ -1953,22 +1947,23 @@ double compute_segment_score(double *x, double *q, double **cloud, flann_index_t
 
 
 
-//dbug: useful debugging data from model_placement_score
-static int mps_idx_[100000];
-static double mps_vis_prob_[100000];
+//double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
+//			     flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
+//			     pcd_t *pcd_obs, range_image_t *obs_range_image, double **obs_edge_image, double **obs_xyzn,
+//			     scope_params_t *params, int score_round)
 
-double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
-			     flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
-			     pcd_t *pcd_obs, range_image_t *obs_range_image, double **obs_edge_image, double **obs_xyzn,
-			     scope_params_t *params, int score_round)
+double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
 {
+  double *x = sample->x;
+  double *q = sample->q;
+
   //double t0 = get_time_ms();  //dbug
 
   // get model validation points
   int i;
-  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : pcd_model->num_points);
+  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
   int idx[num_validation_points];
-  get_validation_points(idx, pcd_model, num_validation_points);
+  get_validation_points(idx, model_data->pcd_model, num_validation_points);
 
   //printf("break 0, %.2f ms\n", get_time_ms() - t0);  //dbug
   //t0 = get_time_ms();
@@ -1980,14 +1975,14 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   //t0 = get_time_ms();
 
   // extract transformed model validation features
-  double **cloud = get_sub_cloud_at_pose(pcd_model, idx, num_validation_points, x, q);
+  double **cloud = get_sub_cloud_at_pose(model_data->pcd_model, idx, num_validation_points, x, q);
 
   if (score_round == 1) {  // after c=1, just use free space to score
     double dthresh = .05;  //TODO: make this a param
     double score = 0;
     int xi, yi;
     for (i = 0; i < num_validation_points; i++)
-      if (range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]) && obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
+      if (range_image_xyz2sub(&xi, &yi, obs_data->obs_range_image, cloud[i]) && obs_data->obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
 	score -= 1.0;
     score /= (double)num_validation_points;
     free_matrix2(cloud);
@@ -1996,10 +1991,10 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
 
 
 
-  double **cloud_normals = get_sub_cloud_normals_rotated(pcd_model, idx, num_validation_points, q);
-  //double **cloud_f = get_sub_cloud_fpfh(pcd_model, idx, num_validation_points);
-  //double **cloud_sdw = get_sub_cloud_sdw(pcd_model, idx, num_validation_points, params);
-  double **cloud_lab = get_sub_cloud_lab(pcd_model, idx, num_validation_points);
+  double **cloud_normals = get_sub_cloud_normals_rotated(model_data->pcd_model, idx, num_validation_points, sample->q);
+  //double **cloud_f = get_sub_cloud_fpfh(model_data->pcd_model, idx, num_validation_points);
+  //double **cloud_sdw = get_sub_cloud_sdw(model_data->pcd_model, idx, num_validation_points, params);
+  double **cloud_lab = get_sub_cloud_lab(model_data->pcd_model, idx, num_validation_points);
   //double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
 
   //printf("break 2, %.2f ms\n", get_time_ms() - t0);  //dbug
@@ -2008,7 +2003,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   // compute p(visibile)
   double vis_prob[num_validation_points];
   for (i = 0; i < num_validation_points; i++)
-    vis_prob[i] = compute_visibility_prob(cloud[i], cloud_normals[i], obs_range_image, params->vis_thresh, 0);
+    vis_prob[i] = compute_visibility_prob(cloud[i], cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
   double vis_pmf[num_validation_points];
   normalize_pmf(vis_pmf, vis_prob, num_validation_points);
 
@@ -2019,7 +2014,7 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   //t0 = get_time_ms();
 
   // compute noise models
-  scope_noise_model_t *noise_models = get_noise_models(x, q, idx, num_validation_points, pcd_model, range_edges_model);
+  scope_noise_model_t *noise_models = get_noise_models(x, q, idx, num_validation_points, model_data->pcd_model, model_data->range_edges_model);
 
   //printf("break 4, %.2f ms\n", get_time_ms() - t0);  //dbug
   //t0 = get_time_ms();
@@ -2033,9 +2028,9 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   //range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud_xyzn[i], 1, 6, obs_xyzn, obs_range_image, search_radius);
   //range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud[i], 1, 3, pcd_obs->points, obs_range_image, search_radius);
 
-  double xyz_score = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_range_image, params, score_round);
-  double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_range_image, params, score_round);
-  double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_range_image, pcd_obs, params, score_round);
+  double xyz_score = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
+  double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
+  double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
   //double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
   //double xyz_score = compute_xyz_score(cloud, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
@@ -2051,33 +2046,29 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   double edge_score = 0.0;
   if (obs_edge_image) {
     int n = params->num_validation_points;
-    double **P = get_range_edge_points(&n, x, q, range_edges_model, obs_range_image);
+    double **P = get_range_edge_points(&n, x, q, model_data->range_edges_model, obs_data->obs_range_image);
     transform_cloud(P, P, n, x, q);
     if (params->num_validation_points == 0) {
       int num_occ_edges;
-      int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_range_image, params);
-      edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_range_image, obs_edge_image, params, score_round);
+      int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
+      edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
       if (occ_edges)
 	free_matrix2i(occ_edges);
     }
     else
-      edge_score = compute_edge_score(P, n, NULL, 0, obs_range_image, obs_edge_image, params, score_round);
+      edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
     free_matrix2(P);
   }
 
   //printf("break 6, %.2f ms\n", get_time_ms() - t0);  //dbug
   //t0 = get_time_ms();
 
-  //double occ_edge_score = 0;
   double segment_score = 0;
-  //if (params->num_validation_points == 0) {
-  //occ_edge_score = compute_occ_edge_score(cloud, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params);
-  if (obs_edge_image)
-    segment_score = compute_segment_score(x, q, cloud, model_xyz_index, model_xyz_params, vis_prob, num_validation_points, obs_range_image, obs_edge_image, params, score_round);
-  //}
+  if (score_round >= 3)
+    segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, model_data->model_xyz_params, vis_prob,
+					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
 
-  //double score = xyzn_score + edge_score + lab_score + vis_score;  //+ sdw_score 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score;  //+ sdw_score 
+  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score;
 
   //if (params->verbose) {
   //  printf("score_comp = (%f, %f, %f, %f, %f, %f)\n", xyz_score, normal_score, edge_score, lab_score, vis_score, segment_score);
@@ -2098,193 +2089,123 @@ double model_placement_score(double *x, double *q, pcd_t *pcd_model, multiview_p
   return score;
 }
 
-/*
- * Run model_placement_score() multiple times and average the results.
- */
-double model_placement_score_multi(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
-				   flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
-				   pcd_t *pcd_obs, range_image_t *obs_range_image, double **obs_edge_image,
-				   double **obs_xyzn, scope_params_t *params, int score_round, int num_trials)
-{
-  int i;
-  double score = 0.0;
-  for (i = 0; i < num_trials; i++)
-    score += model_placement_score(x, q, pcd_model, range_edges_model, model_xyz_index, model_xyz_params, pcd_obs, obs_range_image, obs_edge_image, obs_xyzn, params, score_round);
-  return score / (double) num_trials;
-}
 
-void get_good_poses(simple_pose_t *true_pose, int n, double **X, double **Q, int good_pose_idx[], int great_pose_idx[], int perfect_pose_idx[],
-		    int *num_good_poses, int *num_great_poses, int *num_perfect_poses)
+
+
+
+//==============================================================================================//
+
+//----------------------------  Bingham Procrustean Alignment (BPA)  ---------------------------//
+
+//==============================================================================================//
+
+
+// assumes B is already allocated
+void olf_to_bingham(bingham_t *B, int idx, pcd_t *pcd)
 {
-  *num_good_poses = 0;
-  *num_great_poses = 0; 
-  *num_perfect_poses = 0;
+  double epsilon = 1e-50;
+
+  double r1[3] = {pcd->normals[idx][0], pcd->normals[idx][1], pcd->normals[idx][2]};
+  double r2[3] = {pcd->principal_curvatures[idx][0], pcd->principal_curvatures[idx][1], pcd->principal_curvatures[idx][2]};
+  double r3[3];
+  cross(r3, r1, r2);
+  double *R[3] = {r1,r2,r3};
+
+  // v1: mode
+  double v1[4];
+  rotation_matrix_to_quaternion(v1, R);
+  quaternion_inverse(v1, v1);
+
+  // B->V[2]: rotation about the normal vector
   int i;
-  double dx[3];
-  for (i = 0; i < n; ++i) {
-    sub(dx, X[i], true_pose->X, 3);
-    double cos_dq = fabs(dot(Q[i], true_pose->Q, 4));
-    cos_dq = MIN(cos_dq, 1.0);
-    double dq = acos(cos_dq);
-    int good_pose = (norm(dx,3) < 0.05) && (dq < M_PI/8.0);
-    int great_pose = (norm(dx,3) < 0.025) && (dq < M_PI/16.0);
-    int perfect_pose = (norm(dx,3) < 0.015) && (dq < M_PI/24.0);
-    if (good_pose)
-      good_pose_idx[(*num_good_poses)++] = i;
-    if (great_pose)
-      great_pose_idx[(*num_great_poses)++] = i;
-    if (perfect_pose)
-      perfect_pose_idx[(*num_perfect_poses)++] = i;
+  for (i = 0; i < 3; i++) {
+    r2[i] = -r2[i];
+    r3[i] = -r3[i];
   }
+  rotation_matrix_to_quaternion(B->V[2], R);
+  quaternion_inverse(B->V[2], B->V[2]);
+
+  double **V1 = new_matrix2(4,4);  // v1's projection matrix 
+  outer_prod(V1, v1, v1, 4, 4);
+  mult(V1[0], V1[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V1[i][i] += 1.0;
+  double **V2 = new_matrix2(4,4);  // B->V[2]'s projection matrix
+  outer_prod(V2, B->V[2], B->V[2], 4, 4);
+  mult(V2[0], V2[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V2[i][i] += 1.0;
+  double **V12 = new_matrix2(4,4);
+  matrix_mult(V12, V1, V2, 4, 4, 4);
+
+  // find a third orthogonal vector, B->V[1]
+  double v3[4];
+  for (i = 0; i < 4; i++)
+    v3[i] = frand() - 0.5;
+  matrix_vec_mult(B->V[1], V12, v3, 4, 4);
+  normalize(B->V[1], B->V[1], 4);
+
+  double **V3 = V1;  // B->V[1]'s projection matrix
+  outer_prod(V3, B->V[1], B->V[1], 4, 4);
+  mult(V3[0], V3[0], -1, 16);
+  for (i = 0; i < 4; i++)
+    V3[i][i] += 1.0;
+  double **V123 = V2;
+  matrix_mult(V123, V12, V3, 4, 4, 4);
+
+  // find a fourth orthogonal vector, B->V[0]
+  double v4[4];
+  for (i = 0; i < 4; i++)
+    v4[i] = frand() - 0.5;
+  matrix_vec_mult(B->V[0], V123, v4, 4, 4);
+  normalize(B->V[0], B->V[0], 4);
+
+  // compute concentration params
+  double pc1 = MAX(pcd->pc1[idx], epsilon);
+  double pc2 = MAX(pcd->pc2[idx], epsilon);
+  double z3 = MIN(10*(pc1/pc2 - 1), 100);
+  B->Z[0] = -100;
+  B->Z[1] = -100;
+  B->Z[2] = -z3;
+
+  // look up the normalization constant
+  bingham_F(B);
+
+  free_matrix2(V1);
+  free_matrix2(V2);
+  free_matrix2(V12);
 }
 
-void print_good_poses(simple_pose_t *true_pose, double **X, double **Q, int n)
+
+void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_model, pcd_t *pcd_obs, pcd_t *pcd_model)
 {
-  int num_good_poses = 0, num_great_poses = 0, num_perfect_poses = 0;
-  int good_pose_idx[n], great_pose_idx[n], perfect_pose_idx[n];
-  get_good_poses(true_pose, n, X, Q, good_pose_idx, great_pose_idx, perfect_pose_idx, &num_good_poses, &num_great_poses, &num_perfect_poses);
-  printf("Found %d/%d good poses, %d/%d great poses, %d/%d perfect poses\n", num_good_poses, n, num_great_poses, n, num_perfect_poses, n);
-}
+  // compute rotation
+  bingham_t B;
+  bingham_alloc(&B, 4);
+  olf_to_bingham(&B, c_model, pcd_model);
+  int flip = (frand() < .5);
+  double *q_feature_to_world = pcd_obs->quaternions[flip][c_obs];
+  double q_feature_to_model[4], q_model_to_feature[4];
+  double *q_feature_to_model_ptr[1] = {q_feature_to_model};
 
-void print_good_poses_verbose(simple_pose_t *true_pose, double **X, double **Q, double *W, double w_sigma, int n)
-{
-  int num_good_poses = 0, num_great_poses = 0, num_perfect_poses = 0;
-  int good_pose_idx[n], great_pose_idx[n], perfect_pose_idx[n];
-  get_good_poses(true_pose, n, X, Q, good_pose_idx, great_pose_idx, perfect_pose_idx, &num_good_poses, &num_great_poses, &num_perfect_poses);
-  printf("Found %d/%d good poses, %d/%d great poses, %d/%d perfect poses\n", num_good_poses, n, num_great_poses, n, num_perfect_poses, n);
+  bingham_sample(q_feature_to_model_ptr, &B, 1);
+  //bingham_mode(q_feature_to_model, &B);
 
-  int i;
-  for (i = 0; i < n; i++) {
-    if (ismemberi(i, perfect_pose_idx, num_perfect_poses))
-      printf("*** W[%d] = %.2f +- %.2f\n", i, W[i], w_sigma);
-    else if (ismemberi(i, great_pose_idx, num_great_poses))
-      printf("** W[%d] = %.2f +- %.2f\n", i, W[i], w_sigma);
-    else if (ismemberi(i, good_pose_idx, num_good_poses))
-      printf("* W[%d] = %.2f +- %.2f\n", i, W[i], w_sigma);
-    else
-      printf("W[%d] = %.2f +- %.2f\n", i, W[i], w_sigma);
-  }
-}
-
-inline void get_point(double p[3], pcd_t *pcd, int idx)
-{
-  memcpy(p, pcd->points[idx], 3*sizeof(double));
-}
-
-inline void get_normal(double n[3], pcd_t *pcd, int idx)
-{
-  memcpy(n, pcd->normals[idx], 3*sizeof(double));
-}
-
-void orthogonal_vector(double *w, double *v, int n)
-{
-  int i;
-  double w_proj[n];
-  for (i = 0; i < n; i++)
-    w[i] = normrand(0,1);
-  proj(w_proj, w, v, n);
-  sub(w, w, w_proj, n);
-  normalize(w, w, n);
-}
-
-void vector_to_possible_quaternion(double *q, double *v)
-{
-  if (find_first_non_zero(v, 3) == -1) {
-    q[0] = 1;
-    q[1] = q[2] = q[3] = 0;
-    return;
-  }
-
-  double **r = new_matrix2(3, 3);
-  normalize(r[0], v, 3);
-  orthogonal_vector(r[1], r[0], 3);
-  cross(r[2], r[0], r[1]);
-  transpose(r, r, 3, 3);
-  
-  rotation_matrix_to_quaternion(q, r);
-  free_matrix2(r);
-}
-
-int sample_model_point_given_model_pose(double *x, double *q, int *c_model_prev, int n_model_prev, double *model_cmf, pcd_t *pcd_model, range_image_t *obs_range_image)
-{
+  quaternion_inverse(q_model_to_feature, q_feature_to_model);
+  quaternion_mult(q, q_feature_to_world, q_model_to_feature);
   double **R = new_matrix2(3,3);
-  quaternion_to_rotation_matrix(R,q);
+  quaternion_to_rotation_matrix(R, q);
 
-  int i, xi, yi, c_model, found_point = 0;
-  for (i = 0; i < 20; i++) {
+  // compute translation
+  double *obs_point = pcd_obs->points[c_obs];
+  double *model_point = pcd_model->points[c_model];
+  double model_point_rot[3];
+  matrix_vec_mult(model_point_rot, R, model_point, 3, 3);
+  sub(x, obs_point, model_point_rot, 3);
 
-    if (i < 10)  // try sampling from model_cmf
-      c_model = cmfrand(model_cmf, pcd_model->num_points);
-    else  // if that doesn't work, try uniform sampling
-      c_model = irand(pcd_model->num_points);
-
-    if (!ismemberi(c_model, c_model_prev, n_model_prev)) {  // if a point is new
-      double n[3], xyz[3];
-      matrix_vec_mult(n, R, pcd_model->normals[c_model], 3, 3);
-      matrix_vec_mult(xyz, R, pcd_model->points[c_model], 3, 3);
-      add(xyz, xyz, x, 3);
-
-      if (dot(n, xyz, 3) < 0) {  // if normals are pointing towards camera
-	if (obs_range_image == NULL ||
-	    (range_image_xyz2sub(&xi, &yi, obs_range_image, xyz) && obs_range_image->image[xi][yi] > norm(xyz,3))) {  // if visible in range image
-	  found_point = 1;
-	  break;
-	}
-      }
-    }
-  }
-
+  // cleanup
   free_matrix2(R);
-
-  return (found_point ? c_model : -1);
 }
-
-int sample_obs_correspondence_given_model_pose(double *x, double *q, int c_model, pcd_t *pcd_model, double **obs_fxyzn,
-					       flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params, scope_params_t *params)
-{
-  int shape_length = pcd_model->shape_length;
-
-  double **R = new_matrix2(3,3);
-  quaternion_to_rotation_matrix(R,q);
-
-  double mp_pos[3];
-  get_point(mp_pos, pcd_model, c_model);
-  matrix_vec_mult(mp_pos, R, mp_pos, 3, 3);
-  add(mp_pos, mp_pos, x, 3);
-
-  double mp_norm[3];
-  get_normal(mp_norm, pcd_model, c_model);
-  matrix_vec_mult(mp_norm, R, mp_norm, 3, 3);
-
-  double *mp_shape = pcd_model->shapes[c_model];
-  
-  // Look for k-NN in xyz-normal space
-  double xyzn_query[6];
-  mult(xyzn_query, mp_pos, params->xyz_weight, 3);
-  mult(&xyzn_query[3], mp_norm, params->normal_weight, 3);
-  int nn_idx[params->knn];
-  double nn_d2[params->knn];
-  flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
-  
-  // then compute full feature distance on just those k-NN
-  double query[shape_length + 6];
-  memcpy(query, mp_shape, shape_length*sizeof(double));
-  memcpy(&query[shape_length], xyzn_query, 6*sizeof(double));
-
-  int i;
-  double p[params->knn];
-  for (i = 0; i < params->knn; i++) {
-    double d2 = dist2(query, obs_fxyzn[nn_idx[i]], shape_length + 6);
-    p[i] = exp(.5*d2 / params->f_sigma);
-  }
-  normalize_pmf(p, p, params->knn);
-  int c_obs = nn_idx[pmfrand(p, params->knn)];
-
-  free_matrix2(R);
- 
-  return c_obs;
-}
-
 
 
 /*
@@ -2346,6 +2267,7 @@ void get_model_pose_distribution_from_correspondences_LS(pcd_t *pcd_obs, pcd_t *
   free_matrix2(points_obs);
   free_matrix2(points_model);
 }
+
 
 /*
  * Compute x and p(q|x) by combining Bingham distributions from least-squares
@@ -2435,6 +2357,22 @@ void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingha
   free_matrix2(R);
 }
 
+
+void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // compute max likelihood model pose given the point correspondences
+  double x0[3] = {0,0,0};
+  bingham_t B;
+  bingham_alloc(&B, 4);
+  //get_model_pose_distribution_from_correspondences(obs_data->pcd_obs, model_data->fpfh_model, S->samples[i].c_obs, S->samples[i].c_model, c+1, params->xyz_sigma, x0, &B);
+  get_model_pose_distribution_from_correspondences(x0, &B, obs_data->pcd_obs, model_data->fpfh_model, S->samples[i].c_obs, S->samples[i].c_model, c+1, params->xyz_sigma, x0, &B);
+
+  sample_model_pose(fpfh_model, C_model[i], c+1, x0, &B, X[i], Q[i]);
+
+
+}
+
+
 double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B,
 			     double xyz_sigma, double f_sigma, double dispersion_weight, double logp_comp[4])
 {
@@ -2498,22 +2436,162 @@ double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *
   return logp;
 }
 
-int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_xyzn, double **model_fxyzn, scope_params_t *params,
-						 //struct FLANNParameters *model_xyz_params, flann_index_t model_xyz_index,
-						 struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index,
-						 double *x, double *q, int c2_obs, int sample_nn, int use_f)
+
+
+
+
+
+//==============================================================================================//
+
+//-------------------------------------  Correspondences  --------------------------------------//
+
+//==============================================================================================//
+
+
+
+int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
 {
+  // TODO: make these params
+  int num_steps = 3;  
+  int hops = 2;
+  int num_samples = 5;
+
+  int nc = sample->nc;
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+  double ** obs_edge_image = obs_data->obs_edge_image;
+  int w = obs_range_image->w;
+  int h = obs_range_image->h;
+
+  // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
+  int c_obs_new[num_samples];
+  double d2_obs[num_samples];  // dist. b/w obs points
+  double *p_obs = pcd_obs->points[sample->c_obs[nc-1]];
+  int i, xi, yi;
+  range_image_xyz2sub(&xi, &yi, obs_range_image, p_obs);
+  for (i = 0; i < num_samples; i++) {
+    while (1) {
+      int xi2=xi, yi2=yi;
+      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops);
+      if (obs_range_image->idx[xi2][yi2] >= 0) {
+	c_obs_new[i] = obs_range_image->idx[xi2][yi2];
+	break;
+      }
+    }
+    d2_obs[i] = dist2(p_obs, pcd_obs->points[c_obs_new[i]], 3);
+  }
+  i = find_max(d2_obs, num_samples);
+
+  return c_obs_new[i];
+}
+
+
+//int sample_fpfh_model_point_given_model_pose(double *x, double *q, int *c_model_prev, int n_model_prev, double *model_cmf, pcd_t *fpfh_model, range_image_t *obs_range_image)
+int sample_fpfh_model_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data);
+{
+  pcd_t *fpfh_model = model_data->fpfh_model;
+  double *model_cmf = model_data->model_cmf;
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
+
+  int i, xi, yi, c_model, found_point = 0;
+  for (i = 0; i < 20; i++) {
+
+    if (i < 10)  // try sampling from model_cmf
+      c_model = cmfrand(model_cmf, fpfh_model->num_points);
+    else  // if that doesn't work, try uniform sampling
+      c_model = irand(fpfh_model->num_points);
+
+    if (!ismemberi(c_model, sample->c_model, sample->nc)) {  // if a point is new
+      double n[3], xyz[3];
+      matrix_vec_mult(n, R, fpfh_model->normals[c_model], 3, 3);
+      matrix_vec_mult(xyz, R, fpfh_model->points[c_model], 3, 3);
+      add(xyz, xyz, sample->x, 3);
+
+      if (dot(n, xyz, 3) < 0) {  // if normals are pointing towards camera
+	if (obs_range_image == NULL ||
+	    (range_image_xyz2sub(&xi, &yi, obs_range_image, xyz) && obs_range_image->image[xi][yi] > norm(xyz,3))) {  // if visible in range image
+	  found_point = 1;
+	  break;
+	}
+      }
+    }
+  }
+
+  free_matrix2(R);
+
+  return (found_point ? c_model : -1);
+}
+
+int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  pcd_t *fpfh_model = model_data->fpfh_model;
+  double **obs_fxyzn = obs_data->obs_fxyzn;
+  flann_index_t obs_xyzn_index = obs_data->obs_xyzn_index;
+  struct FLANNParameters *obs_xyzn_params = obs_data->obs_xyzn_params;
+  int shape_length = fpfh_model->shape_length;
+
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
+
+  double mp_pos[3];
+  get_point(mp_pos, fpfh_model, c_model);
+  matrix_vec_mult(mp_pos, R, mp_pos, 3, 3);
+  add(mp_pos, mp_pos, sample->x, 3);
+
+  double mp_norm[3];
+  get_normal(mp_norm, fpfh_model, c_model);
+  matrix_vec_mult(mp_norm, R, mp_norm, 3, 3);
+
+  double *mp_shape = fpfh_model->shapes[c_model];
+  
+  // Look for k-NN in xyz-normal space
+  double xyzn_query[6];
+  mult(xyzn_query, mp_pos, params->xyz_weight, 3);
+  mult(&xyzn_query[3], mp_norm, params->normal_weight, 3);
+  int nn_idx[params->knn];
+  double nn_d2[params->knn];
+  flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
+  
+  // then compute full feature distance on just those k-NN
+  double query[shape_length + 6];
+  memcpy(query, mp_shape, shape_length*sizeof(double));
+  memcpy(&query[shape_length], xyzn_query, 6*sizeof(double));
+
+  int i;
+  double p[params->knn];
+  for (i = 0; i < params->knn; i++) {
+    double d2 = dist2(query, obs_fxyzn[nn_idx[i]], shape_length + 6);
+    p[i] = exp(.5*d2 / params->f_sigma);
+  }
+  normalize_pmf(p, p, params->knn);
+  int c_obs = nn_idx[pmfrand(p, params->knn)];
+
+  free_matrix2(R);
+ 
+  return c_obs;
+}
+
+
+int sample_fpfh_model_correspondence_given_model_pose(scope_sample _t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int sample_nn, int use_f)
+{
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  double **model_xyzn = model_data->model_xyzn;
+  double **model_fxyzn = model_data->model_fxyzn;
+  struct FLANNParameters *model_xyzn_params = model_data->model_xyzn_params;
+  flann_index_t model_xyzn_index = model_data->model_xyzn_index;
   int shape_length = pcd_obs->shape_length;
 
   int i;
   double q_inv[4];
-  quaternion_inverse(q_inv, q);
+  quaternion_inverse(q_inv, sample->q);
   double **inv_R_model = new_matrix2(3, 3);
   quaternion_to_rotation_matrix(inv_R_model, q_inv);
 
   double xyz_obs_point2[3];
   get_point(xyz_obs_point2, pcd_obs, c2_obs);
-  sub(xyz_obs_point2, xyz_obs_point2, x, 3);
+  sub(xyz_obs_point2, xyz_obs_point2, sample->x, 3);
   matrix_vec_mult(xyz_obs_point2, inv_R_model, xyz_obs_point2, 3, 3);
 
   double nxyz_obs_point2[3];
@@ -2558,55 +2636,65 @@ int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_
 }
 
 
-void sample_correspondence_given_model_pose(int *c_obs, int *c_model, int nc, double *x, double *q, pcd_t *pcd_obs, range_image_t *obs_range_image, double **obs_edge_image,
-					    double **obs_fxyzn, flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params,
-					    pcd_t *pcd_model, double *model_cmf, double **model_fxyzn, double **model_xyzn,
-					    flann_index_t model_xyzn_index, struct FLANNParameters *model_xyzn_params, scope_params_t *params)
+void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
-  // TODO: make these params
-  int num_steps = 3;  
-  int hops = 2;
-  int num_obs_first_samples = 5;
-  //int num_model_first_samples = 10;
+  // TODO: make this a param
   double model_first_ratio = .5;
 
+  int c_model, c_obs;
+  int correspondence_found = 0;
+
   if (frand() < model_first_ratio) {
-
-    c_model[nc] = sample_model_point_given_model_pose(x, q, c_model, nc, model_cmf, pcd_model, obs_range_image);
-    if (c_model[nc] >= 0) {
-      c_obs[nc] = sample_obs_correspondence_given_model_pose(x, q, c_model[nc], pcd_model, obs_fxyzn, obs_xyzn_index, obs_xyzn_params, params);
-      return;
+    c_model = sample_fpfh_model_point_given_model_pose(sample, model_data, obs_data);
+    if (c_model >= 0) {
+      c_obs = sample_fpfh_obs_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
+      correspondence_found = 1;
     }
   }
-
-  int w = obs_range_image->w;
-  int h = obs_range_image->h;
-
-  // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
-  int c_obs_new[num_obs_first_samples];
-  double d2_obs[num_obs_first_samples];  // dist. b/w obs points
-  double *p_obs = pcd_obs->points[c_obs[nc-1]];
-  int i, xi, yi;
-  range_image_xyz2sub(&xi, &yi, obs_range_image, p_obs);
-  for (i = 0; i < num_obs_first_samples; i++) {
-    while (1) {
-      int xi2=xi, yi2=yi;
-      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops);
-      if (obs_range_image->idx[xi2][yi2] >= 0) {
-	c_obs_new[i] = obs_range_image->idx[xi2][yi2];
-	break;
-      }
-    }
-    d2_obs[i] = dist2(p_obs, pcd_obs->points[c_obs_new[i]], 3);
+  if (!correspondence_found) {
+    c_obs = sample_obs_point_given_model_pose(sample, model_data, obs_data);
+    c_model[nc] = sample_fpfh_model_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params, 1, 0);  //nn, fpfh
   }
-  i = find_max(d2_obs, num_obs_first_samples);
-  c_obs[nc] = c_obs_new[i];
 
-  // sample a corresponding model point
-  c_model[nc] = sample_model_correspondence_given_model_pose(pcd_obs, model_xyzn, model_fxyzn, params, model_xyzn_params, model_xyzn_index, x, q, c_obs[nc], 1, 0);  //nn, fpfh
-  
-  //printf("c_obs = %d, c_model = %d\n", c_obs[nc], c_model[nc]);  //dbug
+  int nc = sample->nc;
+  sample->c_obs[nc] = c_obs;
+  sample->c_model[nc] = c_model;
+  sample->c_type[nc] = C_TYPE_FPFH;
+  sample->nc++;
 }
+
+
+void sample_edge_correspondence_given_model_pose(int *c_obs, int *c_model, int nc, double *x, double *q)
+{
+  //STUB
+
+  // TODO: make these params
+  //double model_first_ratio = .5;
+
+  //if (frand() < model_first_ratio) {
+  //  c_model[nc] = sample_model_edge_point_given_model_pose(x, q, pcd_model, obs_range_image);
+  //}
+}
+
+
+void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  sample_fpfh_correspondence_given_model_pose(sample, model_data, obs_data, params);
+
+  //TODO: add edge, sift correspondences
+}
+
+
+
+
+
+
+
+//==============================================================================================//
+
+//-------------------------------------  Dense Alignments  -------------------------------------//
+
+//==============================================================================================//
 
 
 void align_model_icp_dense(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_obs, range_image_t *obs_range_image,
@@ -2873,6 +2961,7 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
   return score;
 }
 
+
 void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
 			  range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int max_iter, int num_points)
 {
@@ -3020,6 +3109,15 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
 }
 
 
+
+
+//==============================================================================================//
+
+//------------------------------------  SCOPE Data Processing ----------------------------------//
+
+//==============================================================================================//
+
+
 int remove_redundant_pose_samples(double **X, double **Q, double *W, int n, double x_cluster_thresh, double q_cluster_thresh)
 {
   int num_samples = n;
@@ -3050,98 +3148,43 @@ int remove_redundant_pose_samples(double **X, double **Q, double *W, int n, doub
   return cnt;
 }
 
-//void sort_pose_samples(double **X, double **Q, double *W, int **C_obs, int **C_model, int **C_issift, int num_samples, int num_correspondences)
-void sort_pose_samples(double **X, double **Q, double *W, int **C_obs, int **C_model, int num_samples, int num_correspondences)
+void sort_pose_samples(scope_samples_t *S)
 {
-  int idx[num_samples];
-  sort_indices(W, idx, num_samples);  // smallest to biggest
-  reversei(idx, idx, num_samples);  // reverse idx (biggest to smallest)
+  int n = S->num_samples
+  int idx[n];
+  sort_indices(S->W, idx, n);  // smallest to biggest
+  reversei(idx, idx, n);  // reverse idx (biggest to smallest)
 
-  reorder(W, W, idx, num_samples);
-  reorder_rows(X, X, idx, num_samples, 3);
-  reorder_rows(Q, Q, idx, num_samples, 4);
-  reorder_rowsi(C_obs, C_obs, idx, num_samples, num_correspondences);
-  reorder_rowsi(C_model, C_model, idx, num_samples, num_correspondences);
-  //reorder_rowsi(C_issift, C_issift, idx, num_samples, num_correspondences);
+  reorder(S->W, S->W, idx, n);
+
+  scope_sample_t new_samples[n];
+  int i;
+  for (i = 0; i < n; i++)
+    new_samples[i] = S->samples[idx[i]];
+  memcpy(S->samples, new_samples, n*sizeof(scope_sample_t));
 }
 
 
-//dbug
-double **obs_edge_image_;
-int obs_edge_image_width_;
-int obs_edge_image_height_;
-
-
-/*
- * Single Cluttered Object Pose Estimation (SCOPE)
- */
-olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose)
+scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *params)
 {
-  const double MIN_SCORE = -100000.0;
-
-  params->verbose = 0;
-
-  /*dbug
-  params->num_samples_init = 1;
-  params->num_samples = 1;
-  params->num_correspondences = 2;
-  params->branching_factor = 1;
-  params->do_icp = 0;
-  */
-
-  //dbug
-  if (have_true_pose) {
-    x_true_ = true_pose->X;
-    q_true_ = true_pose->Q;
-  }
-
-  int i,j;
-
-  printf("scope()\n");
+  scope_model_data_t *data;
+  safe_calloc(data, 1, scope_model_data_t);
 
   // unpack model arguments
-  pcd_t *pcd_model = model->obj_pcd;
-  pcd_t *fpfh_model = model->fpfh_pcd;
-  pcd_t *sift_model = model->sift_pcd;
-  multiview_pcd_t *range_edges_model = get_multiview_pcd(model->range_edges_pcd);
-
-  // unpack obs arguments
-  pcd_t *pcd_obs = obs->fg_pcd;
-  pcd_t *sift_obs = obs->sift_pcd;
-  pcd_t *pcd_obs_bg = obs->bg_pcd;
-
-  // compute range images
-  range_image_t *obs_range_image = pcd_to_range_image(pcd_obs_bg, 0, M_PI/1000.0, 4);
-  range_image_t *obs_fg_range_image = pcd_to_range_image_from_template(pcd_obs, obs_range_image);
-
-  // compute blurred edge feature image
-  double **obs_edge_image = get_edge_feature_image(pcd_obs, obs_fg_range_image, params);
-
-  //dbug
-  obs_edge_image_width_ = obs_fg_range_image->w;
-  obs_edge_image_height_ = obs_fg_range_image->h;
-  printf("obs_edge_image_width_ = %d\n", obs_edge_image_width_);
-  printf("obs_edge_image_height_ = %d\n", obs_edge_image_height_);
-  obs_edge_image_ = matrix_clone(obs_edge_image, obs_edge_image_width_, obs_edge_image_height_);  //dbug
+  data->pcd_model = model->obj_pcd;
+  data->fpfh_model = model->fpfh_pcd;
+  data->sift_model = model->sift_pcd;
+  data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
 
   // compute model feature saliency (for fpfh correspondences)
-  double *model_pmf = compute_model_saliency(fpfh_model);
-  double model_cmf[fpfh_model->num_points];
-  cumsum(model_cmf, model_pmf, fpfh_model->num_points);
-
-  // find sift matches
-  int sift_match_obs_idx[sift_obs->num_points], sift_match_model_idx[sift_obs->num_points];
-  int num_sift_matches = 0; //find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, sift_obs, sift_model, params->sift_dthresh);
+  data->fpfh_model_pmf = compute_model_saliency(data->fpfh_model);
+  safe_calloc(data->fpfh_model_cmf, data->fpfh_model->num_points, double);
+  cumsum(data->fpfh_model_cmf, data->fpfh_model_pmf, data->fpfh_model->num_points);
 
   // get combined feature matrices
-  double **obs_xyzn = get_xyzn_features(pcd_obs->points, pcd_obs->normals, pcd_obs->num_points, params);
-  double **obs_bg_xyzn = get_xyzn_features(pcd_obs_bg->points, pcd_obs_bg->normals, pcd_obs_bg->num_points, params);
-  double **model_xyzn = get_xyzn_features(pcd_model->points, pcd_model->normals, pcd_model->num_points, params);
-  double **obs_fxyzn = get_fxyzn_features(pcd_obs->shapes, pcd_obs->points, pcd_obs->normals, pcd_obs->num_points, pcd_obs->shape_length, params);
-  double **fpfh_model_fxyzn = get_fxyzn_features(fpfh_model->shapes, fpfh_model->points, fpfh_model->normals, fpfh_model->num_points, fpfh_model->shape_length, params);
-  double **fpfh_model_xyzn = get_xyzn_features(fpfh_model->points, fpfh_model->normals, fpfh_model->num_points, params);
-  //float **obs_fsurf = get_fsurf_features(pcd_obs->shapes, pcd_obs->sdw, pcd_obs->num_points, pcd_obs->shape_length, params);
-  //float **model_fsurf = get_fsurf_features(fpfh_model->shapes, fpfh_model->sdw, fpfh_model->num_points, fpfh_model->shape_length, params);
+  data->model_xyzn = get_xyzn_features(data->pcd_model->points, data->pcd_model->normals, data->pcd_model->num_points, params);
+  data->fpfh_model_fxyzn = get_fxyzn_features(data->fpfh_model->shapes, data->fpfh_model->points, data->fpfh_model->normals, data->fpfh_model->num_points, data->fpfh_model->shape_length, params);
+  data->fpfh_model_xyzn = get_xyzn_features(data->fpfh_model->points, data->fpfh_model->normals, data->fpfh_model->num_points, params);
 
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
@@ -3150,137 +3193,334 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   flann_params.algorithm = FLANN_INDEX_KDTREE;
   //flann_params.trees = 8;
   //flann_params.checks = 64;
-  struct FLANNParameters obs_xyzn_params = flann_params_single;
-  struct FLANNParameters model_xyz_params = flann_params_single;
-  //struct FLANNParameters model_xyzn_params = flann_params_single;
-  //struct FLANNParameters model_fsurf_params = flann_params;
-  struct FLANNParameters model_f_params = flann_params;
-  //struct FLANNParameters fpfh_model_xyz_params = flann_params_single;
-  struct FLANNParameters fpfh_model_xyzn_params = flann_params_single;
-
-  printf("Building FLANN indices\n");
+  data->model_xyz_params = flann_params_single;
+  data->fpfh_model_f_params = flann_params;
+  data->fpfh_model_xyzn_params = flann_params_single;
 
   // build flann indices
   float speedup;
-  flann_index_t obs_xyzn_index = flann_build_index_double(obs_xyzn[0], pcd_obs->num_points, 6, &speedup, &obs_xyzn_params);
-  flann_index_t model_xyz_index = flann_build_index_double(pcd_model->points[0], pcd_model->num_points, 3, &speedup, &model_xyz_params);
-  //flann_index_t model_xyzn_index = flann_build_index_double(model_xyzn[0], pcd_model->num_points, 6, &speedup, &model_xyzn_params);
-  //flann_index_t model_fsurf_index = flann_build_index_float(model_fsurf[0], fpfh_model->num_points, fpfh_model->shape_length + 2, &speedup, &model_fsurf_params);
-  flann_index_t model_f_index = flann_build_index_double(fpfh_model->shapes[0], fpfh_model->num_points, fpfh_model->shape_length, &speedup, &model_f_params);
-  //flann_index_t fpfh_model_xyz_index = flann_build_index_double(fpfh_model->points[0], fpfh_model->num_points, 3, &speedup, &fpfh_model_xyz_params);
-  flann_index_t fpfh_model_xyzn_index = flann_build_index_double(fpfh_model_xyzn[0], fpfh_model->num_points, 6, &speedup, &fpfh_model_xyzn_params);
+  data->model_xyz_index = flann_build_index_double(data->pcd_model->points[0], data->pcd_model->num_points, 3, &speedup, &data->model_xyz_params);
+  data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->shapes[0], data->fpfh_model->num_points, data->fpfh_model->shape_length, &speedup, &data->fpfh_model_f_params);
+  data->fpfh_model_xyzn_index = flann_build_index_double(data->fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
+
+  return data;
+}
+
+scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
+{
+  scope_obs_data_t *data;
+  safe_calloc(data, 1, scope_obs_data_t);
+
+  // unpack obs arguments
+  data->pcd_obs = obs->fg_pcd;
+  data->sift_obs = obs->sift_pcd;
+  data->pcd_obs_bg = obs->bg_pcd;
+
+  // compute range images
+  data->obs_range_image = pcd_to_range_image(data->pcd_obs_bg, 0, M_PI/1000.0, 4);  //TODO: make this a parameter?
+  data->obs_fg_range_image = pcd_to_range_image_from_template(data->pcd_obs, data->obs_range_image);
+
+  // compute blurred edge feature image
+  data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_fg_range_image, params);
 
   //dbug
-  double t0_scope = get_time_ms();
+  obs_edge_image_width_ = data->obs_fg_range_image->w;
+  obs_edge_image_height_ = data->obs_fg_range_image->h;
+  //printf("obs_edge_image_width_ = %d\n", data->obs_edge_image_width_);
+  //printf("obs_edge_image_height_ = %d\n", data->obs_edge_image_height_);
+  obs_edge_image_ = matrix_clone(data->obs_edge_image, obs_edge_image_width_, obs_edge_image_height_);  //dbug
 
-  // create correspondences and pose data structures
-  int num_samples_init = num_sift_matches + (params->num_samples_init == 0 ? pcd_obs->num_points : params->num_samples_init);
-  int num_samples = params->num_samples;
-  int branching_factor = params->branching_factor;
-  int max_num_samples = MAX(num_samples_init, num_samples * branching_factor);
-  int **C_obs = new_matrix2i(max_num_samples, params->num_correspondences);     // obs correspondences
-  int **C_model = new_matrix2i(max_num_samples, params->num_correspondences);   // model correspondences
-  //int **C_issift = new_matrix2i(max_num_samples, params->num_correspondences);  // sift indicator
-  double **X = new_matrix2(max_num_samples, 3);                                 // sample positions
-  double **Q = new_matrix2(max_num_samples, 4);                                 // sample orientations
-  double W[max_num_samples];                                                    // sample weights
+  // get combined feature matrices
+  data->obs_xyzn = get_xyzn_features(data->pcd_obs->points, data->pcd_obs->normals, data->pcd_obs->num_points, params);
+  data->obs_bg_xyzn = get_xyzn_features(data->pcd_obs_bg->points, data->pcd_obs_bg->normals, data->pcd_obs_bg->num_points, params);
+  data->obs_fxyzn = get_fxyzn_features(data->pcd_obs->shapes, data->pcd_obs->points, data->pcd_obs->normals, data->pcd_obs->num_points, data->pcd_obs->shape_length, params);
 
-  printf("Sampling first correspondences\n");
+  // flann params
+  struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
+  flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
+  data->obs_xyzn_params = flann_params_single;
 
-  double t0 = get_time_ms();
+  // build flann indices
+  float speedup;
+  data->obs_xyzn_index = flann_build_index_double(data->obs_xyzn[0], data->pcd_obs->num_points, 6, &speedup, &data->obs_xyzn_params);
+  
+  return data;
+}
+
+void free_scope_model_data(scope_model_data_t *data)
+{
+  free_multiview_pcd(data->range_edges_model);
+  free(data->fpfh_model_pmf);
+  free(data->fpfh_model_cmf);
+  free_matrix2(data->model_xyzn);
+  free_matrix2(data->fpfh_model_fxyzn);
+  free_matrix2(data->fpfh_model_xyzn);
+  flann_free_index(data->model_xyz_index, &data->model_xyz_params);
+  flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
+  flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
+
+  free(data);
+}
+
+void free_scope_obs_data(scope_obs_data_t *data)
+{
+  free_range_image(data->obs_range_image);
+  free_range_image(data->obs_fg_range_image);
+  free_matrix2(data->obs_edge_image);
+  free_matrix2(data->obs_xyzn);
+  free_matrix2(data->obs_bg_xyzn);
+  free_matrix2(data->obs_fxyzn);
+  flann_free_index(data->obs_xyzn_index, &data->obs_xyzn_params);
+
+  free(data);
+}
+
+scope_samples_t *create_scope_samples(int num_samples, int num_correspondences)
+{
+  scope_samples_t *S;
+  S->num_samples_allocated;
+  safe_calloc(S, 1, scope_samples_t);
+  safe_calloc(S->samples, num_samples, scope_sample_t);
+  safe_calloc(S->W, num_samples, double);
+  int i;
+  for (i = 0; i < num_samples; i++) {
+    safe_calloc(S->samples[i].c_obs, num_correspondences, double);
+    safe_calloc(S->samples[i].c_model, num_correspondences, double);
+    safe_calloc(S->samples[i].c_type, num_correspondences, int);
+  }
+
+  return S;
+}
+
+void free_scope_samples(scope_samples_t *S)
+{
+  int i;
+  for (i = 0; i < S->num_samples_allocated; i++) {
+    free(S->samples[i].c_obs);
+    free(S->samples[i].c_model);
+    free(S->samples[i].c_type);
+  }
+  free(S->samples);
+  free(S->W);
+  free(S);
+}
+
+
+
+
+//==============================================================================================//
+
+//------------------------------------------  SCOPE  -------------------------------------------//
+
+//==============================================================================================//
+
+
+scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  double t0 = get_time_ms(); //dbug
+
+  // find sift matches
+  int sift_match_obs_idx[obs_data->sift_obs->num_points], sift_match_model_idx[obs_data->sift_obs->num_points];
+  int num_sift_matches = 0; //find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, obs_data->sift_obs, obs_data->sift_model, params->sift_dthresh);
+
+  // get the max number of samples
+  int num_samples_init = num_sift_matches + (params->num_samples_init == 0 ? obs_data->pcd_obs->num_points : params->num_samples_init);
+  //int max_num_samples = MAX(num_samples_init, params->num_samples * params->branching_factor);
+  int max_num_samples = num_samples_init;
+
+  // create scope samples
+  scope_samples_t *S = create_scope_samples(max_num_samples, params->num_correspondences);
+  S->num_samples = num_samples_init;
 
   // sample poses from one correspondence
+  int i;
   for (i = 0; i < num_samples_init; i++) {
     if (i < num_sift_matches) {  // sift correspondence
-      //C_issift[i][0] = 1;
-      C_obs[i][0] = sift_match_obs_idx[i];
-      C_model[i][0] = sift_match_model_idx[i];
 
-      // sample a model pose given one correspondence
-      model_pose_from_one_correspondence(X[i], Q[i], C_obs[i][0], C_model[i][0], sift_obs, sift_model);
+      int c_obs = sift_match_obs_idx[i];
+      int c_model = sift_match_model_idx[i];
+      S->samples[i].c_obs[0] = c_obs;
+      S->samples[i].c_model[0] = c_model;
+      S->samples[i].c_type[0] = C_TYPE_SIFT;
+      S->samples[i].nc = 1;
+
+      //model_pose_from_one_correspondence(S->samples[i].x, S->samples[i].q, c_obs, c_model, obs_data->sift_obs, model_data->sift_model);
     }
-    else {  // fpfh+sdw correspondence
-      //C_issift[i][0] = 0;
+    else {  // fpfh correspondence
 
-      if (params->num_samples_init == 0)
-	C_obs[i][0] = i - num_sift_matches;
-      else
-	C_obs[i][0] = irand(pcd_obs->num_points);
+      // get obs point
+      int c_obs = irand(obs_data->pcd_obs->num_points);
+      S->samples[i].c_obs[0] = c_obs;
 
+      // get model point
       int nn_idx[params->knn];
-      //float nn_d2[params->knn];
       double nn_d2[params->knn];
-      //flann_find_nearest_neighbors_index_float(model_fsurf_index, obs_fsurf[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_fsurf_params);
-      flann_find_nearest_neighbors_index_double(model_f_index, pcd_obs->shapes[C_obs[i][0]], 1, nn_idx, nn_d2, params->knn, &model_f_params);
+      flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->shapes[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
       double p[params->knn];
       for (j = 0; j < params->knn; j++)
 	p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
 	//p[j] = exp(-.5*nn_d2[j] / (params->fsurf_sigma * params->fsurf_sigma));
       normalize_pmf(p, p, params->knn);
-      j = pmfrand(p, params->knn);
-      C_model[i][0] = nn_idx[j];
+      int j = pmfrand(p, params->knn);
+      int c_model = nn_idx[j];
+
+      S->samples[i].c_obs[0] = c_obs;
+      S->samples[i].c_model[0] = c_model;
+      S->samples[i].c_type[0] = C_TYPE_FPFH;
+      S->samples[i].nc = 1;
 
       // sample a model pose given one correspondence
-      model_pose_from_one_correspondence(X[i], Q[i], C_obs[i][0], C_model[i][0], pcd_obs, fpfh_model);
+      //model_pose_from_one_correspondence(S->samples[i].x, S->samples[i].q, c_obs, c_model, obs_data->pcd_obs, model_data->fpfh_model);
     }
   }
 
+  sample_model_pose_given_correspondences(S->samples[i], model_data, obs_data, params);
+
   //dbug
   printf("Sampled c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
-  if (have_true_pose)
-    print_good_poses(true_pose, X, Q, num_samples_init);
 
   // score hypotheses
   t0 = get_time_ms();
   for (i = 0; i < num_samples_init; i++)
-    W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, NULL /*obs_edge_image*/, obs_bg_xyzn, params, 1);
-
-
-  /*dbug: score hypotheses and return
-  olf_pose_samples_t *pose_samples;
-  safe_calloc(pose_samples, 1, olf_pose_samples_t);
-  pose_samples->X = X;
-  pose_samples->Q = Q;
-  pose_samples->W = W;
-  pose_samples->n = num_samples_init;
-  params->verbose = 1;
-  pose_samples->num_scores = 10;
-  pose_samples->scores = new_matrix2(pose_samples->n, pose_samples->num_scores);
-  for (i = 0; i < pose_samples->n; i++) {
-    W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 1);
-    double scores[10] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2]};
-    memcpy(pose_samples->scores[i], scores, pose_samples->num_scores*sizeof(double));
-  }
-  printf("Scored c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
-  goto CLEANUP;
-  */
-
-
-  /*dbug: only keep great poses
-  int num_good_poses = 0, num_great_poses = 0, good_pose_idx[num_samples_init], great_pose_idx[num_samples_init];
-  get_good_poses(true_pose, num_samples_init, X, Q, good_pose_idx, great_pose_idx, &num_good_poses, &num_great_poses);
-  reorder_rows(X, X, great_pose_idx, num_great_poses, 3);
-  reorder_rows(Q, Q, great_pose_idx, num_great_poses, 4);
-  reorder_rowsi(C_obs, C_obs, great_pose_idx, num_great_poses, 2);
-  reorder_rowsi(C_model, C_model, great_pose_idx, num_great_poses, 2);
-  num_samples = num_great_poses;
-  */
-
-
+    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
   // sort hypotheses
-  //sort_pose_samples(X, Q, W, C_obs, C_model, C_issift, num_samples_init, params->num_correspondences);
-  sort_pose_samples(X, Q, W, C_obs, C_model, num_samples_init, params->num_correspondences);
+  sort_pose_samples(S);
 
   //TODO: make this a param
   double round1_score_thresh = -.2;
-  num_samples = find_first_lt(W, round1_score_thresh, num_samples_init);
-
+  S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
 
   //dbug
   printf("Scored and sorted c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
-  if (have_true_pose)
-    print_good_poses(true_pose, X, Q, num_samples);
+  if (have_true_pose_)
+    print_good_poses(S);
+
+  return S;
+}
+
+
+void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  int c,i;
+  for (c = 1; c < params->num_correspondences; ++c) {
+
+    t0 = get_time_ms();  //dbug
+
+    for (i = 0; i < S->num_samples; ++i) {
+
+      // sample a new correspondence
+      sample_correspondence_given_model_pose(&S->samples[i], model_data, obs_data, params);
+
+      // sample a new model pose (and bingham distribution) given the correspondences
+      sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+
+      if (params->do_icp) {  // + .5 ms
+
+	int c_model_new[c];
+	double x_new[3], q_new[3];
+	double logp, logp_new;
+	double x0_new[3] = {0,0,0};
+	bingham_t B_new;
+	bingham_alloc(&B_new, 4);
+	//bingham_new_uniform(&B_new, 4);
+	//B_new.V[0][3] = B_new.V[1][1] = B_new.V[2][2] = 1;
+
+	logp = model_pose_likelihood(pcd_obs, fpfh_model, C_obs[i], C_model[i], c+1, X[i], Q[i], &B, params->xyz_sigma, -1, -1, NULL);
+
+	int k;
+	for (k = 0; k < 20; ++k) {
+	  int j;
+	  for (j = 0; j <= c; ++j)
+	    c_model_new[j] = sample_model_correspondence_given_model_pose(pcd_obs, fpfh_model_xyzn, fpfh_model_fxyzn, params, &fpfh_model_xyzn_params, fpfh_model_xyzn_index,
+									  X[i], Q[i], C_obs[i][j], 1, 1);  //nn, fpfh
+	  get_model_pose_distribution_from_correspondences(pcd_obs, fpfh_model, C_obs[i], c_model_new, c+1, params->xyz_sigma, x0_new, &B_new);
+	  sample_model_pose(fpfh_model, c_model_new, c+1, x0_new, &B_new, x_new, q_new);
+	  logp_new = model_pose_likelihood(pcd_obs, fpfh_model, C_obs[i], c_model_new, c+1, x_new, q_new, &B_new, params->xyz_sigma, -1, -1, NULL);
+	  
+	  if (logp_new > logp) {
+	    memcpy(C_model[i], c_model_new, (c+1)*sizeof(int));
+	    memcpy(X[i], x_new, 3*sizeof(double));
+	    memcpy(Q[i], q_new, 4*sizeof(double));
+	    bingham_free(&B);
+	    bingham_copy(&B, &B_new);
+	    logp = logp_new;
+	  }
+	  else  // stop ICP when model pose likelihood doesn't increase anymore
+	    break;
+	}
+
+	//W[i] += logp;  //dbug
+      }
+    }
+    
+    printf("Sampled c=%d poses in %.3f seconds\n", c+1, (get_time_ms() - t0) / 1000.0);  //dbug
+    if (have_true_pose)
+      print_good_poses(true_pose, X, Q, num_samples);
+
+
+    //t0 = get_time_ms();
+
+    // score hypotheses
+    //for (i = 0; i < num_samples * branching_factor; i++) {
+    //  if (C_model[i][c] >= 0)
+    //	W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, NULL /*obs_edge_image*/, obs_bg_xyzn, params, 1);  // + .56 ms
+    //  else
+    //	W[i] = MIN_SCORE;
+    //}
+
+    // sort samples by weight and prune branches
+    //sort_pose_samples(X, Q, W, C_obs, C_model, C_issift, num_samples * branching_factor, params->num_correspondences);
+    sort_pose_samples(X, Q, W, C_obs, C_model, num_samples * branching_factor, params->num_correspondences);
+
+    //num_samples /= 2;
+
+    /*dbug
+    for (i = 0; i < num_samples; i++) {
+      if (W[i] == MIN_SCORE) {
+	printf("WARNING: W[%d] == MIN_SCORE --> Setting num_samples = %d\n", i, i);
+	num_samples = i;
+      }
+    }
+    */
+
+    /*dbug
+    printf("Scored and sorted c=%d poses in %.3f seconds\n", c+1, (get_time_ms() - t0) / 1000.0);  //dbug
+    if (have_true_pose)
+      print_good_poses(true_pose, X, Q, num_samples);
+    */
+  }
+
+
+}
+
+
+/*
+ * Single Cluttered Object Pose Estimation (SCOPE)
+ */
+olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose)
+{
+  int i,j;
+  const double MIN_SCORE = -100000.0;
+
+  //dbug
+  if (have_true_pose) {
+    x_true_ = true_pose->X;
+    q_true_ = true_pose->Q;
+  }
+
+  // get data
+  scope_model_data_t *model_data = get_scope_model_data(model, params);
+  scope_obs_data_t *obs_data = get_scope_obs_data(obs, params);
+
+  double t0_scope = get_time_ms();  //dbug
+
+  // step 1: sample poses given single correspondences
+  scope_samples_t *samples = scope_round1(model_data, obs_data, params);
+
+  // step 2: align with BPA, then score and keep the top N samples
+  scope_round2(samples, model_data, obs_data, params);
+
 
   int c;
   int num_correspondences = params->num_correspondences;
@@ -3400,19 +3640,6 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   }
 
 
-  /*dbug: score hypotheses and return
-  olf_pose_samples_t *pose_samples;
-  safe_calloc(pose_samples, 1, olf_pose_samples_t);
-  pose_samples->X = X;
-  pose_samples->Q = Q;
-  pose_samples->W = W;
-  pose_samples->C_obs = C_obs;
-  pose_samples->C_model = C_model;
-  pose_samples->n = num_samples;
-  goto CLEANUP;
-  */
-
-
 
 
   //----------------------------  BEGIN FINAL ALIGNMENTS / PRUNING -----------------------------//
@@ -3425,50 +3652,45 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   double w_sigma_multi = w_sigma_pre_align + w_sigma / sqrt((double)num_score_trials);
 
 
-  /*dbug
-  if (have_true_pose) {
-    memcpy(X[0], true_pose->X, 3*sizeof(double));
-    memcpy(Q[0], true_pose->Q, 4*sizeof(double));
-    params->verbose = 1;
-    model_placement_score_multi(X[0], Q[0], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 1, 5);
-    params->verbose = 0;
-  }
-  */
-
   //dbug
   t0 = get_time_ms();
+
+
+  //dbug: score hypotheses and return
+  olf_pose_samples_t *pose_samples;
+  safe_calloc(pose_samples, 1, olf_pose_samples_t);
+  pose_samples->X = X;
+  pose_samples->Q = Q;
+  pose_samples->W = W;
+  pose_samples->n = num_samples;
+  params->verbose = 1;
+  pose_samples->num_scores = 10;
+  pose_samples->scores = new_matrix2(pose_samples->n, pose_samples->num_scores);
+  for (i = 0; i < pose_samples->n; i++) {
+    W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 2);
+    double scores[10] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2]};
+    memcpy(pose_samples->scores[i], scores, pose_samples->num_scores*sizeof(double));
+  }
+  printf("Scored c=3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+  goto CLEANUP;
+  //
+
+
 
   // re-weight
   for (i = 0; i < num_samples; i++)
     W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, NULL /*obs_edge_image*/, obs_bg_xyzn, params, 2);
-    //W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, NULL /*obs_edge_image*/, obs_bg_xyzn, params, 2, num_score_trials);
   sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
+
+
 
   // cluster poses
   if (params->pose_clustering)
     num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
 
-  //num_samples = find_first_lt(W, W[0] - 2*w_sigma, num_samples);
-  //num_samples = MIN(num_samples, params->num_samples);
-
   //dbug
   if (have_true_pose)
     print_good_poses(true_pose, X, Q, num_samples);
-
-  // re-score samples
-  //int num_score_trials = 10;
-  //for (i = 0; i < num_samples; i++)
-  //  W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, NULL /*obs_edge_image*/, obs_bg_xyzn, params, 2, num_score_trials);
-  //printf("W[0] = %f\n", W[0]);  //dbug
-  //sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
-
-  // remove low-weight samples
-  //num_samples = 50; //find_first_lt(W, W[0] - 2*w_sigma, num_samples);
-
-  //dbug
-  //if (have_true_pose)
-  //  print_good_poses_verbose(true_pose, X, Q, W, w_sigma, num_samples);
-  //  print_good_poses(true_pose, X, Q, num_samples);
 
   // remove low-weight samples
   num_samples = find_first_lt(W, W[0] - 2*w_sigma_multi, num_samples);
@@ -3506,11 +3728,6 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     // cluster
     //if (params->pose_clustering)
     //  num_samples = remove_redundant_pose_samples(X, Q, W, num_samples, params->x_cluster_thresh, params->q_cluster_thresh);
-
-    // re-weight
-    //for (i = 0; i < num_samples; i++)
-    //  W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 2, num_score_trials);
-    //sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
 
     // remove low-weight samples
     w_sigma_multi = w_sigma / sqrt((double)num_score_trials);
@@ -3566,7 +3783,6 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
     params->num_validation_points = 0;
     for (i = 0; i < num_samples; i++)
       W[i] = model_placement_score(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 3);
-      //W[i] = model_placement_score_multi(X[i], Q[i], pcd_model, range_edges_model, model_xyz_index, &model_xyz_params, pcd_obs_bg, obs_range_image, obs_edge_image, obs_bg_xyzn, params, 3, num_score_trials);
     sort_pose_samples(X, Q, W, C_obs, C_model, num_samples, params->num_correspondences);
     printf("Scored %d samples with full models in %.3f seconds\n", num_samples, (get_time_ms() - t0) / 1000.0);
 
@@ -3599,7 +3815,7 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
   printf("Ran scope() in %.3f seconds\n", (get_time_ms() - t0_scope) / 1000.0);  //dbug
 
   // pack return value
-  olf_pose_samples_t *pose_samples;
+  //olf_pose_samples_t *pose_samples;
   safe_calloc(pose_samples, 1, olf_pose_samples_t);
   pose_samples->X = X;
   pose_samples->Q = Q;
@@ -3644,33 +3860,39 @@ olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *pa
 
 
  CLEANUP:
-
-  // cleanup
-  free_multiview_pcd(range_edges_model);
-  free_range_image(obs_range_image);
-  free_range_image(obs_fg_range_image);
-  free_matrix2(obs_edge_image);
-  free(model_pmf);
-  free_matrix2(obs_xyzn);
-  free_matrix2(model_xyzn);
-  free_matrix2(obs_fxyzn);
-  free_matrix2(fpfh_model_fxyzn);
-  free_matrix2(fpfh_model_xyzn);
-  //free_matrix2f(obs_fsurf);
-  //free_matrix2f(model_fsurf);
-  flann_free_index(obs_xyzn_index, &obs_xyzn_params);
-  flann_free_index(model_xyz_index, &model_xyz_params);
-  //flann_free_index(model_xyzn_index, &model_xyzn_params);
-  //flann_free_index(model_fsurf_index, &model_fsurf_params);
-  flann_free_index(model_f_index, &model_f_params);
-  //flann_free_index(fpfh_model_xyz_index, &fpfh_model_xyz_params);
-  flann_free_index(fpfh_model_xyzn_index, &fpfh_model_xyzn_params);
-  //free_matrix2i(C_obs);
-  //free_matrix2i(C_model);
-  //free_matrix2i(C_issift);
+  free_scope_model_data(model_data);
+  free_scope_obs_data(obs_data);
+  free_scope_samples(samples);
   
   return pose_samples;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

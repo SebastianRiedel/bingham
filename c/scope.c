@@ -226,6 +226,7 @@ int main(int argc, char *argv[])
   model.range_edges_pcd = load_pcd(argv[7]);
 
   scope_params_t params;
+  memset(&params, 0, sizeof(scope_params_t));
   load_params(&params, argv[8]);
 
   FILE *f = fopen(argv[9], "w");
@@ -311,7 +312,7 @@ int main(int argc, char *argv[])
   
   
 
-  //***************************************************
+  /***************************************************
 
   //dbug
   double **vis_probs = poses->vis_probs;
@@ -398,7 +399,7 @@ int main(int argc, char *argv[])
     fprintf(f, "];\n");
   }
 
-  //*****************************************************/
+  *****************************************************/
 
   fclose(f);
 
