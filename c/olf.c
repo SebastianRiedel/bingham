@@ -121,6 +121,17 @@ void print_good_poses_verbose(scope_samples_t *S, double w_sigma)
 //---------------------------- STATIC HELPER FUNCTIONS ---------------------------//
 
 /*
+ * reverse principal curvature
+ */
+void quaternion_flip(double *q2, double *q)
+{
+  q2[0] = -q[1];
+  q2[1] = q[0];
+  q2[2] = q[3];
+  q2[3] = -q[2];
+}
+
+/*
  * compute viewpoint (in model coordinates) for model placement (x,q) assuming observed viewpoint = (0,0,0)
  */
 void model_pose_to_viewpoint(double *vp, double *x, double *q)
@@ -2176,6 +2187,39 @@ void olf_to_bingham(bingham_t *B, int idx, pcd_t *pcd)
   free_matrix2(V12);
 }
 
+void get_olf(olf_t *olf, pcd_t *pcd, int idx, int bingham)
+{
+  memset(olf, 0, sizeof(olf_t));
+
+  if (pcd->points) {
+    safe_calloc(olf->x, 3, double);
+    memcpy(olf->x, pcd->points[idx], 3*sizeof(double));
+  }
+
+  if (pcd->Q) {
+    safe_calloc(olf->q, 4, double);
+    memcpy(olf->q, pcd->quaternions[0][idx], 4*sizeof(double));
+
+    if (bingham) {
+      safe_calloc(olf->B, 1, bingham_t);
+      bingham_alloc(olf->B, 4);
+      olf_to_bingham(olf->B, idx, pcd);
+    }
+  }
+}
+
+void free_olf(olf_t *olf)
+{
+  if (olf->x)
+    free(olf->x);
+  if (olf->q)
+    free(olf->q);
+  if (olf->B) {
+    bingham_free(olf->B);
+    free(olf->B);
+  }
+}
+
 
 void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_model, pcd_t *pcd_obs, pcd_t *pcd_model)
 {
@@ -2209,44 +2253,35 @@ void model_pose_from_one_correspondence(double *x, double *q, int c_obs, int c_m
 
 
 /*
- * Use only least-squares information (not OLFs).
+ * Use only least-squares information (not orientations)
  */
-void get_model_pose_distribution_from_correspondences_LS(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n,
-							 double xyz_sigma, double *x, bingham_t *B)
+void get_model_pose_distribution_from_olf_correspondences_LS(double *x, bingham_t *B, olf_t *model_olfs, olf_t *obs_olfs, int n, double xyz_sigma)
 {
-  // shift point cloud centroids to the origin and compute translation, x
-  double **points_obs = new_matrix2(n, 3);
-  double **points_model = new_matrix2(n, 3);
+  // compute olf centroids
   int i;
-  for (i = 0; i < n; ++i) {
-    get_point(points_obs[i], pcd_obs, c_obs[i]);
-    get_point(points_model[i], pcd_model, c_model[i]);
-
-    //printf("points_obs[%d] = [%.4f, %.4f, %.4f]\n", i, points_obs[i][0], points_obs[i][1], points_obs[i][2]);
-    //printf("points_model[%d] = [%.4f, %.4f, %.4f]\n", i, points_model[i][0], points_model[i][1], points_model[i][2]);
+  double mean_model[3] = {0,0,0};
+  double mean_obs[3] = {0,0,0};
+  for (i = 0; i < n; i++) {
+    add(mean_model, mean_model, model_olfs[i].x, 3);
+    add(mean_obs, mean_obs, obs_olfs[i].x, 3);
   }
-  double mean_obs[3], mean_model[3];
-  mean(mean_obs, points_obs, n, 3);
-  mean(mean_model, points_model, n, 3);
+  mult(mean_model, mean_model, 1/(double)n, 3);
+  mult(mean_obs, mean_obs, 1/(double)n, 3);
+
+  // compute model position
   sub(x, mean_obs, mean_model, 3);
   
-  for (i = 0; i < n; ++i) {
-    sub(points_obs[i], points_obs[i], mean_obs, 3);
-    sub(points_model[i], points_model[i], mean_model, 3);
-  }
-
   // compute LS Bingham distributions for each point correspondence
   bingham_t B_ls[n];
-  for (i = 0; i < n; ++i) {
-    bingham_alloc(&B_ls[i], 4);
-  }
-  for (i = 0; i < n; ++i) {
-    double *v_obs = points_obs[i];
-    double *v_model = points_model[i];
+  for (i = 0; i < n; ++i)
+    double v_obs[3], v_model[3];
+    sub(v_obs, obs_olfs[i].x, mean_obs, 3);
+    sub(v_model, model_olfs[i].x, mean_model, 3);
     double q_obs[4], q_model[4];
     vector_to_possible_quaternion(q_obs, v_obs);
     vector_to_possible_quaternion(q_model, v_model);
     double k = norm(v_obs, 3) * norm(v_model, 3) / (xyz_sigma * xyz_sigma);
+    bingham_alloc(&B_ls[i], 4);
     B->d = 4;
     B->Z[0] = -2 * k;
     B->Z[1] = -2 * k;
@@ -2263,72 +2298,54 @@ void get_model_pose_distribution_from_correspondences_LS(pcd_t *pcd_obs, pcd_t *
   
   for (i = 0; i < n; ++i)
     bingham_free(&B_ls[i]);
-
-  free_matrix2(points_obs);
-  free_matrix2(points_model);
 }
 
 
 /*
  * Compute x and p(q|x) by combining Bingham distributions from least-squares
  * alignment (LS) with Bingham distributions from OLFs.  The tuple (x,q)
- * where q is sampled from B indicates that one should rotate pcd_model(c_model)
+ * where q is sampled from B indicates that one should rotate model_olfs
  * about its centroid by q, then shift by x.
  */
-void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n,
-						      double xyz_sigma, double *x, bingham_t *B)
+void get_model_pose_distribution_from_olf_correspondences(double *x, bingham_t *B, olf_t *model_olfs, olf_t *obs_olfs, int n, double xyz_sigma)
 {
   bingham_t B_array[n+1];
-  bingham_alloc(&B_array[0], 4);
-  get_model_pose_distribution_from_correspondences_LS(pcd_obs, pcd_model, c_obs, c_model, n, xyz_sigma, x, &B_array[0]);
+  bingham_t *B_ls = &B_array[0];
+  bingham_alloc(B_ls, 4);
+  get_model_pose_distribution_from_olf_correspondences_LS(x, B_ls, model_olfs, obs_olfs, n, xyz_sigma);
 
   bingham_t *B_olf = &B_array[1];
   int i;
   for (i = 0; i < n; ++i)
     bingham_alloc(&B_olf[i], 4);
-  bingham_t B_feature_to_model, B_model_to_feature;
-  bingham_alloc(&B_feature_to_model, 4);
+  bingham_t B_model_to_feature;
   bingham_alloc(&B_model_to_feature, 4);
-  double *q_feature_to_world;
 
-  for (i = 0; i < n; ++i) {    
-    olf_to_bingham(&B_feature_to_model, c_model[i], pcd_model);
-    bingham_invert_3d(&B_model_to_feature, &B_feature_to_model);
-    q_feature_to_world = pcd_obs->quaternions[0][c_obs[i]];
-    bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, q_feature_to_world);
+  for (i = 0; i < n; ++i) {
+    if (model_olfs[i].B == NULL)
+      bingham_set_uniform(&B_olf[i]);
+    else {
+      bingham_invert_3d(&B_model_to_feature, model_olfs[i].B);
+      double *q_feature_to_world = obs_olfs[i].q;
+      bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, q_feature_to_world);
 
-    // greedy check for principal curvature flips
-    //if (i > 0) {
-
-      //bingham_mult_array(B, B_array, i+2, 0);  // compute product of B_array[]
-      //double z_prod_orig = fabs(prod(B->Z, 3));
-      //printf("Z_orig = (%f, %f, %f), z_prod_orig = %f, ", B->Z[0], B->Z[1], B->Z[2], z_prod_orig);  //dbug
-
-      //bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, pcd_obs->quaternions[1][c_obs[i]]);
-      //bingham_mult_array(B, B_array, i+2, 0);  // compute product of B_array[] with B_olf[i] flipped
-      //double z_prod_flipped = fabs(prod(B->Z, 3));
-      //printf("Z_flipped = (%f, %f, %f), z_prod_flipped = %f\n", B->Z[0], B->Z[1], B->Z[2], z_prod_flipped);  //dbug
-
-      //if (z_prod_orig > z_prod_flipped)
-      //  bingham_post_rotate_3d(&B_olf[i], &B_model_to_feature, q_feature_to_world);  // revert to original
-
+      // greedy check for principal curvature flips
       double q1[4], q2[4];
-      bingham_mode(q1, &B_olf[i]);
-      bingham_post_rotate_3d(B, &B_model_to_feature, pcd_obs->quaternions[1][c_obs[i]]);
-      bingham_mode(q2, B);
+      quaternion_flip(q2, obs_olfs[i].q);
+      bingham_post_rotate_3d(B, &B_model_to_feature, q2);
+      bingham_mode(q1, &B_olf[i]);  // original
+      bingham_mode(q2, B);          // flipped
 	
-      if (bingham_pdf(q1, &B_array[0]) < bingham_pdf(q2, &B_array[0]))
+      // pick whichever one has a higher likelihood w.r.t. LS distribution
+      if (bingham_pdf(q1, B_ls) < bingham_pdf(q2, B_ls))
 	bingham_copy(&B_olf[i], B);
-    //}
+    }
   }  
 
   bingham_mult_array(B, B_array, n+1, 1);
-  //bingham_mult_array(B, B_array, n, 1);
-  //bingham_copy(B, &B_array[0]);
 
   for (i = 0; i < n+1; i++)
     bingham_free(&B_array[i]);
-  bingham_free(&B_feature_to_model);
   bingham_free(&B_model_to_feature);
 }
 
@@ -2360,23 +2377,47 @@ void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingha
 
 void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
-  // compute max likelihood model pose given the point correspondences
+  // get model pose distribution
   double x0[3] = {0,0,0};
-  bingham_t B;
-  bingham_alloc(&B, 4);
-  //get_model_pose_distribution_from_correspondences(obs_data->pcd_obs, model_data->fpfh_model, S->samples[i].c_obs, S->samples[i].c_model, c+1, params->xyz_sigma, x0, &B);
-  get_model_pose_distribution_from_correspondences(x0, &B, obs_data->pcd_obs, model_data->fpfh_model, S->samples[i].c_obs, S->samples[i].c_model, c+1, params->xyz_sigma, x0, &B);
+  bingham_t *B = &sample->B;
+  if (sample->nc == 1)
+    bingham_alloc(B, 4);
+  get_model_pose_distribution_from_olf_correspondences(x0, B, sample->model_olfs, sample->obs_olfs, sample->nc, params->xyz_sigma);
 
-  sample_model_pose(fpfh_model, C_model[i], c+1, x0, &B, X[i], Q[i]);
+  // sample a model orientation
+  double *q = &sample->q;
+  //bingham_sample(q, B, 1);
+  bingham_mode(q, B);
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, q);
 
+  // compute model position, x = x0 + mu - R*mu
+  double *x = &sample->x;
+  double mu[3] = {0,0,0};
+  for (i = 0; i < sample->nc; i++)
+    add(mu, mu, model_olfs[i].x, 3);
+  mult(mu, mu, 1/(double)n, 3);
+  matrix_vec_mult(x, R, mu, 3, 3);
+  sub(x, mu, x, 3);
+  add(x, x0, x, 3);
 
+  // cleanup
+  free_matrix2(R);
 }
 
 
-double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B,
-			     double xyz_sigma, double f_sigma, double dispersion_weight, double logp_comp[4])
+//double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B,
+//			     double xyz_sigma, double f_sigma, double dispersion_weight, double logp_comp[4])
+double compute_olf_correspondence_score(scope_sample_t *sample, scope_params_t *params)
 {
-  int shape_length = pcd_model->shape_length;
+  double *x = sample->x;
+  double *q = sample->q;
+  bingham_t *B = sample->B;
+  int *c_model = sample->c_model;
+  int *c_obs = sample->c_obs;
+  int n = sample->nc;
+  double xyz_sigma = params->xyz_sigma;
+  double dispersion_weight = params->dispersion_weight;
 
   double **R = new_matrix2(3, 3);
   quaternion_to_rotation_matrix(R, q);
@@ -2403,7 +2444,7 @@ double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *
   // compute the OLF orientation likelihood
   double logp_olf = log(bingham_pdf(q, B));
   
-  // compute FPFH likelihood
+  /* compute FPFH likelihood
   double logp_fpfh = 0.;
   if (f_sigma > 0) {
     for (i = 0; i < n; ++i) {
@@ -2412,6 +2453,7 @@ double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *
     }
     logp_fpfh /= (double)n;
   }
+  */
 
   // compute dispersion likelihood
   double logp_disp = 0;
@@ -2421,14 +2463,19 @@ double model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *
     logp_disp = log(dispersion_weight * sum(vars, 3));
   }
 
-  double logp = logp_ls + logp_olf + logp_fpfh + logp_disp;
+  // compute the feature correspondence likelihood
+  double logp_c = sum(sample->c_score, n) / (double)n;
 
+  double logp = logp_ls + logp_olf + logp_disp + logp_c;
+
+  /*
   if (logp_comp) {
     logp_comp[0] = logp_ls;
     logp_comp[1] = logp_olf;
     logp_comp[2] = logp_fpfh;
     logp_comp[3] = logp_disp;
   }
+  */
   
   free_matrix2(xyz_obs);
   free_matrix2(xyz_model);
@@ -2679,9 +2726,18 @@ void sample_edge_correspondence_given_model_pose(int *c_obs, int *c_model, int n
 
 void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
+  // fpfh
   sample_fpfh_correspondence_given_model_pose(sample, model_data, obs_data, params);
+  int i = sample->nc - 1;
+  get_olf(&sample->model_olfs[i], model_data->fpfh_model, sample->c_model[i], 0, 1);
+  get_olf(&sample->obs_olfs[i], obs_data->pcd_obs, sample->c_obs[i], 0, 0);
 
-  //TODO: add edge, sift correspondences
+  // sift
+  //get_olf(&model_olfs[i], model_data->sift_model, sample->c_model[i], 1);
+  //get_olf(&obs_olfs[i], obs_data->sift_obs, sample->c_obs[i], 0);
+
+  // edge
+
 }
 
 
@@ -3287,6 +3343,9 @@ scope_samples_t *create_scope_samples(int num_samples, int num_correspondences)
     safe_calloc(S->samples[i].c_obs, num_correspondences, double);
     safe_calloc(S->samples[i].c_model, num_correspondences, double);
     safe_calloc(S->samples[i].c_type, num_correspondences, int);
+    safe_calloc(S->samples[i].c_score, num_correspondences, int);
+    safe_calloc(S->samples[i].obs_olfs, num_correspondences, olf_t);
+    safe_calloc(S->samples[i].model_olfs, num_correspondences, olf_t);
   }
 
   return S;
@@ -3294,11 +3353,18 @@ scope_samples_t *create_scope_samples(int num_samples, int num_correspondences)
 
 void free_scope_samples(scope_samples_t *S)
 {
-  int i;
+  int i,j;
   for (i = 0; i < S->num_samples_allocated; i++) {
     free(S->samples[i].c_obs);
     free(S->samples[i].c_model);
     free(S->samples[i].c_type);
+    free(S->samples[i].c_score);
+    if (S->samples[i].nc > 0)
+      bingham_free(&S->samples[i].B);
+    for (j = 0; j < S->samples[i].nc; j++) {
+      free_olf(&S->samples[i].obs_olfs[j]);
+      free_olf(&S->samples[i].model_olfs[j]);
+    }
   }
   free(S->samples);
   free(S->W);
