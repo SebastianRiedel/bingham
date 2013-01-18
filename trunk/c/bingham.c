@@ -398,9 +398,7 @@ double bingham_F(bingham_t *B)
 
 /*
  * Copy the contents (but not the stats) of one bingham distribution into another.
- * Note: bingham_copy() blindly allocates space for dst->V and dst->Z
- * without freeing them first, so it should only be called on a freshly
- * allocated bingham_t struct.
+ * Note: assumes dst is already allocated.
  */
 void bingham_copy(bingham_t *dst, bingham_t *src)
 {
@@ -408,15 +406,15 @@ void bingham_copy(bingham_t *dst, bingham_t *src)
 
   dst->d = d;
 
-  dst->V = new_matrix2(d-1, d);
+  //dst->V = new_matrix2(d-1, d);
   memcpy(dst->V[0], src->V[0], d*(d-1)*sizeof(double));
 
-  safe_malloc(dst->Z, d-1, double);
+  //safe_malloc(dst->Z, d-1, double);
   memcpy(dst->Z, src->Z, (d-1)*sizeof(double));
 
   dst->F = src->F;
 
-  dst->stats = NULL;
+  //dst->stats = NULL;
 }
 
 
@@ -501,6 +499,17 @@ void bingham_new(bingham_t *B, int d, double **V, double *Z)
 void bingham_new_uniform(bingham_t *B, int d)
 {
   bingham_alloc(B, d);
+  memset(B->V[0], 0, d*(d-1)*sizeof(double));
+  memset(B->Z, 0, (d-1)*sizeof(double));
+  B->F = surface_area_sphere(d);
+}
+
+/*
+ * Set an already allocated Bingham to be uniform.
+ */
+void bingham_set_uniform(bingham_t *B)
+{
+  int d = B->d;
   memset(B->V[0], 0, d*(d-1)*sizeof(double));
   memset(B->Z, 0, (d-1)*sizeof(double));
   B->F = surface_area_sphere(d);
@@ -1660,6 +1669,15 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
     return;
   }
 
+  if (bingham_is_uniform(B1)) {
+    bingham_copy(B, B2);
+    return;
+  }
+  else if (bingham_is_uniform(B2)) {
+    bingham_copy(B, B1);
+    return;
+  }
+
   int i, j;
   int d = B1->d;
 
@@ -1759,8 +1777,24 @@ void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F)
 {
   int i, j, k;
   int d = B_array[0].d;
-
   B->d = d;
+
+  // check which binghams in B_array are uniform
+  int uniform[n], num_uniform=0;
+  for (i = 0; i < n; i++) {
+    uniform[i] = bingham_is_uniform(&B_array[i]);
+    if (uniform[i])
+      num_uniform++;
+  }
+  if (num_uniform == 0) {
+    bingham_set_uniform(B);
+    return;
+  }
+  else if (num_uniform == 1) {
+    find(&i, uniform, n);
+    bingham_copy(B, &B_array[i]);
+    return;
+  }
 
   double **C = new_matrix2(d, d);   // C = 0
   double **C2 = new_matrix2(d, d);
@@ -1828,6 +1862,7 @@ void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src)
   int i;
   for (i = 0; i < src->n; i++) {
     dst->w[n+i] = src->w[i];
+    bingham_alloc(&dst->B[n+i], src->B[i].d);
     bingham_copy(&dst->B[n+i], &src->B[i]);
   }
 }
@@ -1836,7 +1871,7 @@ void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src)
 /*
  * Copy the contents of one bingham mixture into another.
  *
- * Warning: allocates new space in 'dst' blindly.
+ * Note: allocates new space in 'dst' blindly.
  */
 void bingham_mixture_copy(bingham_mix_t *dst, bingham_mix_t *src)
 {
@@ -1846,6 +1881,7 @@ void bingham_mixture_copy(bingham_mix_t *dst, bingham_mix_t *src)
   safe_malloc(dst->B, n, bingham_t);
   for (i = 0; i < n; i++) {
     dst->w[i] = src->w[i];
+    bingham_alloc(&dst->B[i], src->B[i].d);
     bingham_copy(&dst->B[i], &src->B[i]);
   }
 }

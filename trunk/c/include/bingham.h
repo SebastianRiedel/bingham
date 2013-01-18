@@ -45,6 +45,7 @@ typedef struct {
 void bingham_init();
 void bingham_new(bingham_t *B, int d, double **V, double *Z);
 void bingham_new_uniform(bingham_t *B, int d);
+void bingham_set_uniform(bingham_t *B);
 void bingham_new_S1(bingham_t *B, double *v1, double z1);
 void bingham_new_S2(bingham_t *B, double *v1, double *v2, double z1, double z2);
 void bingham_new_S3(bingham_t *B, double *v1, double *v2, double *v3, double z1, double z2, double z3);

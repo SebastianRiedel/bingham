@@ -55,6 +55,11 @@ extern "C" {
 
   } pcd_t;
 
+  typedef struct {
+    double *x;
+    double *q;
+    bingham_t *B;
+  } olf_t;
 
   // range image
   typedef struct {
@@ -258,7 +263,10 @@ extern "C" {
     double *c_obs;
     double *c_model;
     int *c_type;
+    double *c_score;
     int nc;
+    olf_t *obs_olfs;
+    olf_t *model_olfs;
   } scope_sample_t;
 
   typedef struct {
