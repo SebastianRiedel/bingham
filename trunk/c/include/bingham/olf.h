@@ -84,7 +84,7 @@ extern "C" {
     int *view_cnt;   // view_cnt[i] = number of pcd points with views[i] as their viewpoint
   } multiview_pcd_t;
 
-
+  /*
   typedef struct {
     double **X;
     double **Q;
@@ -106,7 +106,7 @@ extern "C" {
     int num_scores;
 
   } olf_pose_samples_t;
-
+  */
 
   typedef struct {
     double X[3];
@@ -260,13 +260,17 @@ extern "C" {
     double x[3];
     double q[4];
     bingham_t B;
-    double *c_obs;
-    double *c_model;
+    int *c_obs;
+    int *c_model;
     int *c_type;
     double *c_score;
     int nc;
     olf_t *obs_olfs;
     olf_t *model_olfs;
+
+    //dbug
+    double *scores;
+    int num_scores;
   } scope_sample_t;
 
   typedef struct {
@@ -276,7 +280,7 @@ extern "C" {
     int num_samples_allocated;
   } scope_samples_t;
 
-  olf_pose_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
+  scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
 
 
   /*  
