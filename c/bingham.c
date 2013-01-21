@@ -1780,18 +1780,18 @@ void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F)
   B->d = d;
 
   // check which binghams in B_array are uniform
-  int uniform[n], num_uniform=0;
+  int not_uniform[n], num_not_uniform=0;
   for (i = 0; i < n; i++) {
-    uniform[i] = bingham_is_uniform(&B_array[i]);
-    if (uniform[i])
-      num_uniform++;
+    not_uniform[i] = !bingham_is_uniform(&B_array[i]);
+    if (not_uniform[i])
+      num_not_uniform++;
   }
-  if (num_uniform == 0) {
+  if (num_not_uniform == 0) {
     bingham_set_uniform(B);
     return;
   }
-  else if (num_uniform == 1) {
-    find(&i, uniform, n);
+  else if (num_not_uniform == 1) {
+    find(&i, not_uniform, n);
     bingham_copy(B, &B_array[i]);
     return;
   }

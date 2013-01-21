@@ -238,77 +238,52 @@ int main(int argc, char *argv[])
   if (argc > 10)
     have_true_pose = load_true_pose(argv[10], &true_pose);
 
-  olf_pose_samples_t *poses;
-  if (have_true_pose) {
-    poses = scope(&model, &obs, &params, have_true_pose, &true_pose);
-  } else {
-    poses = scope(&model, &obs, &params, have_true_pose, NULL);
-  }
-
-  // write pose samples to file
-  double **X = poses->X;
-  double **Q = poses->Q;
-  double *W = poses->W;
-  int n = poses->n;
-
-  double **scores = poses->scores;
-  int num_scores = poses->num_scores;
-
-  /*
-  for (n = 1; n < poses->n; n++)
-    if (W[n] < .01 * W[0])
-      break;
-  mult(W, W, 1/sum(W,n), n);
-  */
+  scope_samples_t *S = scope(&model, &obs, &params, have_true_pose, (have_true_pose ? &true_pose : NULL));
+  int n = S->num_samples;
 
   fprintf(f, "X = [");
   int i, j;
   for (i = 0; i < n; i++)
-    fprintf(f, "%f, %f, %f;  ", X[i][0], X[i][1], X[i][2]);
+    fprintf(f, "%f, %f, %f;  ", S->samples[i].x[0], S->samples[i].x[1], S->samples[i].x[2]);
   fprintf(f, "];\n");
 
   fprintf(f, "Q = [");
   for (i = 0; i < n; i++)
-    fprintf(f, "%f, %f, %f, %f;  ", Q[i][0], Q[i][1], Q[i][2], Q[i][3]);
+    fprintf(f, "%f, %f, %f, %f;  ", S->samples[i].q[0], S->samples[i].q[1], S->samples[i].q[2], S->samples[i].q[3]);
   fprintf(f, "];\n");
 
   fprintf(f, "W = [");
   for (i = 0; i < n; i++)
-    fprintf(f, "%f ", W[i]);
+    fprintf(f, "%f ", S->W[i]);
   fprintf(f, "];\n");
-
-  if (scores) {
-    fprintf(f, "scores = [");
-    for (i = 0; i < n; i++) {
-      for (j = 0; j < num_scores; j++)
-	fprintf(f, "%f ", scores[i][j]);
-      fprintf(f, "; ");
-    }
-    fprintf(f, "];\n");
-  }
 
 
   //**************************************************
 
   //dbug
-  if (poses->C_obs) {
-    fprintf(f, "C_obs = [");
-    for (i = 0; i < n; i++) {
-      for (j = 0; j < params.num_correspondences; j++)
-	fprintf(f, "%d ", 1 + poses->C_obs[i][j]);
-      fprintf(f, "; ");
-    }
-    fprintf(f, "];\n");
+  fprintf(f, "scores = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].num_scores; j++)
+      fprintf(f, "%f ", S->samples[i].scores[j]);
+    fprintf(f, "; ");
   }
-  if (poses->C_model) {
-    fprintf(f, "C_model = [");
-    for (i = 0; i < n; i++) {
-      for (j = 0; j < params.num_correspondences; j++)
-	fprintf(f, "%d ", 1 + poses->C_model[i][j]);
-      fprintf(f, "; ");
-    }
-    fprintf(f, "];\n");
+  fprintf(f, "];\n");
+
+  fprintf(f, "C_obs = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].nc; j++)
+      fprintf(f, "%d ", 1 + S->samples[i].c_obs[j]);
+    fprintf(f, "; ");
   }
+  fprintf(f, "];\n");
+
+  fprintf(f, "C_model = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].nc; j++)
+      fprintf(f, "%d ", 1 + S->samples[i].c_model[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
   
   
 
