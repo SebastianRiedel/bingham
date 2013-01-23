@@ -13,4 +13,8 @@ if isfield(pcd, 'VX')
     pcd2.VZ = pcd2.VZ + x(3);
 end
 
+if isfield(pcd, 'vp') && ~isempty(pcd.vp)
+    pcd2.vp(1:3) = pcd2.vp(1:3) + x;
+end
+
 pcd2.data = populate_pcd_data(pcd2);

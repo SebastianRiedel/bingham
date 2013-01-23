@@ -41,6 +41,7 @@ elseif norm(origin) > .0001  %dbug: move this outside of cloud_to_range_image!!!
     r2 = cross(r3,r1);
     rot_mat = [r1,r2,r3]';  % transpose = inverse for rotation matrices
     P = P*rot_mat';
+    viewpoint(4:7) = rotationMatrixToQuaternion(rot_mat);
 end
 D = sqrt(sum(P.^2,2));
 X = atan2(P(:,1), P(:,3));
