@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
 
   fprintf(f, "C_obs = [");
   for (i = 0; i < n; i++) {
-    for (j = 0; j < S->samples[i].nc; j++)
+    for (j = 0; j < params.num_correspondences; j++)
       fprintf(f, "%d ", 1 + S->samples[i].c_obs[j]);
     fprintf(f, "; ");
   }
@@ -279,12 +279,24 @@ int main(int argc, char *argv[])
 
   fprintf(f, "C_model = [");
   for (i = 0; i < n; i++) {
-    for (j = 0; j < S->samples[i].nc; j++)
+    for (j = 0; j < params.num_correspondences; j++)
       fprintf(f, "%d ", 1 + S->samples[i].c_model[j]);
     fprintf(f, "; ");
   }
   fprintf(f, "];\n");
+
+  fprintf(f, "C_type = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < params.num_correspondences; j++)
+      fprintf(f, "%d ", S->samples[i].c_type[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
   
+  fprintf(f, "C_num = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%d ", S->samples[i].nc);
+  fprintf(f, "];\n");
   
 
   /***************************************************

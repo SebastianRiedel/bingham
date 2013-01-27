@@ -1741,7 +1741,7 @@ void variance(double *vars, double **X, int n, int m)
       vars[j] += dx*dx;
     }
   }
-  mult(vars, vars, 1/(double)n, n);
+  mult(vars, vars, 1/(double)n, m);
 }
 
 // compute the covariance of the rows of X, given mean mu
