@@ -20,6 +20,7 @@ double mps_xyz_dists_[100000];
 double xyz_score_;
 double mps_normal_dists_[100000];
 double normal_score_;
+double fpfh_score_;
 double lab_scores_[3];
 double vis_score_;
 int **occ_edge_pixels_ = NULL;
@@ -34,8 +35,6 @@ int mps_idx_[100000];
 double mps_vis_prob_[100000];
 double *x_true_, *q_true_;
 int have_true_pose_ = 0;
-
-//scope_params_t **params_ptr_;
 
 
 
@@ -921,7 +920,36 @@ void range_image_find_nn(int *nn_idx, double *nn_d2, double **query_xyz, double 
   }
 }
 
+double **get_edge_points(pcd_t *pcd, int *num_edge_points, int **edge_idx)
+{
+  int i, idx[pcd->num_points], n=0;
+  for (i = 0; i < pcd->num_points; i++)
+    if (pcd->range_edge[i] > 0 || pcd->curv_edge[i] > 0 || pcd->img_edge[i] > 0)
+      idx[n++] = i;
 
+  double **P = new_matrix2(n,3);
+  reorder_rows(P, pcd->points, idx, n, 3);
+
+  *num_edge_points = n;
+  safe_calloc(*edge_idx, n, int);
+  memcpy(*edge_idx, idx, n*sizeof(int));
+  return P;
+}
+
+double **get_edge_points_image(double **P, int n, range_image_t *range_image)
+{
+  int w = range_image->w;
+  int h = range_image->h;
+
+  double **E = new_matrix2(w,h);  // edge image
+
+  int i, x, y;
+  for (i = 0; i < n; i++)
+    if (range_image_xyz2sub(&x, &y, range_image, P[i]))
+      E[x][y] = 1.0;
+
+  return E;
+}
 
 double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, scope_params_t *params)
 {
@@ -1238,7 +1266,7 @@ float **get_fsurf_features(double **fpfh, double **sdw, int n, int fpfh_length, 
 /*
  * returns the number of points
  */
-double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t *range_edges_model, range_image_t *obs_range_image)
+double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t *range_edges_model, int *model_idx)
 {
   // compute viewpoint for model placement (x,q) assuming observed viewpoint = (0,0,0)
   double vp[3];
@@ -1274,6 +1302,9 @@ double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t
   // get the actual points in the correct pose
   double **P = new_matrix2(n,3);
   reorder_rows(P, range_edges_model->pcd->points, idx, n, 3);
+
+  if (model_idx)
+    memcpy(model_idx, idx, n*sizeof(int));
 
   *n_ptr = n;
   return P;
@@ -1444,6 +1475,10 @@ scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
   data->obs_range_image = pcd_to_range_image(data->pcd_obs_bg, 0, M_PI/1000.0, 4);  //TODO: make this a parameter?
   data->obs_fg_range_image = pcd_to_range_image_from_template(data->pcd_obs, data->obs_range_image);
 
+  // get edge points
+  data->obs_edge_points = get_edge_points(data->pcd_obs, &data->num_obs_edge_points, &data->obs_edge_idx);
+  data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_fg_range_image);
+
   // compute blurred edge feature image
   data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_fg_range_image, params);
 
@@ -1490,6 +1525,9 @@ void free_scope_obs_data(scope_obs_data_t *data)
 {
   free_range_image(data->obs_range_image);
   free_range_image(data->obs_fg_range_image);
+  free(data->obs_edge_idx);
+  free_matrix2(data->obs_edge_points);
+  free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
   free_matrix2(data->obs_xyzn);
   free_matrix2(data->obs_bg_xyzn);
@@ -1852,6 +1890,46 @@ double compute_xyz_score(double **xyz, int *nn_idx, double *vis_prob, int n, pcd
 }
 */
 
+double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, /*scope_noise_model_t *noise_models,*/ int num_validation_points,
+			  range_image_t *obs_fg_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
+{
+  double score = 0.0;
+  int i;
+  for (i = 0; i < num_validation_points; i++) {
+    if (vis_pmf[i] > .01/(double)num_validation_points) {
+      int xi,yi;
+      range_image_xyz2sub(&xi, &yi, obs_fg_range_image, cloud[i]);
+      double f_sigma = params->f_sigma; // * 2*noise_models[i].range_sigma;  //TODO: get FPFH noise model
+      double dmax = 2*f_sigma;
+      double d = dmax;
+      if (obs_fg_range_image->cnt[xi][yi] > 0) {
+	int idx = obs_fg_range_image->idx[xi][yi];
+	d = dist(cloud_fpfh[i], pcd_obs->shapes[idx], pcd_obs->shape_length);
+	d = MIN(d, dmax);
+      }
+      score += vis_pmf[i] * log(normpdf(d, 0, f_sigma));
+
+      //dbug
+      //if (params->verbose)
+      //  mps_f_dists_[i] = d / dmax;
+    }
+  }
+  score -= log(normpdf(0, 0, params->f_sigma));
+
+  //dbug
+  if (params->verbose)
+    fpfh_score_ = score;
+
+  double w = 0;
+  if (score_round == 2)
+    w = params->score2_fpfh_weight;
+  else
+    w = params->score3_fpfh_weight;
+
+  return w * score;
+}
+
+/*
 double compute_fpfh_score(double **fpfh, int *nn_idx, double *vis_prob, int n, pcd_t *pcd_obs, scope_params_t *params)
 {
   double score = 0.0;
@@ -1867,6 +1945,7 @@ double compute_fpfh_score(double **fpfh, int *nn_idx, double *vis_prob, int n, p
   score -= log(normpdf(0,0,2*f_sigma));
   return params->f_weight * score;
 }
+*/
 
 /*
 double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd_t *pcd_obs, scope_params_t *params)
@@ -2277,10 +2356,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     return score;
   }
 
-
-
   double **cloud_normals = get_sub_cloud_normals_rotated(model_data->pcd_model, idx, num_validation_points, sample->q);
-  //double **cloud_f = get_sub_cloud_fpfh(model_data->pcd_model, idx, num_validation_points);
   //double **cloud_sdw = get_sub_cloud_sdw(model_data->pcd_model, idx, num_validation_points, params);
   double **cloud_lab = get_sub_cloud_lab(model_data->pcd_model, idx, num_validation_points);
   //double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
@@ -2320,9 +2396,23 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
   double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
+
+  // get fpfh score (TODO: add fpfh features to occ_model)
+  int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
+  int fpfh_idx[fpfh_num_validation_points];
+  get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
+  double **fpfh_cloud = get_sub_cloud_at_pose(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, x, q);
+  double **fpfh_cloud_normals = get_sub_cloud_normals_rotated(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, q);
+  double **fpfh_cloud_f = get_sub_cloud_fpfh(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points);
+  double fpfh_vis_prob[fpfh_num_validation_points];
+  for (i = 0; i < fpfh_num_validation_points; i++)
+    fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
+  double fpfh_vis_pmf[fpfh_num_validation_points];
+  normalize_pmf(fpfh_vis_pmf, fpfh_vis_prob, fpfh_num_validation_points);
+  double fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image, obs_data->pcd_obs, params, score_round);
+
   //double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
   //double xyz_score = compute_xyz_score(cloud, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
-  //double f_score = compute_fpfh_score(cloud_f, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   //double sdw_score = compute_sdw_score(cloud_sdw, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
   //double lab_score = compute_lab_score(cloud_lab, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
 
@@ -2334,7 +2424,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double edge_score = 0.0;
   if (obs_data->obs_edge_image) {
     int n = params->num_validation_points;
-    double **P = get_range_edge_points(&n, x, q, model_data->range_edges_model, obs_data->obs_range_image);
+    double **P = get_range_edge_points(&n, x, q, model_data->range_edges_model, NULL);
     transform_cloud(P, P, n, x, q);
     if (params->num_validation_points == 0) {
       int num_occ_edges;
@@ -2356,7 +2446,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
 					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score;
+  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score + fpfh_score;
 
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
@@ -2371,9 +2461,9 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   
   if (params->verbose) {
-    double scores[10] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2]};
+    double scores[11] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_};
     if (sample->scores == NULL) {
-      sample->num_scores = 10;
+      sample->num_scores = 11;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));
@@ -2383,11 +2473,13 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   // cleanup
   free_matrix2(cloud);
   free_matrix2(cloud_normals);
-  //free_matrix2(cloud_f);
   //free_matrix2(cloud_sdw);
   free_matrix2(cloud_lab);
   //free_matrix2(cloud_xyzn);
   free(noise_models);
+  free_matrix2(fpfh_cloud);
+  free_matrix2(fpfh_cloud_normals);
+  free_matrix2(fpfh_cloud_f);
 
   return score;
 }
@@ -2997,16 +3089,132 @@ void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_m
 }
 
 
-void sample_edge_correspondence_given_model_pose(int *c_obs, int *c_model, int nc, double *x, double *q)
+
+
+int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
 {
-  //STUB
+  int i, j, n = 20;
+  int c_model[n];
+  double **P = get_range_edge_points(&n, sample->x, sample->q, model_data->range_edges_model, c_model);
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+
+  int found_point = 0;
+  for (i = 0; i < n; i++) {
+    int unique = 1;
+    for (j = 0; j < sample->nc; j++) {
+      if (sample->c_type[j] == C_TYPE_EDGE && sample->c_model[j] == c_model[i]) {
+	unique = 0;
+	break;
+      }
+    }
+    if (unique) {
+      int xi, yi;
+      if (obs_range_image == NULL || (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i]) && obs_range_image->image[xi][yi] > norm(P[i],3))) {  // if visible in range image
+	found_point = 1;
+	break;
+      }
+    }
+  }
+  free_matrix2(P);
+
+  return (found_point ? c_model[i] : -1);
+}
+
+int sample_obs_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // get model edge point
+  double *p = model_data->range_edges_model->pcd->points[c_model];
+
+  // get closest obs image edge point (TODO: use KD-tree)
+  int i, c_obs=obs_data->obs_edge_idx[0], d2min = dist2(p, obs_data->obs_edge_points[0], 3);
+  for (i = 1; i < obs_data->num_obs_edge_points; i++) {
+    double d2 = dist2(p, obs_data->obs_edge_points[i], 3);
+    if (d2 < d2min) {
+      d2min = d2;
+      c_obs = obs_data->obs_edge_idx[i];
+    }
+  }
+
+  return c_obs;
+}
+
+int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+{
+  // sample a random obs image edge via random walk in edge image
+
+
+
+  // convert from fpfh to edge features
+
+
+
 
   // TODO: make these params
-  //double model_first_ratio = .5;
+  int num_steps = 3;  
+  int hops = 2;
+  int num_samples = 5;
 
-  //if (frand() < model_first_ratio) {
-  //  c_model[nc] = sample_model_edge_point_given_model_pose(x, q, pcd_model, obs_range_image);
-  //}
+  int nc = sample->nc;
+  range_image_t *obs_fg_range_image = obs_data->obs_fg_range_image;
+  double ** obs_edge_image = obs_data->obs_edge_image;
+  int w = obs_fg_range_image->w;
+  int h = obs_fg_range_image->h;
+
+  // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
+  int c_obs_new[num_samples];
+  double d2_obs[num_samples];  // dist. b/w obs points
+  double *p_obs = obs_data->pcd_obs->points[sample->c_obs[nc-1]];
+  int i, xi, yi;
+  range_image_xyz2sub(&xi, &yi, obs_fg_range_image, p_obs);
+  for (i = 0; i < num_samples; i++) {
+    while (1) {
+      int xi2=xi, yi2=yi;
+      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops);
+      if (obs_fg_range_image->idx[xi2][yi2] >= 0) {
+	c_obs_new[i] = obs_fg_range_image->idx[xi2][yi2];
+	break;
+      }
+    }
+    d2_obs[i] = dist2(p_obs, obs_data->pcd_obs->points[c_obs_new[i]], 3);
+  }
+  i = find_max(d2_obs, num_samples);
+
+  return c_obs_new[i];
+
+
+}
+
+int sample_model_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // get closest model edge point
+
+}
+
+
+
+
+void sample_edge_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // TODO: make these params
+  double model_first_ratio = .5;
+
+  int nc = sample->nc;
+  int c_model, c_obs;
+  int correspondence_found = 0;
+
+  if (frand() < model_first_ratio) {
+    c_model = sample_model_edge_point_given_model_pose(sample, model_data, obs_data);
+    if (c_model >= 0) {
+      c_obs = sample_obs_edge_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
+      correspondence_found = 1;
+    }
+  }
+  if (!correspondence_found) {
+    c_obs = sample_obs_edge_point_given_model_pose(sample, model_data, obs_data);
+    c_model = sample_model_edge_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params);
+  }
+
+  double c_score = 0.0;
 }
 
 
@@ -3024,6 +3232,7 @@ void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_
   //get_olf(&obs_olfs[i], obs_data->sift_obs, sample->c_obs[i], 0);
 
   // edge
+  
 
 }
 
@@ -3557,15 +3766,15 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   // score hypotheses
   t0 = get_time_ms();
   for (i = 0; i < num_samples_init; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
+    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
   // sort hypotheses
   sort_pose_samples(S);
 
   //TODO: make this a param
-  //double round1_score_thresh = -.2;
-  //S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
-  S->num_samples = MIN(S->num_samples, params->num_samples);
+  double round1_score_thresh = -.2;
+  S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
+  //S->num_samples = MIN(S->num_samples, params->num_samples);
 
   //dbug
   printf("Scored and sorted c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
@@ -3580,6 +3789,15 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 {
   double t0;
   int c,i;
+
+  // score hypotheses
+  t0 = get_time_ms();
+  for (i = 0; i < S->num_samples; i++)
+    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
+  sort_pose_samples(S);
+  S->num_samples = MIN(S->num_samples, params->num_samples);
+  printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+
   for (c = 1; c < params->num_correspondences; ++c) {
 
     t0 = get_time_ms();  //dbug
@@ -3644,7 +3862,7 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   //printf("Scored and sorted c=%d poses in %.3f seconds\n", c, (get_time_ms() - t0) / 1000.0);  //dbug
 
   // remove low-weight samples
-  S->num_samples = MIN(S->num_samples, params->num_samples);
+  //S->num_samples = MIN(S->num_samples, params->num_samples);
 
   if (have_true_pose_)
     print_good_poses(S);
@@ -3678,7 +3896,11 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   // step 2: align with BPA
   scope_round2(S, model_data, obs_data, params);
 
-  printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+  //dbug: add true pose
+  if (have_true_pose_) {
+    memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
+    memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
+  }
 
   //dbug
   params->verbose = 1;
@@ -3687,12 +3909,14 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
   sort_pose_samples(S);
 
+  printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+
   // cluster poses
   //if (params->pose_clustering)
   //  remove_redundant_pose_samples(S, params);
 
-  if (have_true_pose_)
-    print_good_poses(S);
+  //if (have_true_pose_)
+  //  print_good_poses(S);
 
   // cleanup
   free_scope_model_data(model_data);
