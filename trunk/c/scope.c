@@ -136,6 +136,8 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score2_A_weight);
       else if (!wordcmp(name, "score2_B_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_B_weight);
+      else if (!wordcmp(name, "score2_fpfh_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_fpfh_weight);
 
       else if (!wordcmp(name, "score3_xyz_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_xyz_weight);
@@ -157,6 +159,8 @@ void load_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score3_A_weight);
       else if (!wordcmp(name, "score3_B_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_B_weight);
+      else if (!wordcmp(name, "score3_fpfh_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_fpfh_weight);
 
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))

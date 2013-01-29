@@ -188,6 +188,7 @@ extern "C" {
     double score2_L_weight;
     double score2_A_weight;
     double score2_B_weight;
+    double score2_fpfh_weight;
 
     // SCORE3 PARAMS
     double score3_xyz_weight;
@@ -200,6 +201,7 @@ extern "C" {
     double score3_L_weight;
     double score3_A_weight;
     double score3_B_weight;
+    double score3_fpfh_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
@@ -246,6 +248,10 @@ extern "C" {
     pcd_t *pcd_obs_bg;
     range_image_t *obs_range_image;
     range_image_t *obs_fg_range_image;
+    int num_obs_edge_points;
+    int *obs_edge_idx;
+    double **obs_edge_points;
+    double **obs_edge_points_image;
     double **obs_edge_image;
     double **obs_xyzn;
     double **obs_bg_xyzn;
