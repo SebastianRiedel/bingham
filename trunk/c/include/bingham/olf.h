@@ -41,7 +41,7 @@ extern "C" {
 
     // computed data
     int *clusters;
-    double **quaternions[2];
+    double **quaternions; //[2]
     double **lab;
 
     // data sizes
