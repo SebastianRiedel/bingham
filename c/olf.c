@@ -245,7 +245,7 @@ void matrix_cell_gradient(double *g, int i, int j, double **X, int n, int m)
 /*
  * compute quaternions given normals and principal curvatures
  */
-void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int num_points)
+void compute_orientation_quaternions(double **Q, double **N, double **PCS, int num_points)
 {
   int i;
   double nx, ny, nz, pcx, pcy, pcz, pcx2, pcy2, pcz2;
@@ -266,13 +266,14 @@ void compute_orientation_quaternions(double ***Q, double **N, double **PCS, int 
     R[0][0] = nx;  R[0][1] = pcx;  R[0][2] = pcx2;
     R[1][0] = ny;  R[1][1] = pcy;  R[1][2] = pcy2;
     R[2][0] = nz;  R[2][1] = pcz;  R[2][2] = pcz2;
-    rotation_matrix_to_quaternion(Q[0][i], R);
+    rotation_matrix_to_quaternion(Q[i], R);
+    //rotation_matrix_to_quaternion(Q[0][i], R);
 
     // compute "down" quaternion
-    R[0][0] = nx;  R[0][1] = -pcx;  R[0][2] = -pcx2;
-    R[1][0] = ny;  R[1][1] = -pcy;  R[1][2] = -pcy2;
-    R[2][0] = nz;  R[2][1] = -pcz;  R[2][2] = -pcz2;
-    rotation_matrix_to_quaternion(Q[1][i], R);
+    //R[0][0] = nx;  R[0][1] = -pcx;  R[0][2] = -pcx2;
+    //R[1][0] = ny;  R[1][1] = -pcy;  R[1][2] = -pcy2;
+    //R[2][0] = nz;  R[2][1] = -pcz;  R[2][2] = -pcz2;
+    //rotation_matrix_to_quaternion(Q[1][i], R);
   }
 
   free_matrix2(R);
@@ -411,8 +412,9 @@ static void pcd_add_data_pointers(pcd_t *pcd)
 
   // add quaternion orientation features
   if (ch_nx>=0 && ch_ny>=0 && ch_nz>=0 && ch_pcx>=0 && ch_pcy>=0 && ch_pcz>=0) {
-    pcd->quaternions[0] = new_matrix2(pcd->num_points, 4);
-    pcd->quaternions[1] = new_matrix2(pcd->num_points, 4);
+    pcd->quaternions = new_matrix2(pcd->num_points, 4);
+    //pcd->quaternions[0] = new_matrix2(pcd->num_points, 4);
+    //pcd->quaternions[1] = new_matrix2(pcd->num_points, 4);
     compute_orientation_quaternions(pcd->quaternions, pcd->normals, pcd->principal_curvatures, pcd->num_points);
   }
 
@@ -456,10 +458,12 @@ static void pcd_free_data_pointers(pcd_t *pcd)
   if (pcd->clusters)
     free(pcd->clusters);
 
-  if (pcd->quaternions[0])
-    free_matrix2(pcd->quaternions[0]);
-  if (pcd->quaternions[1])
-    free_matrix2(pcd->quaternions[1]);
+  if (pcd->quaternions)
+    free_matrix2(pcd->quaternions);
+  //if (pcd->quaternions[0])
+  //  free_matrix2(pcd->quaternions[0]);
+  //if (pcd->quaternions[1])
+  //  free_matrix2(pcd->quaternions[1]);
 
   //if (pcd->points_kdtree)
   //  kdtree_free(pcd->points_kdtree);
@@ -942,11 +946,12 @@ double **get_edge_points_image(double **P, int n, range_image_t *range_image)
   int h = range_image->h;
 
   double **E = new_matrix2(w,h);  // edge image
+  memset(E[0], -1000.0, w*h*sizeof(double));  //log(0)
 
   int i, x, y;
   for (i = 0; i < n; i++)
     if (range_image_xyz2sub(&x, &y, range_image, P[i]))
-      E[x][y] = 1.0;
+      E[x][y] = 0.0;  //log(1)
 
   return E;
 }
@@ -1311,7 +1316,7 @@ double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t
 }
 
 
-void edge_image_random_walk(int *xi_ptr, int *yi_ptr, double **obs_edge_image, int w, int h, int num_steps, int hops)
+void edge_image_random_walk(int *xi_ptr, int *yi_ptr, double **obs_edge_image, int w, int h, int num_steps, int hops, int sample_endpoint)
 {
   int xi = *xi_ptr;
   int yi = *yi_ptr;
@@ -1343,10 +1348,15 @@ void edge_image_random_walk(int *xi_ptr, int *yi_ptr, double **obs_edge_image, i
       yi2 = floor(yf);
     }
 
-    // pick a random observed point along the ray
-    double r = frand();
-    xi = floor(r*xi + (1-r)*xi2);
-    yi = floor(r*yi + (1-r)*yi2);
+    if (sample_endpoint) {
+      xi = xi2;
+      yi = yi2;
+    }
+    else {  // pick a random observed point along the ray
+      double r = frand();
+      xi = floor(r*xi + (1-r)*xi2);
+      yi = floor(r*yi + (1-r)*yi2);
+    }
   }
 
   *xi_ptr = xi;
@@ -2279,7 +2289,7 @@ double compute_segment_score(double *x, double *q, double **cloud, flann_index_t
   for (i = 0; i < n; i++) {
     if (vis_prob[i] > .1 && range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i])) {
       
-      edge_image_random_walk(&xi, &yi, obs_edge_image, w, h, 1, 0);
+      edge_image_random_walk(&xi, &yi, obs_edge_image, w, h, 1, 0, 0);
 
       if (obs_range_image->cnt[xi][yi] > 0) {
 
@@ -2582,7 +2592,8 @@ void get_olf(olf_t *olf, pcd_t *pcd, int idx, int bingham)
   if (pcd->quaternions) {
     if (olf->q == NULL)
       safe_calloc(olf->q, 4, double);
-    memcpy(olf->q, pcd->quaternions[0][idx], 4*sizeof(double));
+    memcpy(olf->q, pcd->quaternions[idx], 4*sizeof(double));
+    //memcpy(olf->q, pcd->quaternions[0][idx], 4*sizeof(double));
 
     if (bingham) {
       if (olf->B == NULL) {
@@ -2873,6 +2884,7 @@ int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t
   // TODO: make these params
   int num_steps = 3;  
   int hops = 2;
+  int sample_endpoint = 0;
   int num_samples = 5;
 
   int nc = sample->nc;
@@ -2884,13 +2896,14 @@ int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t
   // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
   int c_obs_new[num_samples];
   double d2_obs[num_samples];  // dist. b/w obs points
-  double *p_obs = obs_data->pcd_obs->points[sample->c_obs[nc-1]];
+  //double *p_obs = (sample->c_type[nc-1] == C_TYPE_SIFT ? obs_data->sift_obs->points[sample->c_obs[nc-1]] : obs_data->pcd_obs->points[sample->c_obs[nc-1]]);
+  double *p_obs = sample->obs_olfs[0].x;  //sample->obs_olfs[nc-1].x;
   int i, xi, yi;
   range_image_xyz2sub(&xi, &yi, obs_fg_range_image, p_obs);
   for (i = 0; i < num_samples; i++) {
     while (1) {
       int xi2=xi, yi2=yi;
-      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops);
+      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops, sample_endpoint);
       if (obs_fg_range_image->idx[xi2][yi2] >= 0) {
 	c_obs_new[i] = obs_fg_range_image->idx[xi2][yi2];
 	break;
@@ -3091,11 +3104,12 @@ void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_m
 
 
 
-int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   int i, j, n = 20;
   int c_model[n];
   double **P = get_range_edge_points(&n, sample->x, sample->q, model_data->range_edges_model, c_model);
+  transform_cloud(P, P, n, sample->x, sample->q);
   range_image_t *obs_range_image = obs_data->obs_range_image;
 
   int found_point = 0;
@@ -3103,19 +3117,25 @@ int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model
     int unique = 1;
     for (j = 0; j < sample->nc; j++) {
       if (sample->c_type[j] == C_TYPE_EDGE && sample->c_model[j] == c_model[i]) {
+	//printf("not unique\n"); //dbug
 	unique = 0;
 	break;
       }
     }
     if (unique) {
       int xi, yi;
-      if (obs_range_image == NULL || (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i]) && obs_range_image->image[xi][yi] > norm(P[i],3))) {  // if visible in range image
+      if (obs_range_image == NULL ||
+	  (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i])
+	   && params->range_sigma + obs_range_image->image[xi][yi] > norm(P[i],3))) {  // if visible in range image
 	found_point = 1;
 	break;
       }
+      //printf("not visible: p = [%f, %f, %f]\n", P[i][0], P[i][1], P[i][2]); //dbug
     }
   }
   free_matrix2(P);
+
+  //printf("c_model[%d] = %d\n", i, c_model[i]); //dbug
 
   return (found_point ? c_model[i] : -1);
 }
@@ -3123,10 +3143,13 @@ int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model
 int sample_obs_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   // get model edge point
-  double *p = model_data->range_edges_model->pcd->points[c_model];
+  double p[3], *pp[1] = {p};
+  transform_cloud(pp, &model_data->range_edges_model->pcd->points[c_model], 1, sample->x, sample->q);
+  //double *p = model_data->range_edges_model->pcd->points[c_model];
 
   // get closest obs image edge point (TODO: use KD-tree)
-  int i, c_obs=obs_data->obs_edge_idx[0], d2min = dist2(p, obs_data->obs_edge_points[0], 3);
+  int i, c_obs=obs_data->obs_edge_idx[0];
+  double d2min = dist2(p, obs_data->obs_edge_points[0], 3);
   for (i = 1; i < obs_data->num_obs_edge_points; i++) {
     double d2 = dist2(p, obs_data->obs_edge_points[i], 3);
     if (d2 < d2min) {
@@ -3142,34 +3165,30 @@ int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_d
 {
   // sample a random obs image edge via random walk in edge image
 
-
-
-  // convert from fpfh to edge features
-
-
-
-
   // TODO: make these params
-  int num_steps = 3;  
+  int num_steps = 1;
   int hops = 2;
+  int sample_endpoint = 1;
   int num_samples = 5;
 
   int nc = sample->nc;
   range_image_t *obs_fg_range_image = obs_data->obs_fg_range_image;
-  double ** obs_edge_image = obs_data->obs_edge_image;
+  double ** obs_edge_points_image = obs_data->obs_edge_image; //obs_data->obs_edge_points_image;
   int w = obs_fg_range_image->w;
   int h = obs_fg_range_image->h;
 
   // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
   int c_obs_new[num_samples];
   double d2_obs[num_samples];  // dist. b/w obs points
-  double *p_obs = obs_data->pcd_obs->points[sample->c_obs[nc-1]];
+  //double *p_obs = (sample->c_type[nc-1] == C_TYPE_SIFT ? obs_data->sift_obs->points[sample->c_obs[nc-1]] : obs_data->pcd_obs->points[sample->c_obs[nc-1]]);
+  double *p_obs = sample->obs_olfs[0].x;  //sample->obs_olfs[nc-1].x;
+
   int i, xi, yi;
   range_image_xyz2sub(&xi, &yi, obs_fg_range_image, p_obs);
   for (i = 0; i < num_samples; i++) {
     while (1) {
       int xi2=xi, yi2=yi;
-      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops);
+      edge_image_random_walk(&xi2, &yi2, obs_edge_points_image, w, h, num_steps, hops, sample_endpoint);
       if (obs_fg_range_image->idx[xi2][yi2] >= 0) {
 	c_obs_new[i] = obs_fg_range_image->idx[xi2][yi2];
 	break;
@@ -3180,14 +3199,24 @@ int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_d
   i = find_max(d2_obs, num_samples);
 
   return c_obs_new[i];
-
-
 }
 
 int sample_model_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
-  // get closest model edge point
+  // get closest model edge point at current viewpoint
+  int i, n = 0;
+  int c_model[model_data->pcd_model->num_points];
+  double **P = get_range_edge_points(&n, sample->x, sample->q, model_data->range_edges_model, c_model);
+  transform_cloud(P, P, n, sample->x, sample->q);
 
+  double d2[n];
+  for (i = 0; i < n; i++)
+    d2[i] = dist2(P[i], obs_data->pcd_obs->points[c_obs], 3);
+  i = find_min(d2, n);
+
+  free_matrix2(P);
+
+  return c_model[i];
 }
 
 
@@ -3203,37 +3232,52 @@ void sample_edge_correspondence_given_model_pose(scope_sample_t *sample, scope_m
   int correspondence_found = 0;
 
   if (frand() < model_first_ratio) {
-    c_model = sample_model_edge_point_given_model_pose(sample, model_data, obs_data);
+    c_model = sample_model_edge_point_given_model_pose(sample, model_data, obs_data, params);
     if (c_model >= 0) {
       c_obs = sample_obs_edge_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
       correspondence_found = 1;
+
+      //printf("model first: c_obs = %d, c_model = %d\n", c_obs, c_model); //dbug
     }
   }
   if (!correspondence_found) {
     c_obs = sample_obs_edge_point_given_model_pose(sample, model_data, obs_data);
     c_model = sample_model_edge_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params);
+
+    //printf("obs first: c_obs = %d, c_model = %d\n", c_obs, c_model); //dbug
   }
 
   double c_score = 0.0;
+
+  sample->c_obs[nc] = c_obs;
+  sample->c_model[nc] = c_model;
+  sample->c_score[nc] = c_score;
+  sample->c_type[nc] = C_TYPE_EDGE;
+  sample->nc++;
 }
 
 
 void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
-  // fpfh
-  sample_fpfh_correspondence_given_model_pose(sample, model_data, obs_data, params);
-  int i = sample->nc - 1;
+  //TODO: make these params
+  double fpfh_ratio = .5;
 
-  get_olf(&sample->model_olfs[i], model_data->fpfh_model, sample->c_model[i], 1);
-  get_olf(&sample->obs_olfs[i], obs_data->pcd_obs, sample->c_obs[i], 0);
+  int nc = sample->nc;
+
+  if (frand() < fpfh_ratio) {
+    sample_fpfh_correspondence_given_model_pose(sample, model_data, obs_data, params);
+    get_olf(&sample->model_olfs[nc], model_data->fpfh_model, sample->c_model[nc], 1);
+    get_olf(&sample->obs_olfs[nc], obs_data->pcd_obs, sample->c_obs[nc], 0);
+  }
+  else {
+    sample_edge_correspondence_given_model_pose(sample, model_data, obs_data, params);
+    get_olf(&sample->model_olfs[nc], model_data->range_edges_model->pcd, sample->c_model[nc], 0);
+    get_olf(&sample->obs_olfs[nc], obs_data->pcd_obs, sample->c_obs[nc], 0);
+  }
 
   // sift
   //get_olf(&model_olfs[i], model_data->sift_model, sample->c_model[i], 1);
   //get_olf(&obs_olfs[i], obs_data->sift_obs, sample->c_obs[i], 0);
-
-  // edge
-  
-
 }
 
 
@@ -3245,12 +3289,11 @@ void resample_model_correspondences(scope_sample_t *sample, scope_model_data_t *
       sample->c_model[i] = sample_fpfh_model_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params, 1, 1);  //nn, fpfh
       get_olf(&sample->model_olfs[i], model_data->fpfh_model, sample->c_model[i], 1);
     }
-    else if (sample->c_type[i] == C_TYPE_SIFT) {
-      //STUB
-    }
     else if (sample->c_type[i] == C_TYPE_EDGE) {
-      //STUB
+      sample->c_model[i] = sample_model_edge_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params);
+      get_olf(&sample->model_olfs[i], model_data->range_edges_model->pcd, sample->c_model[i], 0);
     }
+    //else if (sample->c_type[i] == C_TYPE_SIFT)
   }
 }
 
@@ -3897,10 +3940,10 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   scope_round2(S, model_data, obs_data, params);
 
   //dbug: add true pose
-  if (have_true_pose_) {
-    memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
-    memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
-  }
+  //if (have_true_pose_) {
+  //  memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
+  //  memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
+  //}
 
   //dbug
   params->verbose = 1;
@@ -3912,8 +3955,8 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   // cluster poses
-  //if (params->pose_clustering)
-  //  remove_redundant_pose_samples(S, params);
+  if (params->pose_clustering)
+    remove_redundant_pose_samples(S, params);
 
   //if (have_true_pose_)
   //  print_good_poses(S);
@@ -4815,7 +4858,10 @@ olf_pose_samples_t *olf_pose_sample(olf_t *olf, pcd_t *pcd, int n)
     else
       j = irand(npoints);
 
-    q_feature = (frand() < .5 ? pcd->quaternions[0][j] : pcd->quaternions[1][j]);
+    q_feature = pcd->quaternions[j];
+    if (frand() < .5)
+      quaternion_flip(q_feature, q_feature);
+    //q_feature = (frand() < .5 ? pcd->quaternions[0][j] : pcd->quaternions[1][j]);
 
     x_feature[0] = pcd->points[0][j];
     x_feature[1] = pcd->points[1][j];
