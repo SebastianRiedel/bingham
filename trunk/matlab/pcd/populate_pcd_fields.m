@@ -34,6 +34,8 @@ ch_surfwidth = find(strcmp(columns, 'surfwidth'));
 ch_m = find(strncmp(columns, 'm', 1));
 ch_cov = find(strncmp(columns, 'cov', 3));
 
+ch_cnt = find(strncmp(columns, 'cnt', 3));
+
 if ~isempty(ch_cluster)
    pcd.L = data(:, ch_cluster);
    pcd.k = max(pcd.L)+1;
@@ -132,4 +134,6 @@ if ~isempty(ch_m)
    tmp_cov2 = data(:, ch_cov(7:12));
    pcd.C1 = tmp_cov1(:, [1, 2, 3, 2, 4, 5, 3, 5, 6]); % This is awful...
    pcd.C2 = tmp_cov2(:, [1, 2, 3, 2, 4, 5, 3, 5, 6]); % This is awful...
+   pcd.CNT1 = data(:, ch_cnt(1));
+   pcd.CNT2 = data(:, ch_cnt(2));
 end
