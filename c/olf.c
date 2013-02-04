@@ -22,6 +22,7 @@ double mps_normal_dists_[100000];
 double normal_score_;
 double fpfh_score_;
 double lab_scores_[3];
+double labdist_score_;
 double vis_score_;
 int **occ_edge_pixels_ = NULL;
 int num_occ_edge_points_;
@@ -317,6 +318,10 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_ved1 = pcd_channel(pcd, "ved1");
   int ch_ved66 = pcd_channel(pcd, "ved66");
 
+  //TODO: clean up these column names
+  int ch_labdist1 = pcd_channel(pcd, "ml1");
+  int ch_labdist20 = pcd_channel(pcd, "cnt2");
+
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
     safe_malloc(pcd->clusters, num_points, int);
@@ -396,6 +401,13 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     }
   }
   */
+  if (ch_labdist1>=0 && ch_labdist20>=0) {
+    pcd->labdist_length = 20;
+    pcd->labdist = new_matrix2(num_points, pcd->labdist_length);
+    for (i = 0; i < num_points; i++)
+      for (j = 0; j < pcd->labdist_length; j++)
+	pcd->labdist[i][j] = pcd->data[ch_labdist1 + j][i];
+  }
 
   // data pointers
   if (ch_pc1>=0 && ch_pc2>=0) {
@@ -455,6 +467,8 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free_matrix2(pcd->ved);
   //if (pcd->sdw)
   //  free_matrix2(pcd->sdw);
+  if (pcd->labdist)
+    free_matrix2(pcd->labdist);
   if (pcd->clusters)
     free(pcd->clusters);
 
@@ -523,7 +537,7 @@ pcd_t *load_pcd(char *f_pcd)
       }
       else if (!wordcmp(s, "DATA", " \t\n")) {
 	s = sword(s, " \t", 1);
-	if (wordcmp(s, "ascii", " \t\n")) {  // NOTE(sanja): should this be !wordcmp?
+	if (wordcmp(s, "ascii", " \t\n")) {
 	  fprintf(stderr, "Error: only ascii pcd files are supported.\n");
 	  pcd_free(pcd);
 	  free(pcd);
@@ -675,6 +689,64 @@ void free_multiview_pcd(multiview_pcd_t *mvp)
   free(mvp);
 }
 
+pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
+{
+  pcd_color_model_t *C;
+  safe_calloc(C, 1, pcd_color_model_t);
+
+  C->means[0] = new_matrix2(pcd->num_points, 3);
+  C->means[1] = new_matrix2(pcd->num_points, 3);
+  C->covs[0] = new_matrix3(pcd->num_points, 3, 3);
+  C->covs[1] = new_matrix3(pcd->num_points, 3, 3);
+  safe_calloc(C->cnts[0], pcd->num_points, int);
+  safe_calloc(C->cnts[1], pcd->num_points, int);
+  C->num_points = pcd->num_points;
+  C->avg_cov = new_matrix2(3,3);
+
+  int i;
+  for (i = 0; i < pcd->num_points; i++) {
+    double *labdist = pcd->labdist[i];
+    double m1[3] = {labdist[0], labdist[1], labdist[2]};
+    double m2[3] = {labdist[3], labdist[4], labdist[5]};
+    double C1_data[9] = {labdist[6], labdist[7], labdist[8], labdist[7], labdist[9], labdist[10], labdist[8], labdist[10], labdist[11]};
+    double C2_data[9] = {labdist[12], labdist[13], labdist[14], labdist[13], labdist[15], labdist[16], labdist[14], labdist[16], labdist[17]};
+    memcpy(C->means[0][i], m1, 3*sizeof(double));
+    memcpy(C->means[1][i], m2, 3*sizeof(double));
+    memcpy(C->covs[0][i][0], C1_data, 9*sizeof(double));
+    memcpy(C->covs[1][i][0], C2_data, 9*sizeof(double));
+    C->cnts[0][i] = labdist[18];
+    C->cnts[1][i] = labdist[19];
+
+    add(C->avg_cov[0], C->avg_cov[0], C1_data, 9);
+  }
+  mult(C->avg_cov[0], C->avg_cov[0], 1/(double)pcd->num_points, 9);
+
+  // add in avg_cov prior
+  for (i = 0; i < pcd->num_points; i++) {
+    double w0 = 5;  // prior weight
+    double w1 = C->cnts[0][i];
+    double w2 = C->cnts[1][i];
+    int j;
+    for (j = 0; j < 9; j++) {
+      C->covs[0][i][0][j] = (w1*C->covs[0][i][0][j] + w0*C->avg_cov[0][j]) / (w1+w0);
+      C->covs[1][i][0][j] = (w2*C->covs[1][i][0][j] + w0*C->avg_cov[0][j]) / (w2+w0);
+    }
+  }
+
+  return C;
+}
+
+void free_pcd_color_model(pcd_color_model_t *C)
+{
+  free_matrix2(C->means[0]);
+  free_matrix2(C->means[1]);
+  free_matrix3(C->covs[0]);
+  free_matrix3(C->covs[1]);
+  free(C->cnts[0]);
+  free(C->cnts[1]);
+  free_matrix2(C->avg_cov);
+  free(C);
+}
 
 
 
@@ -1205,6 +1277,13 @@ double **get_sub_cloud_lab(pcd_t *pcd, int *idx, int n)
   return lab;
 }
 
+double **get_sub_cloud_labdist(pcd_t *pcd, int *idx, int n)
+{
+  double **labdist = new_matrix2(n, pcd->labdist_length);
+  reorder_rows(labdist, pcd->labdist, idx, n, pcd->labdist_length);
+  return labdist;
+}
+
 double **get_xyzn_features(double **points, double **normals, int n, scope_params_t *params)
 {
   int i, j;
@@ -1439,6 +1518,7 @@ scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *par
   data->pcd_model = model->obj_pcd;
   data->fpfh_model = model->fpfh_pcd;
   data->sift_model = model->sift_pcd;
+  data->color_model = get_pcd_color_model(model->obj_pcd);
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
 
   // compute model feature saliency (for fpfh correspondences)
@@ -1518,6 +1598,7 @@ scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
 
 void free_scope_model_data(scope_model_data_t *data)
 {
+  free_pcd_color_model(data->color_model);
   free_multiview_pcd(data->range_edges_model);
   free(data->fpfh_model_pmf);
   free(data->fpfh_model_cmf);
@@ -1983,6 +2064,94 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
 */
 
 
+//double labdist_likelihood(double *labdist, double *lab, double pmin)
+double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, double pmin)
+{
+  /*
+  double m1[3] = {labdist[0], labdist[1], labdist[2]};
+  double m2[3] = {labdist[3], labdist[4], labdist[5]};
+  double C1_data[9] = {labdist[6], labdist[7], labdist[8], labdist[7], labdist[9], labdist[10], labdist[8], labdist[10], labdist[11]};
+  double C2_data[9] = {labdist[12], labdist[13], labdist[14], labdist[13], labdist[15], labdist[16], labdist[14], labdist[16], labdist[17]};
+  double **C1 = new_matrix2_data(3, 3, C1_data);
+  double **C2 = new_matrix2_data(3, 3, C2_data);
+  double cnt1 = (labdist[18] < 4 ? 0 : labdist[18]);
+  double cnt2 = (labdist[19] < 4 ? 0 : labdist[19]);
+  */
+  int cnt1 = color_model->cnts[0][idx];
+  int cnt2 = color_model->cnts[1][idx];
+  if (cnt1 < 4)
+    cnt1 = 0;
+  if (cnt2 < 4)
+    cnt2 = 0;
+
+  if (cnt1 == 0 && cnt2 == 0) {
+    double z[3] = {0,0,0};
+    return log(pmin * mvnpdf(z, z, color_model->avg_cov, 3));
+  }
+
+  double w1 = cnt1 / (double)(cnt1+cnt2);
+  double w2 = cnt2 / (double)(cnt1+cnt2);
+
+  double *m1 = color_model->means[0][idx];
+  double *m2 = color_model->means[1][idx];
+  double **C1 = color_model->covs[0][idx];
+  double **C2 = color_model->covs[1][idx];
+
+  double *maxm = (w1 > w2 ? m1 : m2);
+  double maxp = (w1 > 0 ? w1*mvnpdf(maxm, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(maxm, m2, C2, 3) : 0);
+
+  double p = (w1 > 0 ? w1*mvnpdf(lab, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(lab, m2, C2, 3) : 0);
+  p = MAX(p, maxp*pmin);
+
+  if (!isfinite(p)) {
+    printf("p = %f, cnt1 = %d, cnt2 = %d, idx = %d\n", p, cnt1, cnt2, idx); //dbug
+    printf("det(C1) = %f, det(C2) = %f\n", det(C1,3), det(C2,3));
+
+    printf("C1 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C1[0][0], C1[0][1], C1[0][2], C1[0][3], C1[0][4], C1[0][5], C1[0][6], C1[0][7], C1[0][8]);
+    printf("C2 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C2[0][0], C2[0][1], C2[0][2], C2[0][3], C2[0][4], C2[0][5], C2[0][6], C2[0][7], C2[0][8]);
+  }
+
+  return log(p);
+}
+
+//double compute_labdist_score(double **cloud, double **labdist, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
+double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
+			     range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
+{
+  //TODO: make this a param
+  double pmin = .1;
+
+  double zero[3] = {0,0,0};
+  double score = 0.0;
+  int i;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      int xi,yi;
+      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
+
+      int obs_idx = obs_range_image->idx[xi][yi];
+      double *obs_lab = (obs_idx >= 0 ? pcd_obs->lab[obs_idx] : zero);
+      //double logp = labdist_likelihood(labdist[i], obs_lab, pmin);
+      double logp = labdist_likelihood(color_model, idx[i], obs_lab, pmin);
+      score += vis_pmf[i] * logp;
+    }
+  }
+
+  //dbug
+  if (params->verbose)
+    labdist_score_ = score;
+
+  double w = 0;
+  if (score_round == 2)
+    w = params->score2_labdist_weight;
+  else
+    w = params->score3_labdist_weight;
+
+  return w * score;
+}
+
+
+
 double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
 {
   double scores[3] = {0, 0, 0};
@@ -2003,7 +2172,7 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
       }
 
       int obs_idx = obs_range_image->idx[xi][yi];
-      if (obs_idx > 0) {
+      if (obs_idx >= 0) {
 	double *obs_lab = pcd_obs->lab[obs_idx];
 	sub(dlab, lab[i], obs_lab, 3);
 	//dlab[0] = L_weight * (lab[i][0] - obs_lab[0]) / noise_models[i].lab_sigma[0];
@@ -2369,7 +2538,9 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double **cloud_normals = get_sub_cloud_normals_rotated(model_data->pcd_model, idx, num_validation_points, sample->q);
   //double **cloud_sdw = get_sub_cloud_sdw(model_data->pcd_model, idx, num_validation_points, params);
   double **cloud_lab = get_sub_cloud_lab(model_data->pcd_model, idx, num_validation_points);
+  //double **cloud_labdist = get_sub_cloud_labdist(model_data->pcd_model, idx, num_validation_points);
   //double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
+
 
   //printf("break 2, %.2f ms\n", get_time_ms() - t0);  //dbug
   //t0 = get_time_ms();
@@ -2405,6 +2576,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double xyz_score = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
   double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
   double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
+  //double labdist_score = compute_labdist_score(cloud, cloud_labdist, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
+  double labdist_score = compute_labdist_score(cloud, model_data->color_model, idx, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
 
   // get fpfh score (TODO: add fpfh features to occ_model)
@@ -2456,7 +2629,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
 					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score + fpfh_score;
+  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score + fpfh_score + labdist_score;
 
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
@@ -2471,9 +2644,9 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   
   if (params->verbose) {
-    double scores[11] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_};
+    double scores[12] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, labdist_score_};
     if (sample->scores == NULL) {
-      sample->num_scores = 11;
+      sample->num_scores = 12;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));
@@ -2485,6 +2658,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   free_matrix2(cloud_normals);
   //free_matrix2(cloud_sdw);
   free_matrix2(cloud_lab);
+  //free_matrix2(cloud_labdist);
   //free_matrix2(cloud_xyzn);
   free(noise_models);
   free_matrix2(fpfh_cloud);

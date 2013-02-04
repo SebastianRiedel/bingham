@@ -1209,8 +1209,26 @@ void mvnrand(double *x, double *mu, double **S, int d)
   free_matrix2(V);
 }
 
+double mvnpdf(double *x, double *mu, double **S, int d)
+{
+  double **S_inv = new_matrix2(d,d);
+  inv(S_inv, S, d);
+  
+  double dx[d];
+  sub(dx, x, mu, d);
+  double S_inv_dx[d];
+  matrix_vec_mult(S_inv_dx, S_inv, dx, d, d);
+  double dm = dot(dx, S_inv_dx, d);
 
-// compute a multivariate normal pdf
+  double p = exp(-.5*dm) / sqrt(pow(2*M_PI, d) * det(S,d));
+
+  free_matrix2(S_inv);
+
+  return p;
+
+}
+
+/* compute a multivariate normal pdf
 double mvnpdf(double *x, double *mu, double **S, int d)
 {
   double z[d], **V = new_matrix2(d,d);
@@ -1219,12 +1237,15 @@ double mvnpdf(double *x, double *mu, double **S, int d)
   for (i = 0; i < d; i++)
     z[i] = sqrt(z[i]);
 
+  printf("S = [%f %f %f; %f %f %f; %f %f %f]\n", S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2]); //dbug
+  printf("z = [%f, %f, %f]\n", z[0], z[1], z[2]); //dbug
+
   double p = mvnpdf_pcs(x,mu,z,V,d);
 
   free_matrix2(V);
   return p;
 }
-
+*/
 
 // sample from a multivariate normal in principal components form
 void mvnrand_pcs(double *x, double *mu, double *z, double **V, int d)
