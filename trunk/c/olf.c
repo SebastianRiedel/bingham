@@ -2114,6 +2114,103 @@ double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, 
   return log(p);
 }
 
+void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx, int n, double **obs_lab, double *obs_weights, double pmin, scope_params_t *params)
+{
+  //TODO: make these params
+  double lambda = 1.0;
+  double shift_threshold = 0.1;
+
+  double **C_inv = new_matrix2(3,3);
+  double **B = new_matrix2(3,3);
+  inv(B, color_model->avg_cov, 3);
+  double **A = new_matrix2(3,3);
+  double z[3];  // m-bar
+  double w;
+
+  memset(shift, 0, 3*sizeof(double));
+
+  int i, j, iter, max_iter = 10;
+  for (iter = 0; iter < max_iter; iter++) {
+
+    // reset shift statistics
+    memset(A[0], 0, 9*sizeof(double));
+    memset(z, 0, 3*sizeof(double));
+    w = 0;
+
+    for (i = 0; i < n; i++) {
+
+      if (obs_weights[i] == 0.0)
+	continue;
+
+      int cnt1 = color_model->cnts[0][idx[i]];
+      int cnt2 = color_model->cnts[1][idx[i]];
+      if (cnt1 < 4)
+	cnt1 = 0;
+      if (cnt2 < 4)
+	cnt2 = 0;
+      if (cnt1 == 0 && cnt2 == 0)
+	continue;
+
+      double *m1 = color_model->means[0][idx[i]];
+      double *m2 = color_model->means[1][idx[i]];
+      double **C1 = color_model->covs[0][idx[i]];
+      double **C2 = color_model->covs[1][idx[i]];
+
+      // assign observed color to a cluster
+      double y[3];  // current obs_lab[i]
+      add(y, obs_lab[i], shift, 3);
+      double p1 = (cnt1 > 0 ? mvnpdf(y, m1, C1, 3) : 0);
+      double p2 = (cnt2 > 0 ? mvnpdf(y, m2, C2, 3) : 0);
+      
+      // check if assigned cluster could be a specularity cluster (i.e., has higher L-value)
+      if ((p1 > p2 && p2 > 0 && m1[0] > m2[0]) || (p2 > p1 && p1 > 0 && m2[0] > m1[0]))
+	continue;
+
+      double *m = (p1 > p2 ? m1 : m2);
+      double **C = (p1 > p2 ? C1 : C2);
+
+      double maxp = mvnpdf(m, m, C, 3);
+      double p = mvnpdf(y, m, C, 3);
+
+      // check if point is an outlier of the cluster
+      if (p < pmin*maxp)
+	continue;
+
+      // add observed color and color model covariance matrix to the shift statistics
+      for (j = 0; j < 3; j++)
+	z[j] = z[j] + obs_weights[i]*(m[j] - obs_lab[i][j]);
+      inv(C_inv, C, 3);
+      for (j = 0; j < 9; j++)
+	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
+      w += obs_weights[i];
+    }
+
+    mult(z, z, 1/w, 3);  // avg. z
+    mult(A[0], A[0], lambda/w, 9);  // avg. A and multiply by lambda
+
+    // solve for best shift = inv(lambda*A+B)*lambda*A*z
+    double new_shift[3];
+    matrix_vec_mult(z, A, z, 3, 3);
+    add(A[0], A[0], B[0], 9);
+    inv(C_inv, A, 3);
+    matrix_vec_mult(new_shift, C_inv, z, 3, 3);
+    double d2 = dist2(shift, new_shift, 3);
+    memcpy(shift, new_shift, 3*sizeof(double));
+
+    if (d2 < shift_threshold*shift_threshold)
+      break;
+  }
+
+  // apply shift to obs_lab
+  for (i = 0; i < n; i++)
+    if (obs_weights[i] > 0.0)
+      add(obs_lab[i], obs_lab[i], shift, 3);
+
+  free_matrix2(A);
+  free_matrix2(B);
+  free_matrix2(C_inv);
+}
+
 //double compute_labdist_score(double **cloud, double **labdist, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
 double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
 			     range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
@@ -2121,8 +2218,10 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
   //TODO: make this a param
   double pmin = .1;
 
-  double zero[3] = {0,0,0};
-  double score = 0.0;
+  // get obs colors
+  double **obs_lab = new_matrix2(n,3);
+  double obs_weights[n];
+  memset(obs_weights, 0, n*sizeof(double));
   int i;
   for (i = 0; i < n; i++) {
     if (vis_pmf[i] > .01/(double)n) {
@@ -2130,9 +2229,39 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
       range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
 
       int obs_idx = obs_range_image->idx[xi][yi];
-      double *obs_lab = (obs_idx >= 0 ? pcd_obs->lab[obs_idx] : zero);
-      //double logp = labdist_likelihood(labdist[i], obs_lab, pmin);
-      double logp = labdist_likelihood(color_model, idx[i], obs_lab, pmin);
+      if (obs_idx >= 0) {
+	memcpy(obs_lab[i], pcd_obs->lab[obs_idx], 3*sizeof(double));
+	obs_weights[i] = vis_pmf[i];
+      }
+    }
+  }
+
+  // get color shift (and apply it to obs_lab)
+  double color_shift[3];
+  labdist_color_shift(color_shift, color_model, idx, n, obs_lab, obs_weights, pmin, params);
+
+  //dbug
+  if (params->verbose) {
+    printf("color_shift = [%f, %f, %f]\n", color_shift[0], color_shift[1], color_shift[2]);
+    printf("idx = [");
+    for (i = 0; i < n; i++)
+      printf("%d ", idx[i]+1);
+    printf("];\n");
+    printf("obs_weights = [");
+    for (i = 0; i < n; i++)
+      printf("%f ", obs_weights[i]);
+    printf("];\n");
+    printf("obs_lab = [");
+    for (i = 0; i < n; i++)
+      printf("%f,%f,%f; ...\n", obs_lab[i][0], obs_lab[i][1], obs_lab[i][2]);
+    printf("];\n");
+  }
+
+  double zero[3] = {0,0,0};
+  double score = 0.0;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin);
       score += vis_pmf[i] * logp;
     }
   }
@@ -2146,6 +2275,8 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
     w = params->score2_labdist_weight;
   else
     w = params->score3_labdist_weight;
+
+  free_matrix2(obs_lab);
 
   return w * score;
 }
@@ -4114,14 +4245,15 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   scope_round2(S, model_data, obs_data, params);
 
   //dbug: add true pose
-  //if (have_true_pose_) {
-  //  memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
-  //  memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
-  //}
+  if (have_true_pose_) {
+    memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
+    memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
+  }
+  S->num_samples = 1;
 
   //dbug
   params->verbose = 1;
-  params->num_validation_points = 0;
+  //params->num_validation_points = 0;
   for (i = 0; i < S->num_samples; i++)
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
   sort_pose_samples(S);
