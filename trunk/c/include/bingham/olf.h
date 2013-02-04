@@ -38,6 +38,7 @@ extern "C" {
     double **sift;
     double **ved;
     //double **sdw;
+    double **labdist;
 
     // computed data
     int *clusters;
@@ -49,11 +50,20 @@ extern "C" {
     int sift_length;
     int ved_length;
     //int sdw_length;
+    int labdist_length;
 
     //kdtree_t *points_kdtree;
     //pcd_balls_t *balls;
 
   } pcd_t;
+
+  typedef struct {
+    double **means[2];
+    double ***covs[2];
+    int *cnts[2];
+    int num_points;
+    double **avg_cov;
+  } pcd_color_model_t;
 
   typedef struct {
     double *x;
@@ -189,6 +199,7 @@ extern "C" {
     double score2_A_weight;
     double score2_B_weight;
     double score2_fpfh_weight;
+    double score2_labdist_weight;
 
     // SCORE3 PARAMS
     double score3_xyz_weight;
@@ -202,6 +213,7 @@ extern "C" {
     double score3_A_weight;
     double score3_B_weight;
     double score3_fpfh_weight;
+    double score3_labdist_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
@@ -228,6 +240,7 @@ extern "C" {
     pcd_t *pcd_model;
     pcd_t *fpfh_model;
     pcd_t *sift_model;
+    pcd_color_model_t *color_model;
     multiview_pcd_t *range_edges_model;
     double *fpfh_model_pmf;
     double *fpfh_model_cmf;
