@@ -31,6 +31,7 @@ ch_surfwidth = find(strcmp(columns, 'surfwidth'));
 
 ch_m = find(strncmp(columns, 'm', 1));
 ch_cov = find(strncmp(columns, 'cov', 3));
+ch_cnt = find(strncmp(columns, 'cnt', 3));
 
 if ~isempty(ch_cluster)
    data(:, ch_cluster) = pcd.L;
@@ -110,4 +111,6 @@ if ~isempty(ch_m)
    data(:, ch_m(4:6)) = pcd.M2;   
    data(:, ch_cov(1:6)) = pcd.C1(:, [1, 2, 3, 5, 6, 9]);
    data(:, ch_cov(7:12)) = pcd.C2(:, [1, 2, 3, 5, 6, 9]);
+   data(:, ch_cnt(1)) = pcd.CNT1;
+   data(:, ch_cnt(2)) = pcd.CNT2;
 end
