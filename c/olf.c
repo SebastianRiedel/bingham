@@ -22,6 +22,8 @@ double mps_normal_dists_[100000];
 double normal_score_;
 double fpfh_score_;
 double lab_scores_[3];
+double mps_labdist_p_ratio_;
+double mps_labdist_p_ratios_[100000];
 double labdist_score_;
 double vis_score_;
 int **occ_edge_pixels_ = NULL;
@@ -703,7 +705,7 @@ pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
   C->num_points = pcd->num_points;
   C->avg_cov = new_matrix2(3,3);
 
-  int i;
+  int i,j;
   for (i = 0; i < pcd->num_points; i++) {
     double *labdist = pcd->labdist[i];
     double m1[3] = {labdist[0], labdist[1], labdist[2]};
@@ -726,12 +728,30 @@ pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
     double w0 = 5;  // prior weight
     double w1 = C->cnts[0][i];
     double w2 = C->cnts[1][i];
-    int j;
     for (j = 0; j < 9; j++) {
       C->covs[0][i][0][j] = (w1*C->covs[0][i][0][j] + w0*C->avg_cov[0][j]) / (w1+w0);
       C->covs[1][i][0][j] = (w2*C->covs[1][i][0][j] + w0*C->avg_cov[0][j]) / (w2+w0);
     }
   }
+
+  //dbug: increase covariances
+  mult(C->covs[0][0][0], C->covs[0][0][0], 4, 9*pcd->num_points);
+  mult(C->covs[1][0][0], C->covs[1][0][0], 4, 9*pcd->num_points);
+  mult(C->avg_cov[0], C->avg_cov[0], 4, 9);
+  for (i = 0; i < pcd->num_points; i++) {
+    for (j = 0; j < 2; j++) {
+      C->covs[j][i][0][0] *= 100;
+      C->covs[j][i][0][1] *= 10;
+      C->covs[j][i][0][2] *= 10;
+      C->covs[j][i][1][0] *= 10;
+      C->covs[j][i][2][0] *= 10;
+    }
+  }
+  C->avg_cov[0][0] *= 100;
+  C->avg_cov[0][1] *= 10;
+  C->avg_cov[0][2] *= 10;
+  C->avg_cov[1][0] *= 10;
+  C->avg_cov[2][0] *= 10;
 
   return C;
 }
@@ -1665,6 +1685,7 @@ void free_olf(olf_t *olf)
 
 void scope_sample_alloc(scope_sample_t *sample, int nc)
 {
+  memset(sample, 0, sizeof(scope_sample_t));
   safe_calloc(sample->c_obs, nc, int);
   safe_calloc(sample->c_model, nc, int);
   safe_calloc(sample->c_type, nc, int);
@@ -1703,6 +1724,15 @@ void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
   for (j = 0; j < s1->nc; j++) {
     copy_olf(&s2->obs_olfs[j], &s1->obs_olfs[j]);
     copy_olf(&s2->model_olfs[j], &s1->model_olfs[j]);
+  }
+
+  //dbug
+  if (s1->scores) {
+    memcpy(s2->scores, s1->scores, s1->num_scores * sizeof(double));
+    s2->num_scores = s1->num_scores;
+    memcpy(s2->vis_probs, s1->vis_probs, s1->num_validation_points * sizeof(double));
+    memcpy(s2->labdist_p_ratios, s1->labdist_p_ratios, s1->num_validation_points * sizeof(double));
+    s2->num_validation_points = s1->num_validation_points;
   }
 }
 
@@ -2065,7 +2095,7 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
 
 
 //double labdist_likelihood(double *labdist, double *lab, double pmin)
-double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, double pmin)
+double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, double pmin, scope_params_t *params)
 {
   /*
   double m1[3] = {labdist[0], labdist[1], labdist[2]};
@@ -2103,6 +2133,19 @@ double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, 
   double p = (w1 > 0 ? w1*mvnpdf(lab, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(lab, m2, C2, 3) : 0);
   p = MAX(p, maxp*pmin);
 
+  //dbug
+  if (params->verbose)
+    mps_labdist_p_ratio_ = p / maxp;
+
+  /*dbug
+  if (params->verbose) {
+    double p1 = (cnt1 > 0 ? mvnpdf(lab, m1, C1, 3) : 0);
+    double p2 = (cnt2 > 0 ? mvnpdf(lab, m2, C2, 3) : 0);
+    double *m = (p1 > p2 ? m1 : m2);
+    printf("%f,%f,%f; ...\n", m[0], m[1], m[2]);
+  }
+  */
+
   if (!isfinite(p)) {
     printf("p = %f, cnt1 = %d, cnt2 = %d, idx = %d\n", p, cnt1, cnt2, idx); //dbug
     printf("det(C1) = %f, det(C2) = %f\n", det(C1,3), det(C2,3));
@@ -2113,6 +2156,7 @@ double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, 
 
   return log(p);
 }
+
 
 void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx, int n, double **obs_lab, double *obs_weights, double pmin, scope_params_t *params)
 {
@@ -2197,6 +2241,8 @@ void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx
     double d2 = dist2(shift, new_shift, 3);
     memcpy(shift, new_shift, 3*sizeof(double));
 
+    //printf("shift = [%f, %f, %f]\n", shift[0], shift[1], shift[2]);  //dbug
+
     if (d2 < shift_threshold*shift_threshold)
       break;
   }
@@ -2240,7 +2286,7 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
   double color_shift[3];
   labdist_color_shift(color_shift, color_model, idx, n, obs_lab, obs_weights, pmin, params);
 
-  //dbug
+  /*dbug
   if (params->verbose) {
     printf("color_shift = [%f, %f, %f]\n", color_shift[0], color_shift[1], color_shift[2]);
     printf("idx = [");
@@ -2256,15 +2302,55 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
       printf("%f,%f,%f; ...\n", obs_lab[i][0], obs_lab[i][1], obs_lab[i][2]);
     printf("];\n");
   }
+  */
+  /*  
+  if (params->verbose) {
+    
+    printf("avg_cov = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", color_model->avg_cov[0][0], color_model->avg_cov[0][1], color_model->avg_cov[0][2],
+	   color_model->avg_cov[0][3], color_model->avg_cov[0][4], color_model->avg_cov[0][5], color_model->avg_cov[0][6], color_model->avg_cov[0][7], color_model->avg_cov[0][8]);
 
+    printf("\n obs_weights = [");
+    for (i = 0; i < n; i++)
+      printf("%f ", obs_weights[i]);
+    printf("];\n");
+    printf("\n obs_lab = [");
+    for (i = 0; i < n; i++)
+      printf("%f,%f,%f; ...\n", obs_lab[i][0], obs_lab[i][1], obs_lab[i][2]);
+    printf("];\n");
+    printf("\n model_lab = [");
+  }
+  */
+
+  if (params->verbose) {
+    memset(mps_labdist_p_ratios_, 0, n*sizeof(double));
+  }
+
+
+  double logp_list[n];  memset(logp_list, 0, n*sizeof(double));  //dbug
   double zero[3] = {0,0,0};
   double score = 0.0;
   for (i = 0; i < n; i++) {
     if (vis_pmf[i] > .01/(double)n) {
-      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin);
+      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin, params);
       score += vis_pmf[i] * logp;
+      logp_list[i] = logp; //dbug
+
+      if (params->verbose)
+	mps_labdist_p_ratios_[i] = mps_labdist_p_ratio_;
     }
+    //else  //dbug
+    //  printf("0,0,0; ...\n");
   }
+
+  /*
+  if (params->verbose) {
+    printf("];\n");
+    printf("\n logp_list = [");
+    for (i = 0; i < n; i++)
+      printf("%f,", logp_list[i]);
+    printf("];\n");
+  }
+  */
 
   //dbug
   if (params->verbose)
@@ -2708,8 +2794,22 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
   double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
   //double labdist_score = compute_labdist_score(cloud, cloud_labdist, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
-  double labdist_score = compute_labdist_score(cloud, model_data->color_model, idx, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
+
+  double labdist_score = 0;
+  if (round > 2)
+    labdist_score = compute_labdist_score(cloud, model_data->color_model, idx, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
+
+  //dbug
+  if (params->verbose) {
+    if (sample->num_validation_points < num_validation_points) {
+      safe_realloc(sample->vis_probs, num_validation_points, double);
+      safe_realloc(sample->labdist_p_ratios, num_validation_points, double);
+    }
+    memcpy(sample->vis_probs, vis_prob, num_validation_points*sizeof(double));
+    memcpy(sample->labdist_p_ratios, mps_labdist_p_ratios_, num_validation_points*sizeof(double));
+    sample->num_validation_points = num_validation_points;
+  }
 
   // get fpfh score (TODO: add fpfh features to occ_model)
   int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
@@ -4244,16 +4344,17 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   // step 2: align with BPA
   scope_round2(S, model_data, obs_data, params);
 
-  //dbug: add true pose
+  /*dbug: add true pose
   if (have_true_pose_) {
     memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
   }
   S->num_samples = 1;
+  */
 
   //dbug
   params->verbose = 1;
-  //params->num_validation_points = 0;
+  params->num_validation_points = 0;
   for (i = 0; i < S->num_samples; i++)
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
   sort_pose_samples(S);

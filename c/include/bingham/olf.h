@@ -290,6 +290,9 @@ extern "C" {
     //dbug
     double *scores;
     int num_scores;
+    double *vis_probs;
+    double *labdist_p_ratios;
+    int num_validation_points;
   } scope_sample_t;
 
   typedef struct {
