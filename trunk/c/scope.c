@@ -306,6 +306,21 @@ int main(int argc, char *argv[])
     fprintf(f, "%d ", S->samples[i].nc);
   fprintf(f, "];\n");
   
+  fprintf(f, "vis_probs = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < model.obj_pcd->num_points; j++)
+      fprintf(f, "%f ", S->samples[i].vis_probs[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
+  fprintf(f, "labdist_p_ratios = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < model.obj_pcd->num_points; j++)
+      fprintf(f, "%f ", S->samples[i].labdist_p_ratios[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
 
   /***************************************************
 
