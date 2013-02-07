@@ -290,7 +290,7 @@ extern "C" {
   } scope_samples_t;
 
 
-  typdef struct {
+  typedef struct {
     int *model_ids;
     scope_sample_t *objects;
     int num_objects;
