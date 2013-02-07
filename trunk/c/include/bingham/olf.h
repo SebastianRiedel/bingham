@@ -57,6 +57,7 @@ extern "C" {
 
   } pcd_t;
 
+
   typedef struct {
     double **means[2];
     double ***covs[2];
@@ -65,11 +66,13 @@ extern "C" {
     double **avg_cov;
   } pcd_color_model_t;
 
+
   typedef struct {
     double *x;
     double *q;
     bingham_t *B;
   } olf_t;
+
 
   // range image
   typedef struct {
@@ -94,29 +97,6 @@ extern "C" {
     int *view_cnt;   // view_cnt[i] = number of pcd points with views[i] as their viewpoint
   } multiview_pcd_t;
 
-  /*
-  typedef struct {
-    double **X;
-    double **Q;
-    double *W;
-    int n;
-
-    //dbug
-    int **C_obs;
-    int **C_model;
-    double **vis_probs;
-    double **xyz_dists;
-    double **normal_dists;
-    int **range_edge_pixels;
-    double **range_edge_vis_prob;
-    int *num_range_edge_points;
-    int **occ_edge_pixels;
-    int *num_occ_edge_points;
-    double **scores;
-    int num_scores;
-
-  } olf_pose_samples_t;
-  */
 
   typedef struct {
     double X[3];
@@ -143,6 +123,7 @@ extern "C" {
     pcd_t *range_edges_pcd;
   } olf_model_t;
 
+
   typedef struct {
     pcd_t *fg_pcd;
     pcd_t *sift_pcd;
@@ -156,6 +137,7 @@ extern "C" {
     double normal_sigma;
     double lab_sigma[3];
   } scope_noise_model_t;
+
 
   typedef struct {  // scope_params_t
 
@@ -236,6 +218,7 @@ extern "C" {
 
   } scope_params_t;
 
+
   typedef struct {
     pcd_t *pcd_model;
     pcd_t *fpfh_model;
@@ -255,6 +238,7 @@ extern "C" {
     flann_index_t fpfh_model_xyzn_index;
   } scope_model_data_t;
 
+
   typedef struct {
     pcd_t *pcd_obs;
     pcd_t *sift_obs;
@@ -273,7 +257,9 @@ extern "C" {
     flann_index_t obs_xyzn_index;
   } scope_obs_data_t;
 
+
   enum {C_TYPE_FPFH, C_TYPE_SIFT, C_TYPE_EDGE};
+
 
   typedef struct {
     double x[3];
@@ -295,6 +281,7 @@ extern "C" {
     int num_validation_points;
   } scope_sample_t;
 
+
   typedef struct {
     scope_sample_t *samples;
     double *W;
@@ -302,7 +289,59 @@ extern "C" {
     int num_samples_allocated;
   } scope_samples_t;
 
-  scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose);
+
+  typdef struct {
+    int *model_ids;
+    scope_sample_t *objects;
+    int num_objects;
+  } mope_sample_t;
+
+  typedef struct {
+    mope_sample_t *samples;
+    double *W;
+    int num_samples;
+    int num_samples_allocated;
+  } mope_samples_t;
+  
+
+
+  scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *params);
+  scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params);
+
+  void free_scope_model_data(scope_model_data_t *data);
+  void free_scope_obs_data(scope_obs_data_t *data);
+
+  scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose);
+
+  mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params);
+
+
+
+  /*
+  typedef struct {
+    double **X;
+    double **Q;
+    double *W;
+    int n;
+
+    //dbug
+    int **C_obs;
+    int **C_model;
+    double **vis_probs;
+    double **xyz_dists;
+    double **normal_dists;
+    int **range_edge_pixels;
+    double **range_edge_vis_prob;
+    int *num_range_edge_points;
+    int **occ_edge_pixels;
+    int *num_occ_edge_points;
+    double **scores;
+    int num_scores;
+
+  } olf_pose_samples_t;
+  */
+
+
 
 
   /*  

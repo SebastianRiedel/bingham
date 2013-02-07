@@ -246,8 +246,22 @@ int main(int argc, char *argv[])
   if (argc > 10)
     have_true_pose = load_true_pose(argv[10], &true_pose);
 
-  scope_samples_t *S = scope(&model, &obs, &params, have_true_pose, (have_true_pose ? &true_pose : NULL));
+
+  // get data
+  scope_model_data_t *model_data = get_scope_model_data(model, params);
+  scope_obs_data_t *obs_data = get_scope_obs_data(obs, params);
+
+
+  scope_samples_t *S = scope(model_data, obs_data, &params, (have_true_pose ? &true_pose : NULL));
   int n = S->num_samples;
+
+
+  // cleanup
+  free_scope_model_data(model_data);
+  free_scope_obs_data(obs_data);
+  
+
+
 
   fprintf(f, "X = [");
   int i, j;

@@ -1016,6 +1016,7 @@ void range_image_find_nn(int *nn_idx, double *nn_d2, double **query_xyz, double 
   }
 }
 
+
 double **get_edge_points(pcd_t *pcd, int *num_edge_points, int **edge_idx)
 {
   int i, idx[pcd->num_points], n=0;
@@ -1587,7 +1588,7 @@ scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
 
   // get edge points
   data->obs_edge_points = get_edge_points(data->pcd_obs, &data->num_obs_edge_points, &data->obs_edge_idx);
-  data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_fg_range_image);
+  //data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_fg_range_image);
 
   // compute blurred edge feature image
   data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_fg_range_image, params);
@@ -1707,6 +1708,13 @@ void scope_sample_free(scope_sample_t *sample)
     free_olf(&sample->obs_olfs[j]);
     free_olf(&sample->model_olfs[j]);
   }
+
+  //dbug
+  if (sample->scores) {
+    free(sample->scores);
+    free(sample->vis_probs);
+    free(sample->labdist_p_ratios);
+  }
 }
 
 // assumes s2 is already allocated
@@ -1806,6 +1814,36 @@ void sort_pose_samples(scope_samples_t *S)
 }
 
 
+mope_samples_t *create_mope_samples(int num_samples)
+{
+  mope_samples_t *M;
+  safe_calloc(M, 1, mope_samples_t);
+  safe_calloc(M->samples, num_samples, mope_sample_t);
+  safe_calloc(M->W, num_samples, double);
+  M->num_samples_allocated = num_samples;
+
+  return M;
+}
+
+void mope_sample_free(mope_sample_t *sample)
+{
+  if (sample->objects) {
+    int i;
+    for (i = 0; i < sample->num_objects; i++)
+      scope_sample_free(&sample->objects[i]);
+    free(sample->objects);
+  }
+}
+
+void free_mope_samples(mope_samples_t *M)
+{
+  int i;
+  for (i = 0; i < M->num_samples_allocated; i++)
+    mope_sample_free(&M->samples[i]);
+  free(M->samples);
+  free(M->W);
+  free(M);
+}
 
 
 
@@ -4320,10 +4358,12 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
  */
-scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *params, short have_true_pose, simple_pose_t *true_pose)
+scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose)
 {
   int i;
   //const double MIN_SCORE = -100000.0;
+
+  int have_true_pose = (true_pose != NULL);
 
   //dbug
   if (have_true_pose) {
@@ -4331,10 +4371,6 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
     x_true_ = true_pose->X;
     q_true_ = true_pose->Q;
   }
-
-  // get data
-  scope_model_data_t *model_data = get_scope_model_data(model, params);
-  scope_obs_data_t *obs_data = get_scope_obs_data(obs, params);
 
   double t0 = get_time_ms();  //dbug
 
@@ -4368,18 +4404,63 @@ scope_samples_t *scope(olf_model_t *model, olf_obs_t *obs, scope_params_t *param
   //if (have_true_pose_)
   //  print_good_poses(S);
 
-  // cleanup
-  free_scope_model_data(model_data);
-  free_scope_obs_data(obs_data);
-  
   return S;
 }
 
 
 
 
+//==============================================================================================//
+
+//------------------------------------------  MOPE  --------------------------------------------//
+
+//==============================================================================================//
 
 
+
+
+
+
+
+
+/*
+ * Greedy search for multiple objects.
+ */
+mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params)
+{
+  int max_num_objects = 3;
+
+  mope_sample_t *M;
+  safe_calloc(M, 1, mope_sample_t);
+  safe_calloc(M->objects, max_num_objects, scope_sample_t);
+  safe_calloc(M->model_ids, max_num_objects, int);
+
+  int n;
+  for (n = 0; n < max_num_objects; n++) {
+
+    // add next best object hypothesis
+    M->num_objects++;
+    scope_sample_alloc(&M->objects[n], params->num_correspondences);
+    int i;
+    double wmax = -99999999;
+    for (i = 0; i < num_models; i++) {
+      scope_samples_t *S = scope(&models[i], obs, params, NULL);
+      if (S->W[0] > wmax) {
+	wmax = S->W[0];
+	scope_sample_copy(&M->objects[n], &S->samples[0]);
+	M->model_ids[n] = i;
+      }
+      free_scope_samples(S);
+    }
+
+    //TODO: remove object n from observed point cloud
+
+    //TODO: evaluate mope score
+  }
+  
+
+  return M;
+}
 
 
 
