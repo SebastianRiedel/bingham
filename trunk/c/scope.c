@@ -248,8 +248,8 @@ int main(int argc, char *argv[])
 
 
   // get data
-  scope_model_data_t *model_data = get_scope_model_data(model, params);
-  scope_obs_data_t *obs_data = get_scope_obs_data(obs, params);
+  scope_model_data_t *model_data = get_scope_model_data(&model, &params);
+  scope_obs_data_t *obs_data = get_scope_obs_data(&obs, &params);
 
 
   scope_samples_t *S = scope(model_data, obs_data, &params, (have_true_pose ? &true_pose : NULL));

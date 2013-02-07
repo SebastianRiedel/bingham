@@ -546,9 +546,11 @@ pcd_t *load_pcd(char *f_pcd)
 	  return NULL;
 	}
 
-	safe_calloc(pcd->data, pcd->num_channels, double *);
-	for (i = 0; i < pcd->num_channels; i++)
-	  safe_calloc(pcd->data[i], pcd->num_points, double);
+	//safe_calloc(pcd->data, pcd->num_channels, double *);
+	//for (i = 0; i < pcd->num_channels; i++)
+	//  safe_calloc(pcd->data[i], pcd->num_points, double);
+
+	pcd->data = new_matrix2(pcd->num_channels, pcd->num_points);
 
 	for (i = 0; i < pcd->num_points; i++) {
 	  s = sbuf;
@@ -578,6 +580,65 @@ pcd_t *load_pcd(char *f_pcd)
   return pcd;
 }
 
+void copy_pcd(pcd_t *pcd2, pcd_t *pcd)
+{
+  pcd2->num_channels = pcd->num_channels;
+  pcd2->num_points = pcd->num_points;
+
+  // copy channels
+  safe_calloc(pcd2->channels, pcd->num_channels, char *);
+  int i;
+  for (i = 0; i < pcd->num_channels; i++) {
+    int slen = strlen(pcd->channels[i]);
+    safe_calloc(pcd2->channels[i], slen+1, char);  // +1 to null-terminate the string
+    strncpy(pcd2->channels[i], pcd->channels[i], slen);
+  }
+
+  // copy data
+  pcd2->data = matrix_clone(pcd->data, pcd->num_channels, pcd->num_points);
+
+  // build data pointers
+  pcd_add_data_pointers(pcd2);  
+}
+
+pcd_t *clone_pcd(pcd_t *pcd)
+{
+  pcd_t *pcd2;
+  safe_calloc(pcd2, 1, pcd_t);
+  copy_pcd(pcd2, pcd);
+  return pcd2;
+}
+
+pcd_t *filter_pcd(pcd_t *pcd, int *idx, int n)
+{
+  pcd_t *pcd2;
+  safe_calloc(pcd2, 1, pcd_t);
+
+  pcd2->num_channels = pcd->num_channels;
+  pcd2->num_points = n;
+
+  // copy channels
+  safe_calloc(pcd2->channels, pcd->num_channels, char *);
+  int i;
+  for (i = 0; i < pcd->num_channels; i++) {
+    int slen = strlen(pcd->channels[i]);
+    safe_calloc(pcd2->channels[i], slen+1, char);  // +1 to null-terminate the string
+    strncpy(pcd2->channels[i], pcd->channels[i], slen);
+  }
+
+  // copy data
+  pcd2->data = new_matrix2(pcd->num_channels, n);
+  for (i = 0; i < pcd->num_channels; i++) {
+    int j;
+    for (j = 0; j < n; j++)
+      pcd2->data[i][j] = pcd->data[i][idx[j]];
+  }
+
+  // build data pointers
+  pcd_add_data_pointers(pcd2);  
+
+  return pcd2;
+}
 
 /*
  * frees the contents of a pcd_t, but not the pointer itself
@@ -4419,8 +4480,80 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
 
 
+int get_pcd_mope_outliers(int *idx, pcd_t *pcd, mope_sample_t *M, scope_model_data_t *models, scope_params_t *params)
+{
+  double outlier_d2_thresh = params->xyz_sigma * params->xyz_sigma;
+
+  int i, j, cnt=0;
+
+  double ***R_inv = new_matrix3(M->num_objects, 3, 3);
+  for (j = 0; j < M->num_objects; j++) {
+    double q_inv[4];
+    quaternion_inverse(q_inv, M->objects[j].q);
+    quaternion_to_rotation_matrix(R_inv[j], q_inv);
+  }
+
+  for (i = 0; i < pcd->num_points; i++) {
+
+    int outlier = 1;
+    for (j = 0; j < M->num_objects; j++) {
+
+      // transform observed point into model j coordinates
+      double p[3];
+      sub(p, pcd->points[i], M->objects[j].x, 3);
+      matrix_vec_mult(p, R_inv[j], p, 3, 3);
+
+      // compute nn-distance to model
+      int m = M->model_ids[j];
+      int nn_idx;
+      double nn_d2;
+      flann_find_nearest_neighbors_index_double(models[m].model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &models[m].model_xyz_params);
+
+      if (nn_d2 < outlier_d2_thresh) {
+	outlier = 0;
+	break;
+      }
+    }
+
+    if (outlier)
+      idx[cnt++] = i;
+  }
+
+  free_matrix3(R_inv);
+
+  return cnt;
+}
 
 
+scope_obs_data_t *remove_objects_from_obs_data(scope_obs_data_t *obs_data, mope_sample_t *M, scope_model_data_t *models, scope_params_t *params)
+{
+  int i, n, idx[obs_data->pcd_obs->num_points];
+
+  olf_obs_t obs;
+
+  // remove model inliers from fg_pcd
+  if (M->num_objects > 0) {
+    n = get_pcd_mope_outliers(idx, obs_data->pcd_obs, M, models, params);
+    obs.fg_pcd = filter_pcd(obs_data->pcd_obs, idx, n);
+  }
+  else
+    obs.fg_pcd = clone_pcd(obs_data->pcd_obs);
+
+  // remove model inliers from sift_pcd
+  if (M->num_objects > 0) {
+    n = get_pcd_mope_outliers(idx, obs_data->sift_obs, M, models, params);
+    obs.sift_pcd = filter_pcd(obs_data->sift_obs, idx, n);
+  }
+  else
+    obs.sift_pcd = clone_pcd(obs_data->sift_obs);
+
+  // copy bg_pcd
+  obs.bg_pcd = clone_pcd(obs_data->pcd_obs_bg);
+
+  scope_obs_data_t *new_obs_data = get_scope_obs_data(&obs, params);
+
+  return new_obs_data;
+}
 
 
 /*
@@ -4438,13 +4571,15 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
   int n;
   for (n = 0; n < max_num_objects; n++) {
 
+    scope_obs_data_t *new_obs = remove_objects_from_obs_data(obs, M, models, params);
+
     // add next best object hypothesis
     M->num_objects++;
     scope_sample_alloc(&M->objects[n], params->num_correspondences);
     int i;
     double wmax = -99999999;
     for (i = 0; i < num_models; i++) {
-      scope_samples_t *S = scope(&models[i], obs, params, NULL);
+      scope_samples_t *S = scope(&models[i], new_obs, params, NULL);
       if (S->W[0] > wmax) {
 	wmax = S->W[0];
 	scope_sample_copy(&M->objects[n], &S->samples[0]);
@@ -4453,11 +4588,11 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
       free_scope_samples(S);
     }
 
-    //TODO: remove object n from observed point cloud
-
     //TODO: evaluate mope score
+
+    //cleanup
+    free_scope_obs_data(new_obs);
   }
-  
 
   return M;
 }
