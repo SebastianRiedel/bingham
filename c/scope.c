@@ -125,7 +125,8 @@ olf_model_t *load_olf_models(int *n, char *models_file)
       fprintf(stderr, "Error parsing model file: %s\n", model_file);
       return NULL;
     }
-    strcbrk(
+    if (strlen(line + strspn(line, " \t\n")) > 0)
+      num_models++;
   }
 
   rewind(f);
