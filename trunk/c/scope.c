@@ -40,174 +40,104 @@ int load_true_pose(char *pose_file, simple_pose_t *true_pose) {
   return 1;
 }
 
-void load_params(scope_params_t *params, char *param_file)
+
+char *get_dirname(char *path)
 {
-  FILE *f = fopen(param_file, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Error loading param file: %s\n", param_file);
-    return;
+  // get directory name
+  char *s = strrchr(path, '/');
+  char *dirname;
+  if (s != NULL) {
+    int n = s - path;
+    safe_calloc(dirname, n+1, char);
+    if (n > 0)
+      memcpy(dirname, path, n);
+    dirname[n] = '\0';
+  }
+  else {
+    safe_calloc(dirname, 2, char);
+    sprintf(dirname, ".");
   }
 
-  char sbuf[1024];
+  return dirname;
+}
 
-  int cnt = 0;
-  while (!feof(f)) {
-    char *s = sbuf;
-    if (fgets(s, 1024, f)) {
-      cnt++;
-      
-      // remove comments
-      char *comment_pos = strchr(s, '#');
-      if (comment_pos)
-	*comment_pos = '\n';
+olf_model_t load_olf_model(char *model_file)
+{
+  char *dirname = get_dirname(model_file);
 
-      // skip leading whitespace
-      s += strspn(s, " \t");
+  FILE *f = fopen(model_file, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error loading model file: %s\n", model_file);
+    return NULL;
+  }
 
-      // skip empty lines
-      if (*s == '\n')
-	continue;
-
-      char *name = s;
-      char *value = sword(s, " \t", 1);
-
-      if (!wordcmp(name, "num_samples", " \t\n"))
-	sscanf(value, "%d", &params->num_samples);
-      else if (!wordcmp(name, "num_samples_init", " \t\n"))
-	sscanf(value, "%d", &params->num_samples_init);
-      else if (!wordcmp(name, "num_correspondences", " \t\n"))
-	sscanf(value, "%d", &params->num_correspondences);
-      else if (!wordcmp(name, "branching_factor", "\t\n"))
-	sscanf(value, "%d", &params->branching_factor);
-      else if (!wordcmp(name, "knn", " \t\n"))
-	sscanf(value, "%d", &params->knn);
-      else if (!wordcmp(name, "num_validation_points", " \t\n"))
-	sscanf(value, "%d", &params->num_validation_points);
-      else if (!wordcmp(name, "use_range_image", "\t\n"))
-	sscanf(value, "%d", &params->use_range_image);
-      else if (!wordcmp(name, "do_icp", "\t\n"))
-	sscanf(value, "%d", &params->do_icp);
-      else if (!wordcmp(name, "do_final_icp", "\t\n"))
-	sscanf(value, "%d", &params->do_final_icp);
-
-      else if (!wordcmp(name, "dispersion_weight", "\t\n"))
-	sscanf(value, "%d", &params->dispersion_weight);
-      else if (!wordcmp(name, "sift_dthresh", " \t\n"))
-	sscanf(value, "%lf", &params->sift_dthresh);
-      else if (!wordcmp(name, "xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->xyz_weight);
-      else if (!wordcmp(name, "normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->normal_weight);
-      else if (!wordcmp(name, "range_weight", " \t\n"))
-	sscanf(value, "%lf", &params->range_weight);
-      else if (!wordcmp(name, "f_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->f_sigma);
-      else if (!wordcmp(name, "xyz_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->xyz_sigma);
-      else if (!wordcmp(name, "vis_thresh", " \t\n"))
-	sscanf(value, "%lf", &params->vis_thresh);
-      else if (!wordcmp(name, "f_weight", " \t\n"))
-	sscanf(value, "%lf", &params->f_weight);
-
-      else if (!wordcmp(name, "range_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->range_sigma);
-      else if (!wordcmp(name, "normal_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->normal_sigma);
-      else if (!wordcmp(name, "lab_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->lab_sigma);
-
-      else if (!wordcmp(name, "score2_xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_xyz_weight);
-      else if (!wordcmp(name, "score2_normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_normal_weight);
-      else if (!wordcmp(name, "score2_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_vis_weight);
-      else if (!wordcmp(name, "score2_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_segment_weight);
-      else if (!wordcmp(name, "score2_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_edge_weight);
-      else if (!wordcmp(name, "score2_edge_occ_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_edge_occ_weight);
-      else if (!wordcmp(name, "score2_edge_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_edge_vis_weight);
-      else if (!wordcmp(name, "score2_L_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_L_weight);
-      else if (!wordcmp(name, "score2_A_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_A_weight);
-      else if (!wordcmp(name, "score2_B_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_B_weight);
-      else if (!wordcmp(name, "score2_fpfh_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_fpfh_weight);
-      else if (!wordcmp(name, "score2_labdist_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_labdist_weight);
-
-      else if (!wordcmp(name, "score3_xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_xyz_weight);
-      else if (!wordcmp(name, "score3_normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_normal_weight);
-      else if (!wordcmp(name, "score3_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_vis_weight);
-      else if (!wordcmp(name, "score3_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_segment_weight);
-      else if (!wordcmp(name, "score3_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_edge_weight);
-      else if (!wordcmp(name, "score3_edge_occ_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_edge_occ_weight);
-      else if (!wordcmp(name, "score3_edge_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_edge_vis_weight);
-      else if (!wordcmp(name, "score3_L_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_L_weight);
-      else if (!wordcmp(name, "score3_A_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_A_weight);
-      else if (!wordcmp(name, "score3_B_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_B_weight);
-      else if (!wordcmp(name, "score3_fpfh_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_fpfh_weight);
-      else if (!wordcmp(name, "score3_labdist_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_labdist_weight);
-
-
-      else if (!wordcmp(name, "pose_clustering", " \t\n"))
-	sscanf(value, "%d", &params->pose_clustering);
-      else if (!wordcmp(name, "x_cluster_thresh", " \t\n"))
-	sscanf(value, "%lf", &params->x_cluster_thresh);
-      else if (!wordcmp(name, "q_cluster_thresh", " \t\n"))
-	sscanf(value, "%lf", &params->q_cluster_thresh);
-
-      else if (!wordcmp(name, "range_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->range_edge_weight);
-      else if (!wordcmp(name, "curv_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->curv_edge_weight);
-      else if (!wordcmp(name, "img_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->img_edge_weight);
-      else if (!wordcmp(name, "edge_blur", " \t\n"))
-	sscanf(value, "%d", &params->edge_blur);
-
-      /*
-      else if (!wordcmp(name, "surfdist_weight", " \t\n"))
-	sscanf(value, "%lf", &params->surfdist_weight);
-      else if (!wordcmp(name, "surfwidth_weight", " \t\n"))
-	sscanf(value, "%lf", &params->surfwidth_weight);
-      else if (!wordcmp(name, "surfdist_thresh", " \t\n"))
-	sscanf(value, "%lf", &params->surfdist_thresh);
-      else if (!wordcmp(name, "surfwidth_thresh", " \t\n"))
-	sscanf(value, "%lf", &params->surfwidth_thresh);
-      else if (!wordcmp(name, "surfdist_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->surfdist_sigma);
-      else if (!wordcmp(name, "surfwidth_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->surfwidth_sigma);
-      else if (!wordcmp(name, "fsurf_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->fsurf_sigma);
-      */
-
-      else {
-	fprintf(stderr, "Error: bad parameter ''%s'' at line %d of %s\n", s, cnt, param_file);
-	exit(1);
-      }
-    }
+  char line[1024];
+  if (!fgets(line, 1024, f)) {
+    fprintf(stderr, "Error parsing model file: %s\n", model_file);
+    return NULL;
   }
   fclose(f);
+
+  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], sift_pcd[1024], range_edges_pcd[1024];
+  if (sscanf(line, "%s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, sift_pcd, range_edges_pcd) < 5) {
+    fprintf(stderr, "Error parsing model file: %s\n", model_file);
+    return NULL;
+  }
+
+  olf_model_t model;
+  safe_calloc(model.name, strlen(model_name)+1, char);
+  strcpy(model.name, model_name);
+
+  sprintf(line, "%s/%s", dirname, obj_pcd);
+  model.obj_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, fpfh_pcd);
+  model.fpfh_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, sift_pcd);
+  model.sift_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, range_edges_pcd);
+  model.range_edges_pcd = load_pcd(line);
+
+  //cleanup
+  free(dirname);
+
+  return model;
 }
+
+
+olf_model_t *load_olf_models(int *n, char *models_file)
+{
+  char *dirname = get_dirname(models_file);
+
+  FILE *f = fopen(model_files, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error loading models file: %s\n", models_file);
+    return NULL;
+  }
+
+  // get the number of non-empty lines in models_file
+  int num_models = 0;
+  char line[1024];
+  whlie (!feof(f)) {
+    if (!fgets(line, 1024, f)) {
+      fprintf(stderr, "Error parsing model file: %s\n", model_file);
+      return NULL;
+    }
+    strcbrk(
+  }
+
+  rewind(f);
+
+  fclose(f);
+
+  //cleanup
+  free(dirname);
+
+  return models;
+}
+
 
 
 int main(int argc, char *argv[])
@@ -235,7 +165,7 @@ int main(int argc, char *argv[])
 
   scope_params_t params;
   memset(&params, 0, sizeof(scope_params_t));
-  load_params(&params, argv[8]);
+  load_scope_params(&params, argv[8]);
 
   FILE *f = fopen(argv[9], "w");
   if (f == NULL) {

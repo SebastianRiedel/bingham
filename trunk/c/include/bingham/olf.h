@@ -104,19 +104,10 @@ extern "C" {
   } simple_pose_t;
 
 
-
-  pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
-  void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
-  int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
-  int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
-
-  range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
-
-
-
   // BPA (Bingham Procrustean Alignment)
 
   typedef struct {
+    char *name;
     pcd_t *obj_pcd;
     pcd_t *fpfh_pcd;
     pcd_t *sift_pcd;
@@ -305,6 +296,15 @@ extern "C" {
   
 
 
+
+  pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
+  void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
+  int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
+  int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
+
+  range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
+
+  void load_scope_params(scope_params_t *params, char *param_file);
   scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *params);
   scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params);
 
@@ -316,6 +316,15 @@ extern "C" {
   mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params);
 
 
+
+
+
+
+
+
+  //
+  // DEPRECATED
+  //
 
   /*
   typedef struct {
@@ -340,30 +349,6 @@ extern "C" {
 
   } olf_pose_samples_t;
   */
-
-
-
-
-  /*  
-  int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev, int n_model_prev, double *model_pmf, pcd_t *pcd_model);
-
-  int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, pcd_t *pcd_model, int shape_length, double **obs_fxyzn, flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params, scope_params_t *params);
-  void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int n, int *c_model, double xyz_sigma, double *x, bingham_t *B);
-  void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q);
-  void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B, double xyz_sigma, double f_sigma, double dispersion_weight, 
-			     double *logp, double logp_comp[4]);
-  int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_fxyzn, scope_params_t *params, struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index, double *x, double *q, int c2_obs, int sample_nn, int use_f);
-
-  void get_point(double p[3], pcd_t *pcd, int idx);
-  void get_normal(double p[3], pcd_t *pcd, int idx);
-  void get_shape(double p[33], pcd_t *pcd, int idx);
-  */
-
-
-
-  //
-  // DEPRECATED
-  //
 
   /* heirarchical segmentation and balls model
   typedef struct {
@@ -419,6 +404,21 @@ extern "C" {
 
   //olf_pose_samples_t *olf_pose_samples_new(int n);          // create a new olf_pose_samples_t
   //void olf_pose_samples_free(olf_pose_samples_t *poses);    // free pose samples
+
+  /*  
+  int sample_model_point_given_model_pose(double *X, double *Q, int *c_model_prev, int n_model_prev, double *model_pmf, pcd_t *pcd_model);
+
+  int sample_obs_correspondence_given_model_pose(double *X, double *Q, int model, pcd_t *pcd_model, int shape_length, double **obs_fxyzn, flann_index_t obs_xyzn_index, struct FLANNParameters *obs_xyzn_params, scope_params_t *params);
+  void get_model_pose_distribution_from_correspondences(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int n, int *c_model, double xyz_sigma, double *x, bingham_t *B);
+  void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q);
+  void model_pose_likelihood(pcd_t *pcd_obs, pcd_t *pcd_model, int *c_obs, int *c_model, int n, double *x, double *q, bingham_t *B, double xyz_sigma, double f_sigma, double dispersion_weight, 
+			     double *logp, double logp_comp[4]);
+  int sample_model_correspondence_given_model_pose(pcd_t *pcd_obs, double **model_fxyzn, scope_params_t *params, struct FLANNParameters *model_xyzn_params, flann_index_t model_xyzn_index, double *x, double *q, int c2_obs, int sample_nn, int use_f);
+
+  void get_point(double p[3], pcd_t *pcd, int idx);
+  void get_normal(double p[3], pcd_t *pcd, int idx);
+  void get_shape(double p[33], pcd_t *pcd, int idx);
+  */
 
 
 
