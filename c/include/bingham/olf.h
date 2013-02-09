@@ -304,9 +304,12 @@ extern "C" {
 
   range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
 
+  void load_olf_model(olf_model_t *model, char *model_file);
+  olf_model_t *load_olf_models(int *n, char *models_file);
+
   void load_scope_params(scope_params_t *params, char *param_file);
-  scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *params);
-  scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params);
+  void get_scope_model_data(scope_model_data_t *model_data, olf_model_t *model, scope_params_t *params);
+  void get_scope_obs_data(scope_obs_data_t *obs_data, olf_obs_t *obs, scope_params_t *params);
 
   void free_scope_model_data(scope_model_data_t *data);
   void free_scope_obs_data(scope_obs_data_t *data);

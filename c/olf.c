@@ -126,6 +126,28 @@ void print_good_poses_verbose(scope_samples_t *S, double w_sigma)
 
 //---------------------------- STATIC HELPER FUNCTIONS ---------------------------//
 
+
+char *get_dirname(char *path)
+{
+  // get directory name
+  char *s = strrchr(path, '/');
+  char *dirname;
+  if (s != NULL) {
+    int n = s - path;
+    safe_calloc(dirname, n+1, char);
+    if (n > 0)
+      memcpy(dirname, path, n);
+    dirname[n] = '\0';
+  }
+  else {
+    safe_calloc(dirname, 2, char);
+    sprintf(dirname, ".");
+  }
+
+  return dirname;
+}
+
+
 /*
  * reverse principal curvature
  */
@@ -493,6 +515,100 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 
 //---------------------------- EXTERNAL API ---------------------------//
 
+
+void load_olf_model(olf_model_t *model, char *model_file)
+{
+  printf("model_file = %s\n", model_file); //dbug
+
+  char *dirname = get_dirname(model_file);
+
+  FILE *f = fopen(model_file, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error loading model file: %s\n", model_file);
+    return;
+  }
+
+  char line[1024];
+  if (!fgets(line, 1024, f)) {
+    fprintf(stderr, "Error parsing model file: %s\n", model_file);
+    return;
+  }
+  fclose(f);
+
+  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], sift_pcd[1024], range_edges_pcd[1024];
+  if (sscanf(line, "%s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, sift_pcd, range_edges_pcd) < 5) {
+    fprintf(stderr, "Error parsing model file: %s\n", model_file);
+    return;
+  }
+
+  safe_calloc(model->name, strlen(model_name)+1, char);
+  strcpy(model->name, model_name);
+
+  sprintf(line, "%s/%s", dirname, obj_pcd);
+  model->obj_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, fpfh_pcd);
+  model->fpfh_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, sift_pcd);
+  model->sift_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, range_edges_pcd);
+  model->range_edges_pcd = load_pcd(line);
+
+  //cleanup
+  free(dirname);
+}
+
+
+olf_model_t *load_olf_models(int *n, char *models_file)
+{
+  char *dirname = get_dirname(models_file);
+
+  FILE *f = fopen(models_file, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Error loading models file: %s\n", models_file);
+    return NULL;
+  }
+
+  // get the number of non-empty lines in models_file
+  int num_models = 0;
+  char line[1024];
+  line[0] = '\0';
+  while (!feof(f)) {
+    fgets(line, 1024, f);
+    if (strlen(line + strspn(line, " \t\n")) > 0) {
+      printf("%s", line); //dbug
+      num_models++;
+    }
+  }
+  rewind(f);
+
+  // get model filenames
+  char model_files[num_models][1024];
+  int i = 0;
+  while (!feof(f)) {
+    fgets(line, 1024, f);
+    if (strlen(line + strspn(line, " \t\n")) > 0) {
+      sprintf(model_files[i], "%s/%s", dirname, line);
+      model_files[i][ strcspn(model_files[i], "\n") ] = '\0';
+      i++;
+    }
+  }
+  fclose(f);
+
+  // load models
+  olf_model_t *models;
+  safe_calloc(models, num_models, olf_model_t);
+  for (i = 0; i < num_models; i++)
+    load_olf_model(&models[i], model_files[i]);
+
+  //cleanup
+  free(dirname);
+
+  *n = num_models;
+  return models;
+}
 
 
 void load_scope_params(scope_params_t *params, char *param_file)
@@ -1761,11 +1877,8 @@ int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *
 //==============================================================================================//
 
 
-scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *params)
+void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_params_t *params)
 {
-  scope_model_data_t *data;
-  safe_calloc(data, 1, scope_model_data_t);
-
   // unpack model arguments
   data->pcd_model = model->obj_pcd;
   data->fpfh_model = model->fpfh_pcd;
@@ -1799,15 +1912,10 @@ scope_model_data_t *get_scope_model_data(olf_model_t *model, scope_params_t *par
   data->model_xyz_index = flann_build_index_double(data->pcd_model->points[0], data->pcd_model->num_points, 3, &speedup, &data->model_xyz_params);
   data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->shapes[0], data->fpfh_model->num_points, data->fpfh_model->shape_length, &speedup, &data->fpfh_model_f_params);
   data->fpfh_model_xyzn_index = flann_build_index_double(data->fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
-
-  return data;
 }
 
-scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
+void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *params)
 {
-  scope_obs_data_t *data;
-  safe_calloc(data, 1, scope_obs_data_t);
-
   // unpack obs arguments
   data->pcd_obs = obs->fg_pcd;
   data->sift_obs = obs->sift_pcd;
@@ -1844,8 +1952,6 @@ scope_obs_data_t *get_scope_obs_data(olf_obs_t *obs, scope_params_t *params)
   // build flann indices
   float speedup;
   data->obs_xyzn_index = flann_build_index_double(data->obs_xyzn[0], data->pcd_obs->num_points, 6, &speedup, &data->obs_xyzn_params);
-  
-  return data;
 }
 
 void free_scope_model_data(scope_model_data_t *data)
@@ -1860,8 +1966,6 @@ void free_scope_model_data(scope_model_data_t *data)
   flann_free_index(data->model_xyz_index, &data->model_xyz_params);
   flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
   flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
-
-  free(data);
 }
 
 void free_scope_obs_data(scope_obs_data_t *data)
@@ -1870,14 +1974,12 @@ void free_scope_obs_data(scope_obs_data_t *data)
   free_range_image(data->obs_fg_range_image);
   free(data->obs_edge_idx);
   free_matrix2(data->obs_edge_points);
-  free_matrix2(data->obs_edge_points_image);
+  //free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
   free_matrix2(data->obs_xyzn);
   free_matrix2(data->obs_bg_xyzn);
   free_matrix2(data->obs_fxyzn);
   flann_free_index(data->obs_xyzn_index, &data->obs_xyzn_params);
-
-  free(data);
 }
 
 void copy_olf(olf_t *olf2, olf_t *olf1)
@@ -1967,6 +2069,11 @@ void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
 
   //dbug
   if (s1->scores) {
+    if (s2->scores == NULL) {
+      safe_calloc(s2->scores, s1->num_scores, double);
+      safe_calloc(s2->vis_probs, s1->num_validation_points, double);
+      safe_calloc(s2->labdist_p_ratios, s1->num_validation_points, double);
+    }
     memcpy(s2->scores, s1->scores, s1->num_scores * sizeof(double));
     s2->num_scores = s1->num_scores;
     memcpy(s2->vis_probs, s1->vis_probs, s1->num_validation_points * sizeof(double));
@@ -3066,7 +3173,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
 
   double labdist_score = 0;
-  if (round > 2)
+  if (score_round > 2)
     labdist_score = compute_labdist_score(cloud, model_data->color_model, idx, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
 
   //dbug
@@ -3561,7 +3668,7 @@ int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t
   int sample_endpoint = 0;
   int num_samples = 5;
 
-  int nc = sample->nc;
+  //int nc = sample->nc;
   range_image_t *obs_fg_range_image = obs_data->obs_fg_range_image;
   double ** obs_edge_image = obs_data->obs_edge_image;
   int w = obs_fg_range_image->w;
@@ -3845,7 +3952,7 @@ int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_d
   int sample_endpoint = 1;
   int num_samples = 5;
 
-  int nc = sample->nc;
+  //int nc = sample->nc;
   range_image_t *obs_fg_range_image = obs_data->obs_fg_range_image;
   double ** obs_edge_points_image = obs_data->obs_edge_image; //obs_data->obs_edge_points_image;
   int w = obs_fg_range_image->w;
@@ -4620,10 +4727,13 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   */
 
   //dbug
+  int n = params->num_validation_points;
   params->verbose = 1;
   params->num_validation_points = 0;
   for (i = 0; i < S->num_samples; i++)
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
+  params->verbose = 0;
+  params->num_validation_points = n;
   sort_pose_samples(S);
 
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
@@ -4695,9 +4805,9 @@ int get_pcd_mope_outliers(int *idx, pcd_t *pcd, mope_sample_t *M, scope_model_da
 }
 
 
-scope_obs_data_t *remove_objects_from_obs_data(scope_obs_data_t *obs_data, mope_sample_t *M, scope_model_data_t *models, scope_params_t *params)
+void remove_objects_from_obs_data(scope_obs_data_t *new_obs_data, scope_obs_data_t *obs_data, mope_sample_t *M, scope_model_data_t *models, scope_params_t *params)
 {
-  int i, n, idx[obs_data->pcd_obs->num_points];
+  int n, idx[obs_data->pcd_obs->num_points];
 
   olf_obs_t obs;
 
@@ -4720,9 +4830,7 @@ scope_obs_data_t *remove_objects_from_obs_data(scope_obs_data_t *obs_data, mope_
   // copy bg_pcd
   obs.bg_pcd = clone_pcd(obs_data->pcd_obs_bg);
 
-  scope_obs_data_t *new_obs_data = get_scope_obs_data(&obs, params);
-
-  return new_obs_data;
+  get_scope_obs_data(new_obs_data, &obs, params);
 }
 
 
@@ -4741,7 +4849,8 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
   int n;
   for (n = 0; n < max_num_objects; n++) {
 
-    scope_obs_data_t *new_obs = remove_objects_from_obs_data(obs, M, models, params);
+    scope_obs_data_t new_obs;
+    remove_objects_from_obs_data(&new_obs, obs, M, models, params);
 
     // add next best object hypothesis
     M->num_objects++;
@@ -4749,7 +4858,7 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
     int i;
     double wmax = -99999999;
     for (i = 0; i < num_models; i++) {
-      scope_samples_t *S = scope(&models[i], new_obs, params, NULL);
+      scope_samples_t *S = scope(&models[i], &new_obs, params, NULL);
       if (S->W[0] > wmax) {
 	wmax = S->W[0];
 	scope_sample_copy(&M->objects[n], &S->samples[0]);
@@ -4761,7 +4870,7 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
     //TODO: evaluate mope score
 
     //cleanup
-    free_scope_obs_data(new_obs);
+    free_scope_obs_data(&new_obs);
   }
 
   return M;
