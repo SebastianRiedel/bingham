@@ -41,156 +41,53 @@ int load_true_pose(char *pose_file, simple_pose_t *true_pose) {
 }
 
 
-char *get_dirname(char *path)
-{
-  // get directory name
-  char *s = strrchr(path, '/');
-  char *dirname;
-  if (s != NULL) {
-    int n = s - path;
-    safe_calloc(dirname, n+1, char);
-    if (n > 0)
-      memcpy(dirname, path, n);
-    dirname[n] = '\0';
-  }
-  else {
-    safe_calloc(dirname, 2, char);
-    sprintf(dirname, ".");
-  }
-
-  return dirname;
-}
-
-olf_model_t load_olf_model(char *model_file)
-{
-  char *dirname = get_dirname(model_file);
-
-  FILE *f = fopen(model_file, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Error loading model file: %s\n", model_file);
-    return NULL;
-  }
-
-  char line[1024];
-  if (!fgets(line, 1024, f)) {
-    fprintf(stderr, "Error parsing model file: %s\n", model_file);
-    return NULL;
-  }
-  fclose(f);
-
-  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], sift_pcd[1024], range_edges_pcd[1024];
-  if (sscanf(line, "%s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, sift_pcd, range_edges_pcd) < 5) {
-    fprintf(stderr, "Error parsing model file: %s\n", model_file);
-    return NULL;
-  }
-
-  olf_model_t model;
-  safe_calloc(model.name, strlen(model_name)+1, char);
-  strcpy(model.name, model_name);
-
-  sprintf(line, "%s/%s", dirname, obj_pcd);
-  model.obj_pcd = load_pcd(line);
-
-  sprintf(line, "%s/%s", dirname, fpfh_pcd);
-  model.fpfh_pcd = load_pcd(line);
-
-  sprintf(line, "%s/%s", dirname, sift_pcd);
-  model.sift_pcd = load_pcd(line);
-
-  sprintf(line, "%s/%s", dirname, range_edges_pcd);
-  model.range_edges_pcd = load_pcd(line);
-
-  //cleanup
-  free(dirname);
-
-  return model;
-}
-
-
-olf_model_t *load_olf_models(int *n, char *models_file)
-{
-  char *dirname = get_dirname(models_file);
-
-  FILE *f = fopen(model_files, "r");
-  if (f == NULL) {
-    fprintf(stderr, "Error loading models file: %s\n", models_file);
-    return NULL;
-  }
-
-  // get the number of non-empty lines in models_file
-  int num_models = 0;
-  char line[1024];
-  whlie (!feof(f)) {
-    if (!fgets(line, 1024, f)) {
-      fprintf(stderr, "Error parsing model file: %s\n", model_file);
-      return NULL;
-    }
-    if (strlen(line + strspn(line, " \t\n")) > 0)
-      num_models++;
-  }
-
-  rewind(f);
-
-  fclose(f);
-
-  //cleanup
-  free(dirname);
-
-  return models;
-}
-
-
 
 int main(int argc, char *argv[])
 {
   short have_true_pose = 0;
   simple_pose_t true_pose;
-  if (argc < 10 || argc > 11) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_fpfh> <pcd_model_sift> <pcd_model_range_edges> <param_file> <samples_output>\n", argv[0]);
+  if (argc < 7 || argc > 8) {
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
     printf("or\n");
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_model> <pcd_model_fpfh> <pcd_model_sift> <pcd_model_range_edges> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
     return 1;
   }
 
+  // load params
+  scope_params_t params;
+  memset(&params, 0, sizeof(scope_params_t));
+  load_scope_params(&params, argv[5]);
+
+  // load obs data
   olf_obs_t obs;
-  //obs.range_image = pcd_to_range_image(load_pcd(argv[1]), 0, M_PI/1000.0);
   obs.bg_pcd = load_pcd(argv[1]);
   obs.fg_pcd = load_pcd(argv[2]);
   obs.sift_pcd = load_pcd(argv[3]);
+  scope_obs_data_t obs_data;
+  get_scope_obs_data(&obs_data, &obs, &params);
 
+  // load model data
   olf_model_t model;
-  model.obj_pcd = load_pcd(argv[4]);
-  model.fpfh_pcd = load_pcd(argv[5]);
-  model.sift_pcd = load_pcd(argv[6]);
-  model.range_edges_pcd = load_pcd(argv[7]);
+  load_olf_model(&model, argv[4]);
+  scope_model_data_t model_data;
+  get_scope_model_data(&model_data, &model, &params);
 
-  scope_params_t params;
-  memset(&params, 0, sizeof(scope_params_t));
-  load_scope_params(&params, argv[8]);
-
-  FILE *f = fopen(argv[9], "w");
+  FILE *f = fopen(argv[6], "w");
   if (f == NULL) {
-    printf("Can't open %s for writing\n", argv[9]);
+    printf("Can't open %s for writing\n", argv[6]);
     return 1;
   }
 
-  if (argc > 10)
-    have_true_pose = load_true_pose(argv[10], &true_pose);
+  if (argc > 7)
+    have_true_pose = load_true_pose(argv[7], &true_pose);
 
-
-  // get data
-  scope_model_data_t *model_data = get_scope_model_data(&model, &params);
-  scope_obs_data_t *obs_data = get_scope_obs_data(&obs, &params);
-
-
-  scope_samples_t *S = scope(model_data, obs_data, &params, (have_true_pose ? &true_pose : NULL));
+  scope_samples_t *S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL));
   int n = S->num_samples;
 
 
   // cleanup
-  free_scope_model_data(model_data);
-  free_scope_obs_data(obs_data);
-  
+  free_scope_obs_data(&obs_data);
+  free_scope_model_data(&model_data);
 
 
 
