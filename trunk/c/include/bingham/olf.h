@@ -83,9 +83,10 @@ extern "C" {
     int h;
     double **image;  // stored column-wise: image[x][y]
     int **idx;
-    double ***points;   // average point in each cell
-    double ***normals;  // average normal in each cell
-    int **cnt;          // number of points in each cell
+    double ***points;      // average point in each cell
+    double ***normals;     // average normal in each cell
+    double ***lab_colors;  // average LAB color in each cell
+    int **cnt;             // number of points in each cell
   } range_image_t;
 
 
@@ -134,8 +135,9 @@ extern "C" {
 
     // GENERAL PARAMS
     int verbose;
-    int num_samples_init;
-    int num_samples;
+    int num_samples_round1;
+    int num_samples_round2;
+    int num_samples_round3;
     int num_correspondences;
     int branching_factor;
     int num_validation_points;
@@ -193,11 +195,12 @@ extern "C" {
     double x_cluster_thresh;
     double q_cluster_thresh;
 
-    // EDGE IMAGE PARAMS
+    // IMAGE PARAMS
     double range_edge_weight;
     double curv_edge_weight;
     double img_edge_weight;
     int edge_blur;
+    int color_blur;
 
     //double surfdist_weight;
     //double surfwidth_weight;
@@ -214,6 +217,7 @@ extern "C" {
     pcd_t *pcd_model;
     pcd_t *fpfh_model;
     pcd_t *sift_model;
+    int *model_to_fpfh_map;
     pcd_color_model_t *color_model;
     multiview_pcd_t *range_edges_model;
     double *fpfh_model_pmf;
@@ -241,6 +245,7 @@ extern "C" {
     double **obs_edge_points;
     double **obs_edge_points_image;
     double **obs_edge_image;
+    double ***obs_lab_image;
     double **obs_xyzn;
     double **obs_bg_xyzn;
     double **obs_fxyzn;
@@ -263,6 +268,12 @@ extern "C" {
     int nc;
     olf_t *obs_olfs;
     olf_t *model_olfs;
+
+    // validation memory
+    int num_edge_outliers;
+    int *edge_outliers_idx;
+    int num_xyz_outliers;
+    int *xyz_outliers_idx;
 
     //dbug
     double *scores;
