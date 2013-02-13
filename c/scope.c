@@ -46,40 +46,41 @@ int main(int argc, char *argv[])
 {
   short have_true_pose = 0;
   simple_pose_t true_pose;
-  if (argc < 7 || argc > 8) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
+  if (argc < 8 || argc > 9) {
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
     printf("or\n");
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
     return 1;
   }
 
   // load params
   scope_params_t params;
   memset(&params, 0, sizeof(scope_params_t));
-  load_scope_params(&params, argv[5]);
+  load_scope_params(&params, argv[6]);
 
   // load obs data
   olf_obs_t obs;
   obs.bg_pcd = load_pcd(argv[1]);
   obs.fg_pcd = load_pcd(argv[2]);
-  obs.sift_pcd = load_pcd(argv[3]);
+  obs.shot_pcd = load_pcd(argv[3]);
+  obs.sift_pcd = load_pcd(argv[4]);
   scope_obs_data_t obs_data;
   get_scope_obs_data(&obs_data, &obs, &params);
 
   // load model data
   olf_model_t model;
-  load_olf_model(&model, argv[4]);
+  load_olf_model(&model, argv[5]);
   scope_model_data_t model_data;
   get_scope_model_data(&model_data, &model, &params);
 
-  FILE *f = fopen(argv[6], "w");
+  FILE *f = fopen(argv[7], "w");
   if (f == NULL) {
-    printf("Can't open %s for writing\n", argv[6]);
+    printf("Can't open %s for writing\n", argv[7]);
     return 1;
   }
 
-  if (argc > 7)
-    have_true_pose = load_true_pose(argv[7], &true_pose);
+  if (argc > 8)
+    have_true_pose = load_true_pose(argv[8], &true_pose);
 
   scope_samples_t *S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL));
   int n = S->num_samples;
