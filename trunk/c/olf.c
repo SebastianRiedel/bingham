@@ -331,6 +331,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_pc2 = pcd_channel(pcd, "pc2");
   int ch_f1 = pcd_channel(pcd, "f1");
   int ch_f33 = pcd_channel(pcd, "f33");
+  int ch_shot1 = pcd_channel(pcd, "shot1");
+  int ch_shot352 = pcd_channel(pcd, "shot352");
   //int ch_balls = pcd_channel(pcd, "balls");
   int ch_sift1 = pcd_channel(pcd, "sift1");
   int ch_sift128 = pcd_channel(pcd, "sift128");
@@ -395,11 +397,18 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     }
   }
   if (ch_f1>=0 && ch_f33>=0) {
-    pcd->shape_length = 33;
-    pcd->shapes = new_matrix2(num_points, pcd->shape_length);
+    pcd->fpfh_length = 33;
+    pcd->fpfh = new_matrix2(num_points, pcd->fpfh_length);
     for (i = 0; i < num_points; i++)
-      for (j = 0; j < pcd->shape_length; j++)
-	pcd->shapes[i][j] = pcd->data[ch_f1 + j][i];
+      for (j = 0; j < pcd->fpfh_length; j++)
+	pcd->fpfh[i][j] = pcd->data[ch_f1 + j][i];
+  }
+  if (ch_shot1>=0 && ch_shot352>=0) {
+    pcd->shot_length = 352;
+    pcd->shot = new_matrix2(num_points, pcd->shot_length);
+    for (i = 0; i < num_points; i++)
+      for (j = 0; j < pcd->shot_length; j++)
+	pcd->shot[i][j] = pcd->data[ch_shot1 + j][i];
   }
   if (ch_sift1>=0 && ch_sift128>=0) {
     pcd->sift_length = 128;
@@ -483,8 +492,10 @@ static void pcd_free_data_pointers(pcd_t *pcd)
     free_matrix2(pcd->normals);
   if (pcd->principal_curvatures)
     free_matrix2(pcd->principal_curvatures);
-  if (pcd->shapes)
-    free_matrix2(pcd->shapes);
+  if (pcd->fpfh)
+    free_matrix2(pcd->fpfh);
+  if (pcd->shot)
+    free_matrix2(pcd->shot);
   if (pcd->sift)
     free_matrix2(pcd->sift);
   if (pcd->ved)
@@ -535,8 +546,8 @@ void load_olf_model(olf_model_t *model, char *model_file)
   }
   fclose(f);
 
-  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], sift_pcd[1024], range_edges_pcd[1024];
-  if (sscanf(line, "%s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, sift_pcd, range_edges_pcd) < 5) {
+  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], shot_pcd[1024], sift_pcd[1024], range_edges_pcd[1024];
+  if (sscanf(line, "%s %s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, shot_pcd, sift_pcd, range_edges_pcd) < 6) {
     fprintf(stderr, "Error parsing model file: %s\n", model_file);
     return;
   }
@@ -549,6 +560,9 @@ void load_olf_model(olf_model_t *model, char *model_file)
 
   sprintf(line, "%s/%s", dirname, fpfh_pcd);
   model->fpfh_pcd = load_pcd(line);
+
+  sprintf(line, "%s/%s", dirname, shot_pcd);
+  model->shot_pcd = load_pcd(line);
 
   sprintf(line, "%s/%s", dirname, sift_pcd);
   model->sift_pcd = load_pcd(line);
@@ -665,27 +679,21 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->dispersion_weight);
       else if (!wordcmp(name, "sift_dthresh", " \t\n"))
 	sscanf(value, "%lf", &params->sift_dthresh);
-      else if (!wordcmp(name, "xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->xyz_weight);
-      else if (!wordcmp(name, "normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->normal_weight);
-      else if (!wordcmp(name, "range_weight", " \t\n"))
-	sscanf(value, "%lf", &params->range_weight);
-      else if (!wordcmp(name, "f_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->f_sigma);
-      else if (!wordcmp(name, "xyz_sigma", " \t\n"))
-	sscanf(value, "%lf", &params->xyz_sigma);
       else if (!wordcmp(name, "vis_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->vis_thresh);
-      else if (!wordcmp(name, "f_weight", " \t\n"))
-	sscanf(value, "%lf", &params->f_weight);
 
+      else if (!wordcmp(name, "xyz_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->xyz_sigma);
       else if (!wordcmp(name, "range_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->range_sigma);
       else if (!wordcmp(name, "normal_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->normal_sigma);
       else if (!wordcmp(name, "lab_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->lab_sigma);
+      else if (!wordcmp(name, "f_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->f_sigma);
+      else if (!wordcmp(name, "shot_sigma", " \t\n"))
+	sscanf(value, "%lf", &params->shot_sigma);
 
       else if (!wordcmp(name, "score2_xyz_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_xyz_weight);
@@ -1643,8 +1651,8 @@ double **get_sub_cloud_normals_rotated(pcd_t *pcd, int *idx, int n, double *q)
 
 double **get_sub_cloud_fpfh(pcd_t *pcd, int *idx, int n)
 {
-  double **F = new_matrix2(n, pcd->shape_length);
-  reorder_rows(F, pcd->shapes, idx, n, pcd->shape_length);
+  double **F = new_matrix2(n, pcd->fpfh_length);
+  reorder_rows(F, pcd->fpfh, idx, n, pcd->fpfh_length);
   return F;
 }
 
@@ -1681,13 +1689,17 @@ double **get_sub_cloud_labdist(pcd_t *pcd, int *idx, int n)
   return labdist;
 }
 
-double **get_xyzn_features(double **points, double **normals, int n, scope_params_t *params)
+double **get_xyzn_features(pcd_t *pcd, scope_params_t *params)
 {
+  double **points = pcd->points;
+  double **normals = pcd->normals;
+  int n = pcd->num_points;
+
   int i, j;
-  double xyz_weight = params->xyz_weight;
-  double normal_weight = params->normal_weight;
+  double xyz_weight = 1.0 / params->xyz_sigma;  // range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
   double **xyzn = new_matrix2(n,6);
-  for (i = 0; i <n; i++) {
+  for (i = 0; i < n; i++) {
     for (j = 0; j < 3; j++) {
       xyzn[i][j] = xyz_weight * points[i][j];
       xyzn[i][j+3] = normal_weight * normals[i][j];
@@ -1697,14 +1709,22 @@ double **get_xyzn_features(double **points, double **normals, int n, scope_param
   return xyzn;
 }
 
-double **get_fxyzn_features(double **fpfh, double **points, double **normals, int n, int fpfh_length, scope_params_t *params)
+/*
+double **get_fpfh_fxyzn_features(pcd_t *pcd, scope_params_t *params)
 {
+  double **points = pcd->points;
+  double **normals = pcd->normals;
+  double **fpfh = pcd->fpfh;
+  int fpfh_length = pcd->fpfh_length;
+  int n = pcd->num_points;
+
   int i, j;
-  double xyz_weight = params->xyz_weight;
-  double normal_weight = params->normal_weight;
+  double xyz_weight = 1.0 / params->xyz_sigma;  // range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double fpfh_weight = 1.0 / params->fpfh_sigma;
   double **fxyzn = new_matrix2(n, fpfh_length + 6);
-  for (i = 0; i <n; i++) {
-    memcpy(fxyzn[i], fpfh[i], fpfh_length*sizeof(double));
+  for (i = 0; i < n; i++) {
+    mult(fxyzn[i], fpfh[i], fpfh_weight, fpfh_length);
     for (j = 0; j < 3; j++) {
       fxyzn[i][j+fpfh_length] = xyz_weight * points[i][j];
       fxyzn[i][j+3+fpfh_length] = normal_weight * normals[i][j];
@@ -1713,6 +1733,33 @@ double **get_fxyzn_features(double **fpfh, double **points, double **normals, in
 
   return fxyzn;
 }
+*/
+
+ /*
+double **get_shot_fxyzn_features(pcd_t *pcd, scope_params_t *params)
+{
+  double **points = pcd->points;
+  double **normals = pcd->normals;
+  double **shot = pcd->shot;
+  int shot_length = pcd->shot_length;
+  int n = pcd->num_points;
+
+  int i, j;
+  double xyz_weight = 1.0 / params->xyz_sigma;  // range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double shot_weight = 1.0 / params->shot_sigma;
+  double **fxyzn = new_matrix2(n, shot_length + 6);
+  for (i = 0; i < n; i++) {
+    mult(fxyzn[i], shot[i], shot_weight, shot_length);
+    for (j = 0; j < 3; j++) {
+      fxyzn[i][j+fpfh_length] = xyz_weight * points[i][j];
+      fxyzn[i][j+3+fpfh_length] = normal_weight * normals[i][j];
+    }
+  }
+
+  return fxyzn;
+}
+*/
 
 /*
 float **get_fsurf_features(double **fpfh, double **sdw, int n, int fpfh_length, scope_params_t *params)
@@ -1911,19 +1958,25 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   // unpack model arguments
   data->pcd_model = model->obj_pcd;
   data->fpfh_model = model->fpfh_pcd;
+  data->shot_model = model->shot_pcd;
   data->sift_model = model->sift_pcd;
   data->color_model = get_pcd_color_model(model->obj_pcd);
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
 
-  // compute model feature saliency (for fpfh correspondences)
-  data->fpfh_model_pmf = compute_model_saliency(data->fpfh_model);
-  safe_calloc(data->fpfh_model_cmf, data->fpfh_model->num_points, double);
-  cumsum(data->fpfh_model_cmf, data->fpfh_model_pmf, data->fpfh_model->num_points);
+  // compute fpfh model feature saliency
+  double *p = compute_model_saliency(data->fpfh_model);
+  cumsum(p, p, data->fpfh_model->num_points);
+  data->fpfh_model_cmf = p;
 
-  // get combined feature matrices
-  data->model_xyzn = get_xyzn_features(data->pcd_model->points, data->pcd_model->normals, data->pcd_model->num_points, params);
-  data->fpfh_model_fxyzn = get_fxyzn_features(data->fpfh_model->shapes, data->fpfh_model->points, data->fpfh_model->normals, data->fpfh_model->num_points, data->fpfh_model->shape_length, params);
-  data->fpfh_model_xyzn = get_xyzn_features(data->fpfh_model->points, data->fpfh_model->normals, data->fpfh_model->num_points, params);
+  // compute shot model feature saliency
+  p = compute_model_saliency(data->shot_model);
+  cumsum(p, p, data->shot_model->num_points);
+  data->shot_model_cmf = p;
+
+  // get combined feature matrices for FLANN
+  double **model_xyzn = get_xyzn_features(data->pcd_model, params);
+  double **fpfh_model_xyzn = get_xyzn_features(data->fpfh_model, params);
+  double **shot_model_xyzn = get_xyzn_features(data->shot_model, params);
 
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
@@ -1935,37 +1988,36 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   data->model_xyz_params = flann_params_single;
   data->fpfh_model_f_params = flann_params;
   data->fpfh_model_xyzn_params = flann_params_single;
+  data->shot_model_f_params = flann_params;
+  data->shot_model_xyzn_params = flann_params_single;
 
   // build flann indices
   float speedup;
   data->model_xyz_index = flann_build_index_double(data->pcd_model->points[0], data->pcd_model->num_points, 3, &speedup, &data->model_xyz_params);
-  data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->shapes[0], data->fpfh_model->num_points, data->fpfh_model->shape_length, &speedup, &data->fpfh_model_f_params);
-  data->fpfh_model_xyzn_index = flann_build_index_double(data->fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
+  data->fpfh_model_xyzn_index = flann_build_index_double(fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
+  data->shot_model_xyzn_index = flann_build_index_double(shot_model_xyzn[0], data->shot_model->num_points, 6, &speedup, &data->shot_model_xyzn_params);
+  data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->fpfh[0], data->fpfh_model->num_points, data->fpfh_model->fpfh_length, &speedup, &data->fpfh_model_f_params);
+  data->shot_model_f_index = flann_build_index_double(data->shot_model->shot[0], data->shot_model->num_points, data->shot_model->shot_length, &speedup, &data->shot_model_f_params);
 
-  // build model_to_fpfh_map
+  // build model-to-feature maps
   safe_calloc(data->model_to_fpfh_map, data->pcd_model->num_points, int);
-  int i;
-  for (i = 0; i < data->pcd_model->num_points; i++) {
-    int nn_idx;
-    double nn_d2;
-    flann_find_nearest_neighbors_index_double(data->fpfh_model_xyzn_index, data->model_xyzn[i], 1, &nn_idx, &nn_d2, 1, &data->fpfh_model_xyzn_params);
-    data->model_to_fpfh_map[i] = nn_idx;
-  }
-  /*
-  printf("model_to_fpfh_map = [");
-  for (i = 0; i < data->pcd_model->num_points; i+=100) {
-    printf("%d ", data->model_to_fpfh_map[i+j] + 1);
-    if (i % 100 == 99)
-      printf(" ...\n");
-  }
-  printf("]\n");
-  */
+  safe_calloc(data->model_to_shot_map, data->pcd_model->num_points, int);
+  double nn_d2[data->pcd_model->num_points];
+  flann_find_nearest_neighbors_index_double(data->fpfh_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points, data->model_to_fpfh_map, nn_d2, 1, &data->fpfh_model_xyzn_params);
+  flann_find_nearest_neighbors_index_double(data->shot_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points, data->model_to_shot_map, nn_d2, 1, &data->shot_model_xyzn_params);
+
+  //cleanup
+  free_matrix2(model_xyzn);
+  free_matrix2(fpfh_model_xyzn);
+  free_matrix2(shot_model_xyzn);
 }
+
 
 void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *params)
 {
   // unpack obs arguments
   data->pcd_obs = obs->fg_pcd;
+  data->shot_obs = obs->shot_pcd;
   data->sift_obs = obs->sift_pcd;
   data->pcd_obs_bg = obs->bg_pcd;
 
@@ -1991,34 +2043,41 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   obs_edge_image_ = matrix_clone(data->obs_edge_image, obs_edge_image_width_, obs_edge_image_height_);  //dbug
 
   // get combined feature matrices
-  data->obs_xyzn = get_xyzn_features(data->pcd_obs->points, data->pcd_obs->normals, data->pcd_obs->num_points, params);
-  data->obs_bg_xyzn = get_xyzn_features(data->pcd_obs_bg->points, data->pcd_obs_bg->normals, data->pcd_obs_bg->num_points, params);
-  data->obs_fxyzn = get_fxyzn_features(data->pcd_obs->shapes, data->pcd_obs->points, data->pcd_obs->normals, data->pcd_obs->num_points, data->pcd_obs->shape_length, params);
+  double **obs_xyzn = get_xyzn_features(data->pcd_obs, params);
+  double **shot_obs_xyzn = get_xyzn_features(data->shot_obs, params);
 
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
   flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
   data->obs_xyzn_params = flann_params_single;
+  data->shot_obs_xyzn_params = flann_params_single;
 
   // build flann indices
   float speedup;
-  data->obs_xyzn_index = flann_build_index_double(data->obs_xyzn[0], data->pcd_obs->num_points, 6, &speedup, &data->obs_xyzn_params);
+  data->obs_xyzn_index = flann_build_index_double(obs_xyzn[0], data->pcd_obs->num_points, 6, &speedup, &data->obs_xyzn_params);
+  data->shot_obs_xyzn_index = flann_build_index_double(shot_obs_xyzn[0], data->shot_obs->num_points, 6, &speedup, &data->shot_obs_xyzn_params);
+
+  //cleanup
+  free_matrix2(obs_xyzn);
+  free_matrix2(shot_obs_xyzn);
 }
+
 
 void free_scope_model_data(scope_model_data_t *data)
 {
   free_pcd_color_model(data->color_model);
   free_multiview_pcd(data->range_edges_model);
-  free(data->fpfh_model_pmf);
   free(data->fpfh_model_cmf);
-  free_matrix2(data->model_xyzn);
-  free_matrix2(data->fpfh_model_fxyzn);
-  free_matrix2(data->fpfh_model_xyzn);
+  free(data->shot_model_cmf);
   free(data->model_to_fpfh_map);
+  free(data->model_to_shot_map);
   flann_free_index(data->model_xyz_index, &data->model_xyz_params);
   flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
   flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
+  flann_free_index(data->shot_model_f_index, &data->shot_model_f_params);
+  flann_free_index(data->shot_model_xyzn_index, &data->shot_model_xyzn_params);
 }
+
 
 void free_scope_obs_data(scope_obs_data_t *data)
 {
@@ -2029,10 +2088,8 @@ void free_scope_obs_data(scope_obs_data_t *data)
   //free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
   free_matrix3(data->obs_lab_image);
-  free_matrix2(data->obs_xyzn);
-  free_matrix2(data->obs_bg_xyzn);
-  free_matrix2(data->obs_fxyzn);
   flann_free_index(data->obs_xyzn_index, &data->obs_xyzn_params);
+  flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
 }
 
 void copy_olf(olf_t *olf2, olf_t *olf1)
@@ -2469,7 +2526,7 @@ double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, 
       double d = dmax;
       if (obs_fg_range_image->cnt[xi][yi] > 0) {
 	int idx = obs_fg_range_image->idx[xi][yi];
-	d = dist(cloud_fpfh[i], pcd_obs->shapes[idx], pcd_obs->shape_length);
+	d = dist(cloud_fpfh[i], pcd_obs->fpfh[idx], pcd_obs->fpfh_length);
 	d = MIN(d, dmax);
       }
       score += vis_pmf[i] * log(normpdf(d, 0, f_sigma));
@@ -2501,8 +2558,8 @@ double compute_fpfh_score(double **fpfh, int *nn_idx, double *vis_prob, int n, p
   double f_sigma = params->f_sigma;
   int i;
   for (i = 0; i < n; i++) {
-    double *obs_f = pcd_obs->shapes[nn_idx[i]];
-    double df = dist(fpfh[i], obs_f, pcd_obs->shape_length);
+    double *obs_f = pcd_obs->fpfh[nn_idx[i]];
+    double df = dist(fpfh[i], obs_f, pcd_obs->fpfh_length);
     df = MIN(df, 4*f_sigma);  // TODO: make this a param
     score += vis_prob[i] * log(normpdf(df, 0, 2*f_sigma));
   }
@@ -3620,6 +3677,7 @@ void get_model_pose_distribution_from_olf_correspondences(double *x, bingham_t *
   bingham_free(&B_model_to_feature);
 }
 
+
 void sample_model_pose(pcd_t *pcd_model, int *c_model, int c, double *x0, bingham_t *B, double *x, double *q)
 {
   double mu[3] = {0, 0, 0};
@@ -3716,7 +3774,7 @@ double compute_olf_correspondence_score(scope_sample_t *sample, scope_params_t *
   double logp_fpfh = 0.;
   if (f_sigma > 0) {
     for (i = 0; i < n; ++i) {
-      double d = dist(pcd_obs->shapes[c_obs[i]], pcd_model->shapes[c_model[i]], shape_length);
+      double d = dist(pcd_obs->fpfh[c_obs[i]], pcd_model->fpfh[c_model[i]], fpfh_length);
       logp_fpfh += log(normpdf(d, 0, f_sigma));
     }
     logp_fpfh /= (double)n;
@@ -3805,7 +3863,7 @@ int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t
 
 int sample_fpfh_model_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
 {
-  double outlier_ratio = .5;
+  double outlier_ratio = .1;
 
   if (sample->num_xyz_outliers > 0 && frand() < outlier_ratio)
     return model_data->model_to_fpfh_map[ sample->xyz_outliers_idx[ irand(sample->num_xyz_outliers) ] ];
@@ -3849,10 +3907,17 @@ int sample_fpfh_model_point_given_model_pose(scope_sample_t *sample, scope_model
 int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   pcd_t *fpfh_model = model_data->fpfh_model;
-  double **obs_fxyzn = obs_data->obs_fxyzn;
+  int fpfh_length = fpfh_model->fpfh_length;
+  pcd_t *fpfh_obs = obs_data->pcd_obs;
   flann_index_t obs_xyzn_index = obs_data->obs_xyzn_index;
   struct FLANNParameters *obs_xyzn_params = &obs_data->obs_xyzn_params;
-  int shape_length = fpfh_model->shape_length;
+
+  double xyz_weight = 1.0 / params->xyz_sigma;  //range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double fpfh_weight = 1.0 / params->f_sigma;
+  double xyz_weight2 = xyz_weight * xyz_weight;
+  double normal_weight2 = normal_weight * normal_weight;
+  double fpfh_weight2 = fpfh_weight * fpfh_weight;
 
   double **R = new_matrix2(3,3);
   quaternion_to_rotation_matrix(R, sample->q);
@@ -3866,26 +3931,27 @@ int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int 
   get_normal(mp_norm, fpfh_model, c_model);
   matrix_vec_mult(mp_norm, R, mp_norm, 3, 3);
 
-  double *mp_shape = fpfh_model->shapes[c_model];
+  double *mp_fpfh = fpfh_model->fpfh[c_model];
   
   // Look for k-NN in xyz-normal space
   double xyzn_query[6];
-  mult(xyzn_query, mp_pos, params->xyz_weight, 3);
-  mult(&xyzn_query[3], mp_norm, params->normal_weight, 3);
+  mult(xyzn_query, mp_pos, xyz_weight, 3);
+  mult(&xyzn_query[3], mp_norm, normal_weight, 3);
   int nn_idx[params->knn];
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
   
   // then compute full feature distance on just those k-NN
-  double query[shape_length + 6];
-  memcpy(query, mp_shape, shape_length*sizeof(double));
-  memcpy(&query[shape_length], xyzn_query, 6*sizeof(double));
-
   int i;
   double p[params->knn];
   for (i = 0; i < params->knn; i++) {
-    double d2 = dist2(query, obs_fxyzn[nn_idx[i]], shape_length + 6);
-    p[i] = exp(.5*d2 / params->f_sigma);
+    double *obs_xyz = fpfh_obs->points[ nn_idx[i] ];
+    double *obs_normal = fpfh_obs->normals[ nn_idx[i] ];
+    double *obs_fpfh = fpfh_obs->fpfh[ nn_idx[i] ];
+
+    double d2 = xyz_weight2 * dist2(mp_pos, obs_xyz, 3) + normal_weight2 * dist2(mp_norm, obs_normal, 3) + fpfh_weight2 * dist2(mp_fpfh, obs_fpfh, fpfh_length);
+
+    p[i] = exp(.5*d2);
   }
   normalize_pmf(p, p, params->knn);
   int c_obs = nn_idx[pmfrand(p, params->knn)];
@@ -3898,12 +3964,18 @@ int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int 
 
 int sample_fpfh_model_correspondence_given_model_pose(scope_sample_t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int sample_nn, int use_f)
 {
-  pcd_t *pcd_obs = obs_data->pcd_obs;
-  //double **fpfh_model_xyzn = model_data->fpfh_model_xyzn;
-  double **fpfh_model_fxyzn = model_data->fpfh_model_fxyzn;
   struct FLANNParameters *fpfh_model_xyzn_params = &model_data->fpfh_model_xyzn_params;
   flann_index_t fpfh_model_xyzn_index = model_data->fpfh_model_xyzn_index;
-  int shape_length = pcd_obs->shape_length;
+  pcd_t *fpfh_model = model_data->fpfh_model;
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  int fpfh_length = pcd_obs->fpfh_length;
+
+  double xyz_weight = 1.0 / params->xyz_sigma;  //range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double fpfh_weight = 1.0 / params->f_sigma;
+  double xyz_weight2 = xyz_weight * xyz_weight;
+  double normal_weight2 = normal_weight * normal_weight;
+  double fpfh_weight2 = fpfh_weight * fpfh_weight;
 
   int i;
   double q_inv[4];
@@ -3911,37 +3983,34 @@ int sample_fpfh_model_correspondence_given_model_pose(scope_sample_t *sample, in
   double **inv_R_model = new_matrix2(3, 3);
   quaternion_to_rotation_matrix(inv_R_model, q_inv);
 
-  double xyz_obs_point2[3];
-  get_point(xyz_obs_point2, pcd_obs, c_obs);
-  sub(xyz_obs_point2, xyz_obs_point2, sample->x, 3);
-  matrix_vec_mult(xyz_obs_point2, inv_R_model, xyz_obs_point2, 3, 3);
+  double obs_xyz[3];
+  get_point(obs_xyz, pcd_obs, c_obs);
+  sub(obs_xyz, obs_xyz, sample->x, 3);
+  matrix_vec_mult(obs_xyz, inv_R_model, obs_xyz, 3, 3);
 
-  double nxyz_obs_point2[3];
-  get_normal(nxyz_obs_point2, pcd_obs, c_obs);
-  matrix_vec_mult(nxyz_obs_point2, inv_R_model, nxyz_obs_point2, 3, 3);
+  double obs_normal[3];
+  get_normal(obs_normal, pcd_obs, c_obs);
+  matrix_vec_mult(obs_normal, inv_R_model, obs_normal, 3, 3);
   
+  double *obs_fpfh = pcd_obs->fpfh[c_obs];
+
   // look for k-NN in xyz-normal space
   double xyzn_query[6];
-  mult(xyzn_query, xyz_obs_point2, params->xyz_weight, 3);
-  mult(&xyzn_query[3], nxyz_obs_point2, params->normal_weight, 3);
+  mult(xyzn_query, obs_xyz, xyz_weight, 3);
+  mult(&xyzn_query[3], obs_normal, normal_weight, 3);
   int nn_idx[params->knn];
   double nn_d2[params->knn];
-
   flann_find_nearest_neighbors_index_double(fpfh_model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, fpfh_model_xyzn_params);
-  //flann_find_nearest_neighbors_index_double(fpfh_model_xyz_index, xyz_obs_point2, 1, nn_idx, nn_d2, params->knn, fpfh_model_xyz_params);
-  //for (i = 0; i < params->knn; i++)
-  //  nn_d2[i] = dist2(xyzn_query, fpfh_model_xyzn[nn_idx[i]], 6);
 
+  // then compute full feature distance on just those k-NN
   if (use_f) {
-    // then compute full feature distance on just those k-NN
-    double query[shape_length + 6];
-    memcpy(query, pcd_obs->shapes[c_obs], shape_length * sizeof(double));
-    for (i = 0; i < 3; i++) {
-      query[shape_length + i] = params->xyz_weight * xyz_obs_point2[i];
-      query[shape_length + 3 + i] = params->normal_weight * nxyz_obs_point2[i];
+    for (i = 0; i < params->knn; i++) {
+      double *model_xyz = fpfh_model->points[ nn_idx[i] ];
+      double *model_normal = fpfh_model->normals[ nn_idx[i] ];
+      double *model_fpfh = fpfh_model->fpfh[ nn_idx[i] ];
+
+      nn_d2[i] = xyz_weight2 * dist2(model_xyz, obs_xyz, 3) + normal_weight2 * dist2(model_normal, obs_normal, 3) + fpfh_weight2 * dist2(model_fpfh, obs_fpfh, fpfh_length);
     }
-    for (i = 0; i < params->knn; i++)
-      nn_d2[i] = dist2(query, fpfh_model_fxyzn[nn_idx[i]], shape_length + 6);
   }
 
   int c_model;
@@ -3950,7 +4019,7 @@ int sample_fpfh_model_correspondence_given_model_pose(scope_sample_t *sample, in
   else {
     double p[params->knn];
     for (i = 0; i < params->knn; i++)
-      p[i] = exp(-.5*nn_d2[i] / (params->f_sigma * params->f_sigma));
+      p[i] = exp(-.5*nn_d2[i]);
     normalize_pmf(p, p, params->knn);
     c_model = nn_idx[pmfrand(p, params->knn)];
   }
@@ -3982,7 +4051,7 @@ void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_m
   }
 
   // compute correspondence score
-  double d = dist(obs_data->pcd_obs->shapes[c_obs], model_data->fpfh_model->shapes[c_model], model_data->fpfh_model->shape_length);
+  double d = dist(obs_data->pcd_obs->fpfh[c_obs], model_data->fpfh_model->fpfh[c_model], model_data->fpfh_model->fpfh_length);
   double c_score = log(normpdf(d, 0, params->f_sigma));
 
   sample->c_obs[nc] = c_obs;
@@ -3991,8 +4060,6 @@ void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_m
   sample->c_type[nc] = C_TYPE_FPFH;
   sample->nc++;
 }
-
-
 
 
 int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
@@ -4036,6 +4103,7 @@ int sample_model_edge_point_given_model_pose(scope_sample_t *sample, scope_model
   return (found_point ? c_model[i] : -1);
 }
 
+
 int sample_obs_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   // get model edge point
@@ -4056,6 +4124,7 @@ int sample_obs_edge_correspondence_given_model_pose(scope_sample_t *sample, int 
 
   return c_obs;
 }
+
 
 int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
 {
@@ -4097,6 +4166,7 @@ int sample_obs_edge_point_given_model_pose(scope_sample_t *sample, scope_model_d
   return c_obs_new[i];
 }
 
+
 int sample_model_edge_correspondence_given_model_pose(scope_sample_t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   // get closest model edge point at current viewpoint
@@ -4114,8 +4184,6 @@ int sample_model_edge_correspondence_given_model_pose(scope_sample_t *sample, in
 
   return c_model[i];
 }
-
-
 
 
 void sample_edge_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
@@ -4192,6 +4260,7 @@ void resample_model_correspondences(scope_sample_t *sample, scope_model_data_t *
     //else if (sample->c_type[i] == C_TYPE_SIFT)
   }
 }
+
 
 void resample_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
@@ -4699,7 +4768,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
       // get model point
       int nn_idx[params->knn];
       double nn_d2[params->knn];
-      flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->shapes[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
+      flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
       double p[params->knn];
       for (j = 0; j < params->knn; j++)
 	p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
@@ -5589,7 +5658,7 @@ olf_t *load_olf(char *fname)
 
   // create temporary shape matrix
   double **S = new_matrix2(pcd->num_points, olf->shape_length);
-  transpose(S, pcd->shapes, olf->shape_length, pcd->num_points);
+  transpose(S, pcd->fpfh, olf->shape_length, pcd->num_points);
 
   // get cluster weights
   safe_calloc(olf->cluster_weights, num_clusters, double);

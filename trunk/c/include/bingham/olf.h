@@ -34,7 +34,8 @@ extern "C" {
     double **colors;
     double **normals;
     double **principal_curvatures;
-    double **shapes;
+    double **fpfh;
+    double **shot;
     double **sift;
     double **ved;
     //double **sdw;
@@ -46,7 +47,8 @@ extern "C" {
     double **lab;
 
     // data sizes
-    int shape_length;
+    int fpfh_length;
+    int shot_length;
     int sift_length;
     int ved_length;
     //int sdw_length;
@@ -111,6 +113,7 @@ extern "C" {
     char *name;
     pcd_t *obj_pcd;
     pcd_t *fpfh_pcd;
+    pcd_t *shot_pcd;
     pcd_t *sift_pcd;
     pcd_t *range_edges_pcd;
   } olf_model_t;
@@ -118,6 +121,7 @@ extern "C" {
 
   typedef struct {
     pcd_t *fg_pcd;
+    pcd_t *shot_pcd;
     pcd_t *sift_pcd;
     pcd_t *bg_pcd;
     //range_image_t *range_image;
@@ -146,21 +150,18 @@ extern "C" {
     int do_icp;
     int do_final_icp;
 
-    // WEIGHT / SIGMA PARAMS
+    // WEIGHT / DISTANCE PARAMS
     int dispersion_weight;
-    double xyz_weight;
-    double normal_weight;
-    double range_weight;
     double sift_dthresh;
-    double f_sigma;
-    double xyz_sigma;
     double vis_thresh;
-    double f_weight;
 
     // NOISE MODEL PARAMS
+    double xyz_sigma;
     double range_sigma;
     double normal_sigma;
     double lab_sigma;
+    double f_sigma;
+    double shot_sigma;
 
     // SCORE2 PARAMS
     double score2_xyz_weight;
@@ -216,26 +217,30 @@ extern "C" {
   typedef struct {
     pcd_t *pcd_model;
     pcd_t *fpfh_model;
+    pcd_t *shot_model;
     pcd_t *sift_model;
     int *model_to_fpfh_map;
+    int *model_to_shot_map;
     pcd_color_model_t *color_model;
     multiview_pcd_t *range_edges_model;
-    double *fpfh_model_pmf;
     double *fpfh_model_cmf;
-    double **model_xyzn;
-    double **fpfh_model_fxyzn;
-    double **fpfh_model_xyzn;
+    double *shot_model_cmf;
     struct FLANNParameters model_xyz_params;
     struct FLANNParameters fpfh_model_f_params;
     struct FLANNParameters fpfh_model_xyzn_params;
+    struct FLANNParameters shot_model_f_params;
+    struct FLANNParameters shot_model_xyzn_params;
     flann_index_t model_xyz_index;
     flann_index_t fpfh_model_f_index;
     flann_index_t fpfh_model_xyzn_index;
+    flann_index_t shot_model_f_index;
+    flann_index_t shot_model_xyzn_index;
   } scope_model_data_t;
 
 
   typedef struct {
     pcd_t *pcd_obs;
+    pcd_t *shot_obs;
     pcd_t *sift_obs;
     pcd_t *pcd_obs_bg;
     range_image_t *obs_range_image;
@@ -246,15 +251,14 @@ extern "C" {
     double **obs_edge_points_image;
     double **obs_edge_image;
     double ***obs_lab_image;
-    double **obs_xyzn;
-    double **obs_bg_xyzn;
-    double **obs_fxyzn;
     struct FLANNParameters obs_xyzn_params;
+    struct FLANNParameters shot_obs_xyzn_params;
     flann_index_t obs_xyzn_index;
+    flann_index_t shot_obs_xyzn_index;
   } scope_obs_data_t;
 
 
-  enum {C_TYPE_FPFH, C_TYPE_SIFT, C_TYPE_EDGE};
+  enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE};
 
 
   typedef struct {
