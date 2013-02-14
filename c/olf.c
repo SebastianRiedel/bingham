@@ -1967,44 +1967,83 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data)
 
 /*
  * Sample a candidate set of superpixel segments given a model placement.
- *
-void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+ */
+void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   //TODO: use 3D model distance transform
+  //TODO: use normals, colors
+
+  double vis_thresh = params->vis_thresh;
 
   pcd_t *pcd_obs = obs_data->pcd_obs;
+  pcd_t *pcd_model = model_data->pcd_model;
   
   double q_inv[4];
   quaternion_inverse(q_inv, sample->q);
   double **R_inv = new_matrix2(3,3);
   quaternion_to_rotation_matrix(R_inv, q_inv);
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
 
+  // compute likelihood that each segment belongs to the model
+  double segment_probs[obs_data->num_obs_segments];
   int i;
   for (i = 0; i < obs_data->num_obs_segments; i++) {
 
     superpixel_t *segment = &obs_data->obs_segments[i];
 
     // get distance from observed segment center to closest model point
-    int c_obs = segment->center_point;
     double p[3];
-    sub(p, pcd_obs->points[c_obs], sample->x, 3);
+    sub(p, pcd_obs->points[ segment->center_point ], sample->x, 3);
     matrix_vec_mult(p, R_inv, p, 3, 3);
     int nn_idx;
     double nn_d2;
     flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
 
     if (nn_d2 > segment->max_radius * segment->max_radius)
-      continue;
+      segment_probs[i] = 0.0;
+    else {
+      // get likelihood of segment match given observed segment surface points
+      double P[segment->num_surface_points];
+      int j;
+      for (j = 0; j < segment->num_surface_points; j++) {
+	// get segment surface point's closest model point
+	double *p_obs = pcd_obs->points[ segment->surface_points[j] ];
+	sub(p, p_obs, sample->x, 3);
+	matrix_vec_mult(p, R_inv, p, 3, 3);
+	flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
 
-    // get distances from observed segment surface points to closest model points
-
+	if (nn_d2 > params->xyz_sigma * params->xyz_sigma)
+	  P[j] = 0.0;
+	else {
+	  matrix_vec_mult(p, R, pcd_model->points[nn_idx], 3, 3);
+	  add(p, p, sample->x, 3);
+	  double model_range = norm(p,3);
+	  double obs_range = norm(p_obs,3);
+	  double dR = model_range - obs_range;
+	  P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
+	}
+      }
+      segment_probs[i] = sum(P, segment->num_surface_points) / (double)segment->num_surface_points;
+    }
   }
+
+  // sample a set of segments
+  int idx[obs_data->num_obs_segments];
+  int n=0;
+  for (i = 0; i < obs_data->num_obs_segments; i++)
+    if (segment_probs[i] == 1.0 || (segment_probs[i] > 0.0 && frand() < segment_probs[i]))
+      idx[n++] = i;
+
+  // copy segment indices into sample->segments_idx
+  safe_realloc(sample->segments_idx, n, int);
+  memcpy(sample->segments_idx, idx, n*sizeof(int));
+  sample->num_segments = n;
 
   //cleanup
   free_matrix2(R_inv);
+  free_matrix2(R);
 }
-*/
-
 
 
 
@@ -4543,7 +4582,7 @@ void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_
     get_olf(&sample->model_olfs[nc], model_data->fpfh_model, sample->c_model[nc], 1);
     get_olf(&sample->obs_olfs[nc], obs_data->pcd_obs, sample->c_obs[nc], 0);
   }
-  else if (f - fpfh_ratio < shot_ratio)
+  else if (f - fpfh_ratio < shot_ratio) {
     sample_shot_correspondence_given_model_pose(sample, model_data, obs_data, params);
     get_olf(&sample->model_olfs[nc], model_data->shot_model, sample->c_model[nc], 1);
     get_olf(&sample->obs_olfs[nc], obs_data->shot_obs, sample->c_obs[nc], 0);
@@ -4571,10 +4610,11 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
   double p[params->knn];
+  int j;
   for (j = 0; j < params->knn; j++)
     p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
   normalize_pmf(p, p, params->knn);
-  int j = pmfrand(p, params->knn);
+  j = pmfrand(p, params->knn);
   int c_model = nn_idx[j];
 
   sample->c_obs[0] = c_obs;
@@ -4589,7 +4629,6 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
   get_olf(&sample->obs_olfs[0], obs_data->pcd_obs, c_obs, 0);
   if (frand() > .5)
     quaternion_flip(sample->obs_olfs[0].q, sample->obs_olfs[0].q);
-  
 }
 
 
@@ -4604,10 +4643,11 @@ void sample_first_correspondence_shot(scope_sample_t *sample, scope_model_data_t
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(model_data->shot_model_f_index, obs_data->shot_obs->shot[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->shot_model_f_params);
   double p[params->knn];
+  int j;
   for (j = 0; j < params->knn; j++)
     p[j] = exp(-.5*nn_d2[j] / (params->shot_sigma * params->shot_sigma));
   normalize_pmf(p, p, params->knn);
-  int j = pmfrand(p, params->knn);
+  j = pmfrand(p, params->knn);
   int c_model = nn_idx[j];
 
   sample->c_obs[0] = c_obs;
@@ -5134,7 +5174,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   S->num_samples = num_samples_init;
 
   // sample poses from one correspondence
-  int i,j;
+  int i;
   for (i = 0; i < num_samples_init; i++) {
 
     if (i < num_sift_matches) {  // sift correspondence
