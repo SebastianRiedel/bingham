@@ -1946,6 +1946,68 @@ int find_obs_sift_matches(int *obs_idx, int *model_idx, pcd_t *sift_obs, pcd_t *
 
 
 
+
+
+
+//==============================================================================================//
+
+//---------------------------------  Super-Pixel Segmentation  ---------------------------------//
+
+//==============================================================================================//
+
+
+/*
+ * Segment the observed scene into superpixels.
+ *
+void get_superpixel_segmentation(scope_obs_data_t *obs_data)
+{
+  //STUB
+}
+*/
+
+/*
+ * Sample a candidate set of superpixel segments given a model placement.
+ *
+void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+{
+  //TODO: use 3D model distance transform
+
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  
+  double q_inv[4];
+  quaternion_inverse(q_inv, sample->q);
+  double **R_inv = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R_inv, q_inv);
+
+  int i;
+  for (i = 0; i < obs_data->num_obs_segments; i++) {
+
+    superpixel_t *segment = &obs_data->obs_segments[i];
+
+    // get distance from observed segment center to closest model point
+    int c_obs = segment->center_point;
+    double p[3];
+    sub(p, pcd_obs->points[c_obs], sample->x, 3);
+    matrix_vec_mult(p, R_inv, p, 3, 3);
+    int nn_idx;
+    double nn_d2;
+    flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
+
+    if (nn_d2 > segment->max_radius * segment->max_radius)
+      continue;
+
+    // get distances from observed segment surface points to closest model points
+
+  }
+
+  //cleanup
+  free_matrix2(R_inv);
+}
+*/
+
+
+
+
 //==============================================================================================//
 
 //------------------------------------  SCOPE Data Processing ----------------------------------//
@@ -2373,11 +2435,12 @@ scope_noise_model_t *get_noise_models(double *x, double *q, int *idx, int n, pcd
 
 
 
- //==============================================================================================//
 
- //---------------------------------  Model Placement Scoring  ----------------------------------//
+//==============================================================================================//
 
- //==============================================================================================//
+//---------------------------------  Model Placement Scoring  ----------------------------------//
+
+//==============================================================================================//
 
 
 /*
