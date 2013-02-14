@@ -93,6 +93,16 @@ extern "C" {
 
 
   typedef struct {
+    int *surface_points;
+    int *edge_points;
+    int center_point;
+    int num_surface_points;
+    int num_edge_points;
+    double max_radius;
+  } superpixel_t;
+
+
+  typedef struct {
     pcd_t *pcd;      // must be sorted by viewpoint!
     int num_views;
     double **views;  // Nx3 matrix of the unique viewpoints
@@ -252,11 +262,14 @@ extern "C" {
     double **obs_edge_points_image;
     double **obs_edge_image;
     double ***obs_lab_image;
+    superpixel_t *obs_segments;
+    int num_obs_segments;
     struct FLANNParameters obs_xyzn_params;
     struct FLANNParameters shot_obs_xyzn_params;
     flann_index_t obs_xyzn_index;
     flann_index_t shot_obs_xyzn_index;
   } scope_obs_data_t;
+
 
 
   enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE};
@@ -273,6 +286,10 @@ extern "C" {
     int nc;
     olf_t *obs_olfs;
     olf_t *model_olfs;
+
+    // current superpixel segmentation
+    superpixel_t *segments;
+    int num_segments;
 
     // validation memory
     int num_edge_outliers;
