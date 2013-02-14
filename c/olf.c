@@ -2057,6 +2057,11 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   data->obs_xyzn_index = flann_build_index_double(obs_xyzn[0], data->pcd_obs->num_points, 6, &speedup, &data->obs_xyzn_params);
   data->shot_obs_xyzn_index = flann_build_index_double(shot_obs_xyzn[0], data->shot_obs->num_points, 6, &speedup, &data->shot_obs_xyzn_params);
 
+  // build obs-to-feature maps
+  safe_calloc(data->obs_to_shot_map, data->pcd_obs->num_points, int);
+  double nn_d2[data->pcd_obs->num_points];
+  flann_find_nearest_neighbors_index_double(data->shot_obs_xyzn_index, obs_xyzn[0], data->pcd_obs->num_points, data->obs_to_shot_map, nn_d2, 1, &data->shot_obs_xyzn_params);
+
   //cleanup
   free_matrix2(obs_xyzn);
   free_matrix2(shot_obs_xyzn);
@@ -3822,6 +3827,43 @@ double compute_olf_correspondence_score(scope_sample_t *sample, scope_params_t *
 //==============================================================================================//
 
 
+int sample_shot_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+{
+  // TODO: make these params
+  int num_steps = 3;  
+  int hops = 2;
+  int sample_endpoint = 0;
+  int num_samples = 5;
+
+  //int nc = sample->nc;
+  range_image_t *obs_fg_range_image = obs_data->obs_fg_range_image;
+  double **obs_edge_image = obs_data->obs_edge_image;
+  int w = obs_fg_range_image->w;
+  int h = obs_fg_range_image->h;
+
+  // sample several new obs points candidates, and pick the one that's furthest away from the last obs point
+  int c_obs_new[num_samples];
+  double d2_obs[num_samples];  // dist. b/w obs points
+  //double *p_obs = (sample->c_type[nc-1] == C_TYPE_SIFT ? obs_data->sift_obs->points[sample->c_obs[nc-1]] : obs_data->pcd_obs->points[sample->c_obs[nc-1]]);
+  double *p_obs = sample->obs_olfs[0].x;  //sample->obs_olfs[nc-1].x;
+  int i, xi, yi;
+  range_image_xyz2sub(&xi, &yi, obs_fg_range_image, p_obs);
+  for (i = 0; i < num_samples; i++) {
+    while (1) {
+      int xi2=xi, yi2=yi;
+      edge_image_random_walk(&xi2, &yi2, obs_edge_image, w, h, num_steps, hops, sample_endpoint);
+      if (obs_fg_range_image->idx[xi2][yi2] >= 0) {
+	c_obs_new[i] = obs_data->obs_to_shot_map[ obs_fg_range_image->idx[xi2][yi2] ];
+	break;
+      }
+    }
+    d2_obs[i] = dist2(p_obs, obs_data->shot_obs->points[c_obs_new[i]], 3);
+  }
+  i = find_max(d2_obs, num_samples);
+
+  return c_obs_new[i];
+}
+
 
 int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
 {
@@ -3858,6 +3900,50 @@ int sample_obs_point_given_model_pose(scope_sample_t *sample, scope_model_data_t
   i = find_max(d2_obs, num_samples);
 
   return c_obs_new[i];
+}
+
+
+int sample_shot_model_point_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+{
+  double outlier_ratio = .1;
+
+  if (sample->num_xyz_outliers > 0 && frand() < outlier_ratio)
+    return model_data->model_to_shot_map[ sample->xyz_outliers_idx[ irand(sample->num_xyz_outliers) ] ];
+
+  pcd_t *shot_model = model_data->shot_model;
+  double *model_cmf = model_data->shot_model_cmf;
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
+
+  int i, xi, yi, c_model, found_point = 0;
+  for (i = 0; i < 20; i++) {
+
+    if (i < 10)  // try sampling from model_cmf
+      c_model = cmfrand(model_cmf, shot_model->num_points);
+    else  // if that doesn't work, try uniform sampling
+      c_model = irand(shot_model->num_points);
+
+    if (!ismemberi(c_model, sample->c_model, sample->nc)) {  // if a point is new
+      double n[3], xyz[3];
+      matrix_vec_mult(n, R, shot_model->normals[c_model], 3, 3);
+      matrix_vec_mult(xyz, R, shot_model->points[c_model], 3, 3);
+      add(xyz, xyz, sample->x, 3);
+
+      if (dot(n, xyz, 3) < 0) {  // if normals are pointing towards camera
+	if (obs_range_image == NULL ||
+	    (range_image_xyz2sub(&xi, &yi, obs_range_image, xyz) && obs_range_image->image[xi][yi] > norm(xyz,3))) {  // if visible in range image
+	  found_point = 1;
+	  break;
+	}
+      }
+    }
+  }
+
+  free_matrix2(R);
+
+  return (found_point ? c_model : -1);
 }
 
 
@@ -3903,6 +3989,65 @@ int sample_fpfh_model_point_given_model_pose(scope_sample_t *sample, scope_model
 
   return (found_point ? c_model : -1);
 }
+
+
+int sample_shot_obs_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  pcd_t *shot_model = model_data->shot_model;
+  int shot_length = shot_model->shot_length;
+  pcd_t *shot_obs = obs_data->shot_obs;
+  flann_index_t obs_xyzn_index = obs_data->shot_obs_xyzn_index;
+  struct FLANNParameters *obs_xyzn_params = &obs_data->shot_obs_xyzn_params;
+
+  double xyz_weight = 1.0 / params->xyz_sigma;  //range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double shot_weight = 1.0 / params->shot_sigma;
+  double xyz_weight2 = xyz_weight * xyz_weight;
+  double normal_weight2 = normal_weight * normal_weight;
+  double shot_weight2 = shot_weight * shot_weight;
+
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
+
+  double mp_pos[3];
+  get_point(mp_pos, shot_model, c_model);
+  matrix_vec_mult(mp_pos, R, mp_pos, 3, 3);
+  add(mp_pos, mp_pos, sample->x, 3);
+
+  double mp_norm[3];
+  get_normal(mp_norm, shot_model, c_model);
+  matrix_vec_mult(mp_norm, R, mp_norm, 3, 3);
+
+  double *mp_shot = shot_model->shot[c_model];
+  
+  // Look for k-NN in xyz-normal space
+  double xyzn_query[6];
+  mult(xyzn_query, mp_pos, xyz_weight, 3);
+  mult(&xyzn_query[3], mp_norm, normal_weight, 3);
+  int nn_idx[params->knn];
+  double nn_d2[params->knn];
+  flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
+  
+  // then compute full feature distance on just those k-NN
+  int i;
+  double p[params->knn];
+  for (i = 0; i < params->knn; i++) {
+    double *obs_xyz = shot_obs->points[ nn_idx[i] ];
+    double *obs_normal = shot_obs->normals[ nn_idx[i] ];
+    double *obs_shot = shot_obs->shot[ nn_idx[i] ];
+
+    double d2 = xyz_weight2 * dist2(mp_pos, obs_xyz, 3) + normal_weight2 * dist2(mp_norm, obs_normal, 3) + shot_weight2 * dist2(mp_shot, obs_shot, shot_length);
+
+    p[i] = exp(.5*d2);
+  }
+  normalize_pmf(p, p, params->knn);
+  int c_obs = nn_idx[pmfrand(p, params->knn)];
+
+  free_matrix2(R);
+ 
+  return c_obs;
+}
+
 
 int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int c_model, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
@@ -3959,6 +4104,72 @@ int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int 
   free_matrix2(R);
  
   return c_obs;
+}
+
+
+int sample_shot_model_correspondence_given_model_pose(scope_sample_t *sample, int c_obs, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int sample_nn, int use_f)
+{
+  struct FLANNParameters *shot_model_xyzn_params = &model_data->shot_model_xyzn_params;
+  flann_index_t shot_model_xyzn_index = model_data->shot_model_xyzn_index;
+  pcd_t *shot_model = model_data->shot_model;
+  pcd_t *pcd_obs = obs_data->shot_obs;
+  int shot_length = pcd_obs->shot_length;
+
+  double xyz_weight = 1.0 / params->xyz_sigma;  //range_sigma?
+  double normal_weight = 1.0 / params->normal_sigma;
+  double shot_weight = 1.0 / params->shot_sigma;
+  double xyz_weight2 = xyz_weight * xyz_weight;
+  double normal_weight2 = normal_weight * normal_weight;
+  double shot_weight2 = shot_weight * shot_weight;
+
+  int i;
+  double q_inv[4];
+  quaternion_inverse(q_inv, sample->q);
+  double **inv_R_model = new_matrix2(3, 3);
+  quaternion_to_rotation_matrix(inv_R_model, q_inv);
+
+  double obs_xyz[3];
+  get_point(obs_xyz, pcd_obs, c_obs);
+  sub(obs_xyz, obs_xyz, sample->x, 3);
+  matrix_vec_mult(obs_xyz, inv_R_model, obs_xyz, 3, 3);
+
+  double obs_normal[3];
+  get_normal(obs_normal, pcd_obs, c_obs);
+  matrix_vec_mult(obs_normal, inv_R_model, obs_normal, 3, 3);
+  
+  double *obs_shot = pcd_obs->shot[c_obs];
+
+  // look for k-NN in xyz-normal space
+  double xyzn_query[6];
+  mult(xyzn_query, obs_xyz, xyz_weight, 3);
+  mult(&xyzn_query[3], obs_normal, normal_weight, 3);
+  int nn_idx[params->knn];
+  double nn_d2[params->knn];
+  flann_find_nearest_neighbors_index_double(shot_model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, shot_model_xyzn_params);
+
+  // then compute full feature distance on just those k-NN
+  if (use_f) {
+    for (i = 0; i < params->knn; i++) {
+      double *model_xyz = shot_model->points[ nn_idx[i] ];
+      double *model_normal = shot_model->normals[ nn_idx[i] ];
+      double *model_shot = shot_model->shot[ nn_idx[i] ];
+
+      nn_d2[i] = xyz_weight2 * dist2(model_xyz, obs_xyz, 3) + normal_weight2 * dist2(model_normal, obs_normal, 3) + shot_weight2 * dist2(model_shot, obs_shot, shot_length);
+    }
+  }
+
+  int c_model;
+  if (sample_nn)
+    c_model = nn_idx[find_min(nn_d2, params->knn)];
+  else {
+    double p[params->knn];
+    for (i = 0; i < params->knn; i++)
+      p[i] = exp(-.5*nn_d2[i]);
+    normalize_pmf(p, p, params->knn);
+    c_model = nn_idx[pmfrand(p, params->knn)];
+  }
+
+  return c_model;
 }
 
 
@@ -4025,40 +4236,6 @@ int sample_fpfh_model_correspondence_given_model_pose(scope_sample_t *sample, in
   }
 
   return c_model;
-}
-
-
-void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
-{
-  // TODO: make this a param
-  double model_first_ratio = .2;
-
-  int nc = sample->nc;
-  int c_model, c_obs;
-  int correspondence_found = 0;
-
-  // find a correspondence
-  if (frand() < model_first_ratio) {
-    c_model = sample_fpfh_model_point_given_model_pose(sample, model_data, obs_data);
-    if (c_model >= 0) {
-      c_obs = sample_fpfh_obs_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
-      correspondence_found = 1;
-    }
-  }
-  if (!correspondence_found) {
-    c_obs = sample_obs_point_given_model_pose(sample, model_data, obs_data);
-    c_model = sample_fpfh_model_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params, 1, 0);  //nn, fpfh
-  }
-
-  // compute correspondence score
-  double d = dist(obs_data->pcd_obs->fpfh[c_obs], model_data->fpfh_model->fpfh[c_model], model_data->fpfh_model->fpfh_length);
-  double c_score = log(normpdf(d, 0, params->f_sigma));
-
-  sample->c_obs[nc] = c_obs;
-  sample->c_model[nc] = c_model;
-  sample->c_score[nc] = c_score;
-  sample->c_type[nc] = C_TYPE_FPFH;
-  sample->nc++;
 }
 
 
@@ -4186,6 +4363,74 @@ int sample_model_edge_correspondence_given_model_pose(scope_sample_t *sample, in
 }
 
 
+void sample_fpfh_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // TODO: make this a param
+  double model_first_ratio = .2;
+
+  int nc = sample->nc;
+  int c_model, c_obs;
+  int correspondence_found = 0;
+
+  // find a correspondence
+  if (frand() < model_first_ratio) {
+    c_model = sample_fpfh_model_point_given_model_pose(sample, model_data, obs_data);
+    if (c_model >= 0) {
+      c_obs = sample_fpfh_obs_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
+      correspondence_found = 1;
+    }
+  }
+  if (!correspondence_found) {
+    c_obs = sample_obs_point_given_model_pose(sample, model_data, obs_data);
+    c_model = sample_fpfh_model_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params, 1, 0);  //nn, fpfh
+  }
+
+  // compute correspondence score
+  double d = dist(obs_data->pcd_obs->fpfh[c_obs], model_data->fpfh_model->fpfh[c_model], model_data->fpfh_model->fpfh_length);
+  double c_score = log(normpdf(d, 0, params->f_sigma));
+
+  sample->c_obs[nc] = c_obs;
+  sample->c_model[nc] = c_model;
+  sample->c_score[nc] = c_score;
+  sample->c_type[nc] = C_TYPE_FPFH;
+  sample->nc++;
+}
+
+
+void sample_shot_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // TODO: make this a param
+  double model_first_ratio = .2;
+
+  int nc = sample->nc;
+  int c_model, c_obs;
+  int correspondence_found = 0;
+
+  // find a correspondence
+  if (frand() < model_first_ratio) {
+    c_model = sample_shot_model_point_given_model_pose(sample, model_data, obs_data);
+    if (c_model >= 0) {
+      c_obs = sample_shot_obs_correspondence_given_model_pose(sample, c_model, model_data, obs_data, params);
+      correspondence_found = 1;
+    }
+  }
+  if (!correspondence_found) {
+    c_obs = sample_shot_obs_point_given_model_pose(sample, model_data, obs_data);
+    c_model = sample_shot_model_correspondence_given_model_pose(sample, c_obs, model_data, obs_data, params, 1, 0);  //nn, shot
+  }
+
+  // compute correspondence score
+  double d = dist(obs_data->shot_obs->shot[c_obs], model_data->shot_model->shot[c_model], model_data->shot_model->shot_length);
+  double c_score = log(normpdf(d, 0, params->shot_sigma));
+
+  sample->c_obs[nc] = c_obs;
+  sample->c_model[nc] = c_model;
+  sample->c_score[nc] = c_score;
+  sample->c_type[nc] = C_TYPE_SHOT;
+  sample->nc++;
+}
+
+
 void sample_edge_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   // TODO: make these params
@@ -4224,14 +4469,21 @@ void sample_edge_correspondence_given_model_pose(scope_sample_t *sample, scope_m
 void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   //TODO: make these params
-  double fpfh_ratio = .5;
+  double fpfh_ratio = .3;
+  double shot_ratio = .3;
 
   int nc = sample->nc;
 
-  if (frand() < fpfh_ratio) {
+  double f = frand();
+  if (f < fpfh_ratio) {
     sample_fpfh_correspondence_given_model_pose(sample, model_data, obs_data, params);
     get_olf(&sample->model_olfs[nc], model_data->fpfh_model, sample->c_model[nc], 1);
     get_olf(&sample->obs_olfs[nc], obs_data->pcd_obs, sample->c_obs[nc], 0);
+  }
+  else if (f - fpfh_ratio < shot_ratio)
+    sample_shot_correspondence_given_model_pose(sample, model_data, obs_data, params);
+    get_olf(&sample->model_olfs[nc], model_data->shot_model, sample->c_model[nc], 1);
+    get_olf(&sample->obs_olfs[nc], obs_data->shot_obs, sample->c_obs[nc], 0);
   }
   else {
     sample_edge_correspondence_given_model_pose(sample, model_data, obs_data, params);
@@ -4245,6 +4497,71 @@ void sample_correspondence_given_model_pose(scope_sample_t *sample, scope_model_
 }
 
 
+void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // get obs point
+  int c_obs = irand(obs_data->pcd_obs->num_points);
+  sample->c_obs[0] = c_obs;
+
+  // get model point
+  int nn_idx[params->knn];
+  double nn_d2[params->knn];
+  flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
+  double p[params->knn];
+  for (j = 0; j < params->knn; j++)
+    p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
+  normalize_pmf(p, p, params->knn);
+  int j = pmfrand(p, params->knn);
+  int c_model = nn_idx[j];
+
+  sample->c_obs[0] = c_obs;
+  sample->c_model[0] = c_model;
+  sample->c_type[0] = C_TYPE_FPFH;
+  sample->nc = 1;
+
+  // compute correspondence score
+  sample->c_score[0] = log(normpdf(sqrt(nn_d2[j]), 0, params->f_sigma));
+
+  get_olf(&sample->model_olfs[0], model_data->fpfh_model, c_model, 1);
+  get_olf(&sample->obs_olfs[0], obs_data->pcd_obs, c_obs, 0);
+  if (frand() > .5)
+    quaternion_flip(sample->obs_olfs[0].q, sample->obs_olfs[0].q);
+  
+}
+
+
+void sample_first_correspondence_shot(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  // get obs point
+  int c_obs = irand(obs_data->shot_obs->num_points);
+  sample->c_obs[0] = c_obs;
+
+  // get model point
+  int nn_idx[params->knn];
+  double nn_d2[params->knn];
+  flann_find_nearest_neighbors_index_double(model_data->shot_model_f_index, obs_data->shot_obs->shot[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->shot_model_f_params);
+  double p[params->knn];
+  for (j = 0; j < params->knn; j++)
+    p[j] = exp(-.5*nn_d2[j] / (params->shot_sigma * params->shot_sigma));
+  normalize_pmf(p, p, params->knn);
+  int j = pmfrand(p, params->knn);
+  int c_model = nn_idx[j];
+
+  sample->c_obs[0] = c_obs;
+  sample->c_model[0] = c_model;
+  sample->c_type[0] = C_TYPE_SHOT;
+  sample->nc = 1;
+
+  // compute correspondence score
+  sample->c_score[0] = log(normpdf(sqrt(nn_d2[j]), 0, params->shot_sigma));
+
+  get_olf(&sample->model_olfs[0], model_data->shot_model, c_model, 1);
+  get_olf(&sample->obs_olfs[0], obs_data->shot_obs, c_obs, 0);
+  if (frand() > .5)
+    quaternion_flip(sample->obs_olfs[0].q, sample->obs_olfs[0].q);
+}
+
+
 void resample_model_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   int i;
@@ -4252,6 +4569,10 @@ void resample_model_correspondences(scope_sample_t *sample, scope_model_data_t *
     if (sample->c_type[i] == C_TYPE_FPFH) {
       sample->c_model[i] = sample_fpfh_model_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params, 1, 1);  //nn, fpfh
       get_olf(&sample->model_olfs[i], model_data->fpfh_model, sample->c_model[i], 1);
+    }
+    else if (sample->c_type[i] == C_TYPE_SHOT) {
+      sample->c_model[i] = sample_shot_model_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params, 1, 1);  //nn, shot
+      get_olf(&sample->model_olfs[i], model_data->shot_model, sample->c_model[i], 1);
     }
     else if (sample->c_type[i] == C_TYPE_EDGE) {
       sample->c_model[i] = sample_model_edge_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params);
@@ -4273,6 +4594,10 @@ void resample_correspondences(scope_sample_t *sample, scope_model_data_t *model_
 	sample->c_model[i] = sample_fpfh_model_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params, 1, 1);  //nn, fpfh
 	get_olf(&sample->model_olfs[i], model_data->fpfh_model, sample->c_model[i], 1);
       }
+      else if (sample->c_type[i] == C_TYPE_SHOT) {
+	sample->c_model[i] = sample_shot_model_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params, 1, 1);  //nn, shot
+	get_olf(&sample->model_olfs[i], model_data->shot_model, sample->c_model[i], 1);
+      }
       else if (sample->c_type[i] == C_TYPE_EDGE) {
 	sample->c_model[i] = sample_model_edge_correspondence_given_model_pose(sample, sample->c_obs[i], model_data, obs_data, params);
 	get_olf(&sample->model_olfs[i], model_data->range_edges_model->pcd, sample->c_model[i], 0);
@@ -4283,6 +4608,10 @@ void resample_correspondences(scope_sample_t *sample, scope_model_data_t *model_
       if (sample->c_type[i] == C_TYPE_FPFH) {
 	sample->c_obs[i] = sample_fpfh_obs_correspondence_given_model_pose(sample, sample->c_model[i], model_data, obs_data, params);
 	get_olf(&sample->obs_olfs[i], obs_data->pcd_obs, sample->c_obs[i], 0);
+      }
+      else if (sample->c_type[i] == C_TYPE_SHOT) {
+	sample->c_obs[i] = sample_shot_obs_correspondence_given_model_pose(sample, sample->c_model[i], model_data, obs_data, params);
+	get_olf(&sample->obs_olfs[i], obs_data->shot_obs, sample->c_obs[i], 0);
       }
       else if (sample->c_type[i] == C_TYPE_EDGE) {
 	sample->c_obs[i] = sample_obs_edge_correspondence_given_model_pose(sample, sample->c_model[i], model_data, obs_data, params);
@@ -4758,37 +5087,12 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
       get_olf(&S->samples[i].model_olfs[0], model_data->sift_model, c_model, 1);
       get_olf(&S->samples[i].obs_olfs[0], obs_data->sift_obs, c_obs, 0);
     }
-
-    else {  // fpfh correspondence
-
-      // get obs point
-      int c_obs = irand(obs_data->pcd_obs->num_points);
-      S->samples[i].c_obs[0] = c_obs;
-
-      // get model point
-      int nn_idx[params->knn];
-      double nn_d2[params->knn];
-      flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->pcd_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
-      double p[params->knn];
-      for (j = 0; j < params->knn; j++)
-	p[j] = exp(-.5*nn_d2[j] / (params->f_sigma * params->f_sigma));
-	//p[j] = exp(-.5*nn_d2[j] / (params->fsurf_sigma * params->fsurf_sigma));
-      normalize_pmf(p, p, params->knn);
-      int j = pmfrand(p, params->knn);
-      int c_model = nn_idx[j];
-
-      S->samples[i].c_obs[0] = c_obs;
-      S->samples[i].c_model[0] = c_model;
-      S->samples[i].c_type[0] = C_TYPE_FPFH;
-      S->samples[i].nc = 1;
-
-      // compute correspondence score
-      S->samples[i].c_score[0] = log(normpdf(sqrt(nn_d2[j]), 0, params->f_sigma));
-
-      get_olf(&S->samples[i].model_olfs[0], model_data->fpfh_model, c_model, 1);
-      get_olf(&S->samples[i].obs_olfs[0], obs_data->pcd_obs, c_obs, 0);
-      if (frand() > .5)
-	quaternion_flip(S->samples[i].obs_olfs[0].q, S->samples[i].obs_olfs[0].q);
+    else {
+      double fpfh_ratio = .5;
+      if (frand() < fpfh_ratio)
+	sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, params);
+      else
+	sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
     }
 
     // sample a pose

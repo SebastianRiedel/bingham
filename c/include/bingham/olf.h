@@ -243,6 +243,7 @@ extern "C" {
     pcd_t *shot_obs;
     pcd_t *sift_obs;
     pcd_t *pcd_obs_bg;
+    int *obs_to_shot_map;
     range_image_t *obs_range_image;
     range_image_t *obs_fg_range_image;
     int num_obs_edge_points;
