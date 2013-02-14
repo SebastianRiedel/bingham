@@ -288,8 +288,8 @@ extern "C" {
     olf_t *model_olfs;
 
     // current superpixel segmentation
-    superpixel_t *segments;
     int num_segments;
+    int *segments_idx;
 
     // validation memory
     int num_edge_outliers;
