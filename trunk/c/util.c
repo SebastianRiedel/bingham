@@ -2974,11 +2974,12 @@ void rgb2lab(double lab[], double rgb[])
   double R = rgb[0];
   double G = rgb[1];
   double B = rgb[2];
-  if (R > 1.0 || G > 1.0 || B > 1.0) {
-    R /= 255.0;
-    G /= 255.0;
-    B /= 255.0;
-  }
+
+  //if (R > 1.0 || G > 1.0 || B > 1.0) {
+  R /= 255.0;
+  G /= 255.0;
+  B /= 255.0;
+  //}
   
   // set a threshold
   double T = 0.008856;
@@ -3003,4 +3004,49 @@ void rgb2lab(double lab[], double rgb[])
   lab[0] = (Y>T ? 116*Y3 - 16.0 : 903.3*Y);
   lab[1] = 500*(fX - fY);
   lab[2] = 200*(fY - fZ);
+}
+
+// CIELAB to RGB color space
+void lab2rgb(double rgb[], double lab[])
+{
+  // Thresholds
+  double T1 = 0.008856;
+  double T2 = 0.206893;
+
+  double L = lab[0];
+  double a = lab[1];
+  double b = lab[2];
+
+  // Compute Y
+  double fY = pow((L + 16) / 116., 3);
+  int YT = (fY > T1);
+  if (!YT)
+    fY = L / 903.3;
+  double Y = fY;
+
+  // Alter fY slightly for further calculations
+  fY = (YT ? pow(fY, 1/3.) : 7.787 * fY + 16/116.);
+
+  // Compute X
+  double fX = a / 500. + fY;
+  int XT = fX > T2;
+  double X = (XT ? pow(fX, 3) : (fX - 16/116.) / 7.787);
+
+  // Compute Z
+  double fZ = fY - b / 200.;
+  int ZT = fZ > T2;
+  double Z = (ZT ? pow(fZ, 3) : (fZ - 16/116.) / 7.787);
+
+  // Normalize for D65 white point
+  X = X * 0.950456;
+  Z = Z * 1.088754;
+
+  // XYZ to RGB
+  double R =  3.240479*X - 1.537150*Y - 0.498535*Z;
+  double G = -0.969256*X + 1.875992*Y + 0.041556*Z;
+  double B =  0.055648*X - 0.204043*Y + 1.057311*Z;
+
+  rgb[0] = 255*MAX(MIN(R, 1.0), 0.0);
+  rgb[1] = 255*MAX(MIN(G, 1.0), 0.0);
+  rgb[2] = 255*MAX(MIN(B, 1.0), 0.0);
 }

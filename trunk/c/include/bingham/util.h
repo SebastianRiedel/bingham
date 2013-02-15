@@ -159,6 +159,7 @@ void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* f
 void print_matrix(double **X, int n, int m);
 
 void rgb2lab(double lab[], double rgb[]);                                 /* RGB to CIELAB color space */
+void lab2rgb(double rgb[], double lab[]);                                 /* CIELAB to RGB color space */
 
 
 typedef struct ilist {
