@@ -1966,17 +1966,21 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
   double t0 = get_time_ms();  //dbug
 
   //TODO: make this a param
-  int segment_resolution = 8;  // in units of range image pixels
+  int segment_resolution = 7;  // in units of range image pixels
 
-  range_image_t *obs_range_image = obs_data->obs_range_image;
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  range_image_t *obs_range_image = obs_data->obs_fg_range_image;
   double **obs_edge_image = obs_data->obs_edge_image;
   double ***obs_lab_image = obs_data->obs_lab_image;
   int w = obs_range_image->w;
   int h = obs_range_image->h;
 
-  double xyz_sigma2 = params->xyz_sigma * params->xyz_sigma;
-  double normal_sigma2 = params->normal_sigma * params->normal_sigma;
-  double lab_sigma2 = params->lab_sigma * params->lab_sigma;
+  double xyz_sigma = params->xyz_sigma;
+  double normal_sigma = params->normal_sigma;
+  double lab_sigma = params->lab_sigma;
+  double xyz_sigma2 = xyz_sigma * xyz_sigma;
+  double normal_sigma2 = normal_sigma * normal_sigma;
+  double lab_sigma2 = lab_sigma * lab_sigma;
 
   int num_clusters = ceil(w / segment_resolution) * ceil(h / segment_resolution);
   double **cluster_points = new_matrix2(num_clusters, 3);
@@ -1986,6 +1990,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 
   int I[w][h];     // pixel cluster membership
   double D2[w][h];  // pixel cluster squared distances
+  double d2_tot = 0;
 
   int i, j, xi, yi, iter, max_iter = 50;
   for (iter = 0; iter < max_iter; iter++) {  // kmeans loop
@@ -2038,6 +2043,12 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	  if (i >= 0) {
 	    add(cluster_points[i], cluster_points[i], obs_range_image->points[xi][yi], 3);
 	    add(cluster_normals[i], cluster_normals[i], obs_range_image->normals[xi][yi], 3);
+
+	    //dbug
+	    if (isnan(sum(obs_range_image->normals[xi][yi], 3)))
+	      printf("obs_range_image->normals[%d][%d] = (%f, %f, %f)\n", xi, yi,
+		     obs_range_image->normals[xi][yi][0], obs_range_image->normals[xi][yi][1], obs_range_image->normals[xi][yi][2]);
+
 	    for (j = 0; j < 3; j++)
 	      cluster_colors[i][j] += obs_lab_image[j][xi][yi];
 	    cluster_cnts[i]++;
@@ -2045,11 +2056,13 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	}
       }
       for (i = 0; i < num_clusters; i++) {
-	if (cluster_cnts[i] > 0) {
+	if (cluster_cnts[i] >= 5) {
 	  mult(cluster_points[i], cluster_points[i], 1/(double)cluster_cnts[i], 3);
 	  normalize(cluster_normals[i], cluster_normals[i], 3);
 	  mult(cluster_colors[i], cluster_colors[i], 1/(double)cluster_cnts[i], 3);
 	}
+	else
+	  cluster_cnts[i] = 0;  // kill clusters with < 5 points
       }
 
       // remove empty clusters
@@ -2065,9 +2078,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 
     // update cluster memberships
     memset(I, -1, w*h*sizeof(int));
-    for (xi = 0; xi < w; xi++)
-      for (yi = 0; yi < h; yi++)
-	D2[xi][yi] = 100000.0;
+    memset(D2, 0, w*h*sizeof(double));
 
     for (i = 0; i < num_clusters; i++) {
 
@@ -2084,11 +2095,11 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	    double d2_point = dist2(obs_range_image->points[xi][yi], cluster_points[i], 3);
 	    double d2_normal = dist2(obs_range_image->normals[xi][yi], cluster_normals[i], 3);
 	    double obs_lab[3] = {obs_lab_image[0][xi][yi], obs_lab_image[1][xi][yi], obs_lab_image[2][xi][yi]};
-	    double d2_color = 0; //dist2(obs_lab, cluster_colors[i], 3);
+	    double d2_color = dist2(obs_lab, cluster_colors[i], 3);
 
 	    double d2 = d2_point/xyz_sigma2 + d2_normal/normal_sigma2 + d2_color/lab_sigma2;
 
-	    if (d2 < D2[xi][yi]) {
+	    if (I[xi][yi] < 0 || d2 < D2[xi][yi]) {
 	      I[xi][yi] = i;
 	      D2[xi][yi] = d2;
 	    }
@@ -2096,21 +2107,105 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	}
       }
     }
+
+    double d2_tot_new = sum(D2[0], w*h);
+    if (fabs(d2_tot_new - d2_tot) < 1.0)
+      break;
+    d2_tot = d2_tot_new;
   }
   printf("Got superpixel segmentation in %f ms\n", get_time_ms() - t0);  //dbug
-
+  t0 = get_time_ms();
 
   // get superpixel keypoints
   obs_data->num_obs_segments = num_clusters;
   safe_calloc(obs_data->obs_segments, num_clusters, superpixel_t);
 
-  pcd_t *surface_pcd = obs_data->pcd_obs_bg;
-  double **edge_points = obs_data->obs_edge_points;
-  int num_edge_points = obs_data->num_obs_edge_points;
-  
-  for (i = 0; i < surface_pcd->num_points; i++) {  // first pass to get the center points
+  for (i = 0; i < num_clusters; i++) {
 
+    // find all range image pixels in cluster i
+    int cluster_idx[(2*segment_resolution+1)*(2*segment_resolution+1)];
+    int cluster_cnt = 0;
+
+    range_image_xyz2sub(&xi, &yi, obs_range_image, cluster_points[i]);
+    int x0 = MAX(xi - segment_resolution, 0);
+    int x1 = MIN(xi + segment_resolution, w-1);
+    int y0 = MAX(yi - segment_resolution, 0);
+    int y1 = MIN(yi + segment_resolution, h-1);
+
+    for (xi = x0; xi <= x1; xi++)
+      for (yi = y0; yi <= y1; yi++)
+	if (I[xi][yi] == i)
+	  cluster_idx[cluster_cnt++] = xi*h+yi;
+
+    // find cluster point closest to the centroid in xyz
+    double cluster_d2[cluster_cnt];
+    for (j = 0; j < cluster_cnt; j++) {
+      int idx = obs_range_image->idx[0][cluster_idx[j]];
+      double d2_point = dist2(pcd_obs->points[idx], cluster_points[i], 3);
+      //double d2_normal = dist2(pcd_obs->normals[idx], cluster_normals[i], 3);
+      //cluster_d2[j] = d2_point/xyz_sigma2 + d2_normal/normal_sigma2;
+      cluster_d2[j] = d2_point;
+    }
+    //reorder(cluster_d2, D2[0], cluster_idx, cluster_cnt);
+    int center_pixel = cluster_idx[ find_min(cluster_d2, cluster_cnt) ];
+    obs_data->obs_segments[i].center_point = obs_range_image->idx[0][center_pixel];
+
+    // find surface keypoints
+    int keypoints[cluster_cnt], keypixels[cluster_cnt];
+    int num_keypoints = 1;
+    keypoints[0] = obs_data->obs_segments[i].center_point;
+    keypixels[0] = center_pixel;
+
+    double r2 = 3*3; //.01*.01;
+    int n=cluster_cnt, mask[cluster_cnt], pcd_idx[cluster_cnt];
+    for (j = 0; j < cluster_cnt; j++) {
+      mask[j] = 1;
+      pcd_idx[j] = obs_range_image->idx[0][cluster_idx[j]];
+    }
+    while (n > 0) {
+      double d2min = 10000.0;
+      int jmin = -1;
+      //int keypoint = keypoints[num_keypoints-1];
+      int key_yi = keypixels[num_keypoints-1] % h;
+      int key_xi = keypixels[num_keypoints-1] / h;
+      for (j = 0; j < cluster_cnt; j++) {
+	if (mask[j]) {
+	  //double d2 = dist2(pcd_obs->points[pcd_idx[j]], pcd_obs->points[keypoint], 3);
+	  int dy = key_yi - cluster_idx[j] % h;
+	  int dx = key_xi - cluster_idx[j] / h;
+	  double d2 = dx*dx + dy*dy;
+	  if (d2 < r2) {
+	    mask[j] = 0;  // mask out all points within a given radius of the last keypoint
+	    n--;
+	  }
+	  else if (jmin < 0 || d2 < d2min) {  // next keypoint is the closest point outside of the radius
+	    d2min = d2;
+	    jmin = j;
+	  }
+	}
+      }
+      if (jmin >= 0) {
+	keypixels[num_keypoints] = cluster_idx[jmin];
+	keypoints[num_keypoints++] = pcd_idx[jmin];
+      }
+    }
+    safe_calloc(obs_data->obs_segments[i].surface_points, num_keypoints, int);
+    memcpy(obs_data->obs_segments[i].surface_points, keypoints, num_keypoints*sizeof(int));
+    obs_data->obs_segments[i].num_surface_points = num_keypoints;
+
+    //TODO: find edge keypoints
+
+    // find the max radius (from center point to any keypoint)
+    int *surface_points = obs_data->obs_segments[i].surface_points;
+    int num_surface_points = obs_data->obs_segments[i].num_surface_points;
+    int center_point = obs_data->obs_segments[i].center_point;
+    for (j = 0; j < num_surface_points; j++) {
+      double d2_point = dist2(pcd_obs->points[ surface_points[j] ], pcd_obs->points[center_point], 3);
+      cluster_d2[j] = d2_point;
+    }
+    obs_data->obs_segments[i].max_radius = sqrt(max(cluster_d2, num_surface_points));
   }
+  printf("Got superpixel keypoints in %f ms\n", get_time_ms() - t0);  //dbug
 
 
   //dbug: save superpixel ppm file
@@ -2132,6 +2227,15 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       }
     }
   }
+  for (i = 0; i < num_clusters; i++) {  // add superpixel keypoints
+    for (j = 0; j < obs_data->obs_segments[i].num_surface_points; j++) {
+      if (range_image_xyz2sub(&xi, &yi, obs_range_image, pcd_obs->points[ obs_data->obs_segments[i].surface_points[j] ])) {
+	S[xi][yi][0] = 255;
+	S[xi][yi][1] = 0;
+	S[xi][yi][2] = 0;
+      }
+    }
+  }
   FILE *f = fopen("super.ppm", "w");
   fprintf(f, "P6 %d %d 255\n", w, h);
   for (yi = h-1; yi >= 0; yi--)
@@ -2140,6 +2244,12 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	fputc(S[xi][yi][j], f);
   fprintf(f, "\n");
   fclose(f);
+
+
+  //cleanup
+  free_matrix2(cluster_points);
+  free_matrix2(cluster_normals);
+  free_matrix2(cluster_colors);
 }
 
 
