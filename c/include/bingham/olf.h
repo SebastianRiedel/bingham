@@ -93,9 +93,9 @@ extern "C" {
 
 
   typedef struct {
+    int center_point;
     int *surface_points;
     int *edge_points;
-    int center_point;
     int num_surface_points;
     int num_edge_points;
     double max_radius;
