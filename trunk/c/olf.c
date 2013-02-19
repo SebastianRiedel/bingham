@@ -2191,6 +2191,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
   pcd_t *pcd_obs = obs_data->pcd_obs;
   range_image_t *obs_range_image = obs_data->obs_fg_range_image;
   double **obs_edge_image = obs_data->obs_edge_image;
+  double **obs_edge_points_image = obs_data->obs_edge_points_image;
   double ***obs_lab_image = obs_data->obs_lab_image;
   int w = obs_range_image->w;
   int h = obs_range_image->h;
@@ -2434,7 +2435,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
     double edge_thresh = .5;
     double W[cluster_cnt];
     for (j = 0; j < cluster_cnt; j++) {
-      W[j] = exp(obs_edge_image[0][ cluster_idx[j] ]);
+      W[j] = exp(obs_edge_points_image[0][ cluster_idx[j] ]);
     }
     while (1) {
       j = find_max(W, cluster_cnt);  // next edge keypoint is the highest-weight pixel that hasn't been masked out yet
@@ -2496,6 +2497,15 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       }
     }
   }
+  /*
+  for (i = 0; i < obs_data->num_obs_edge_points; i++) {  // add obs_edge_points
+    if (range_image_xyz2sub(&xi, &yi, obs_range_image, obs_data->obs_edge_points[i])) {
+      S[xi][yi][0] = 0;
+      S[xi][yi][1] = 0;
+      S[xi][yi][2] = 255;
+    }
+  }
+  */
   FILE *f = fopen("super.ppm", "w");
   fprintf(f, "P6 %d %d 255\n", w, h);
   for (yi = h-1; yi >= 0; yi--)
@@ -2866,7 +2876,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
 
   // get edge points
   data->obs_edge_points = get_edge_points(data->pcd_obs, &data->num_obs_edge_points, &data->obs_edge_idx);
-  //data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_fg_range_image);
+  data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_fg_range_image);
 
   // compute blurred edge feature image
   data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_fg_range_image, params);
@@ -2961,7 +2971,7 @@ void free_scope_obs_data(scope_obs_data_t *data)
   free_range_image(data->obs_fg_range_image);
   free(data->obs_edge_idx);
   free_matrix2(data->obs_edge_points);
-  //free_matrix2(data->obs_edge_points_image);
+  free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
   free_matrix3(data->obs_lab_image);
   flann_free_index(data->obs_xyzn_index, &data->obs_xyzn_params);
