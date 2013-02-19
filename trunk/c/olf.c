@@ -2621,7 +2621,7 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	  P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
 
 	  // multiply by color likelihood (TODO: use labdist)
-	  double d_lab = dist(segment->avg_lab_color, pcd_model->lab[nn_idx], 3) / params->lab_sigma;
+	  double d_lab = .3 * dist(segment->avg_lab_color, pcd_model->lab[nn_idx], 3) / params->lab_sigma;  //dbug
 	  P[j] *= normpdf(d_lab, 0, 1) / .3989;
 	}
       }
@@ -2754,9 +2754,19 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
 
     //printf(" - got correspondences in %f ms\n", get_time_ms() - t1); //dbug
     //t1 = get_time_ms(); //dbug
-
     //printf("%d segments  -->  %d correspondences\n", sample->num_segments, sample->nc); //dbug
   
+    // sub-sample from correspondences
+    int nc = params->num_correspondences;
+    if (sample->nc > nc) {
+      int idx[nc];
+      randperm(idx, sample->nc, nc);
+      reorderi(sample->c_type, sample->c_type, idx, nc);
+      reorderi(sample->c_obs, sample->c_obs, idx, nc);
+      reorderi(sample->c_model, sample->c_model, idx, nc);
+      reorder(sample->c_score, sample->c_score, idx, nc);
+    }
+
     // sample model pose given olf correspondences
     sample_model_pose_given_correspondences(sample, model_data, obs_data, params);
 
@@ -3026,12 +3036,14 @@ void free_olf(olf_t *olf)
 void scope_sample_alloc(scope_sample_t *sample, int nc)
 {
   memset(sample, 0, sizeof(scope_sample_t));
-  safe_calloc(sample->c_obs, nc, int);
-  safe_calloc(sample->c_model, nc, int);
-  safe_calloc(sample->c_type, nc, int);
-  safe_calloc(sample->c_score, nc, double);
-  //safe_calloc(sample->obs_olfs, nc, olf_t);
-  //safe_calloc(sample->model_olfs, nc, olf_t);
+  if (nc > 0) {
+    safe_calloc(sample->c_obs, nc, int);
+    safe_calloc(sample->c_model, nc, int);
+    safe_calloc(sample->c_type, nc, int);
+    safe_calloc(sample->c_score, nc, double);
+    //safe_calloc(sample->obs_olfs, nc, olf_t);
+    //safe_calloc(sample->model_olfs, nc, olf_t);
+  }
   bingham_alloc(&sample->B, 4);
 }
 
@@ -6187,8 +6199,11 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 
 void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
+  //TODO: make this a param
+  int num_alignment_iters = 10;
+
   double t0;
-  int c,i;
+  int i, iter;
 
   // score hypotheses
   t0 = get_time_ms();
@@ -6199,22 +6214,31 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   t0 = get_time_ms();  //dbug
-  for (c = 1; c < params->num_correspondences; ++c) {
+  for (iter = 0; iter < num_alignment_iters; iter++) {
     for (i = 0; i < S->num_samples; ++i) {
-      scope_sample_t *sample = &S->samples[i];
-      sample_segments_given_model_pose(sample, model_data, obs_data, params);
-      if (sample->num_segments > 0)
-	align_model_to_segments(sample, model_data, obs_data, params);
+      scope_sample_t sample;
+      scope_sample_alloc(&sample, 0);
+      scope_sample_copy(&sample, &S->samples[i]);
+      sample_segments_given_model_pose(&sample, model_data, obs_data, params);
+      if (sample.num_segments > 0) {
+	align_model_to_segments(&sample, model_data, obs_data, params);
+	double w = model_placement_score(&sample, model_data, obs_data, params, 2);
+	if (w > S->W[i]) {
+	  scope_sample_copy(&S->samples[i], &sample);
+	  S->W[i] = w;
+	}
+      }
+      scope_sample_free(&sample);
     }
     if (have_true_pose_)
       print_good_poses(S);
   }
   printf("Finished round 2 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
-  t0 = get_time_ms();  //dbug
-  for (i = 0; i < S->num_samples; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
-  printf("Scored round 2 final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+  //t0 = get_time_ms();  //dbug
+  //for (i = 0; i < S->num_samples; i++)
+  //  S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
+  //printf("Scored round 2 final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   sort_pose_samples(S);
 
