@@ -2337,11 +2337,17 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
   printf("Got superpixel segmentation in %f ms\n", get_time_ms() - t0);  //dbug
   t0 = get_time_ms();
 
-  // get superpixel keypoints
+  // allocate obs_segments superpixel array
   obs_data->num_obs_segments = num_clusters;
   safe_calloc(obs_data->obs_segments, num_clusters, superpixel_t);
 
+  // get superpixel keypoints
   for (i = 0; i < num_clusters; i++) {
+
+    // copy average point, normal, and color into segment
+    memcpy(obs_data->obs_segments[i].avg_point, cluster_points[i], 3*sizeof(double));
+    memcpy(obs_data->obs_segments[i].avg_normal, cluster_normals[i], 3*sizeof(double));
+    memcpy(obs_data->obs_segments[i].avg_lab_color, cluster_colors[i], 3*sizeof(double));
 
     // find all range image pixels in cluster i
     int cluster_idx[(2*segment_resolution+1)*(2*segment_resolution+1)];
@@ -2481,6 +2487,13 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       }
     }
   }
+  for (i = 0; i < obs_data->num_obs_edge_points; i++) {  // add obs_edge_points
+    if (range_image_xyz2sub(&xi, &yi, obs_range_image, obs_data->obs_edge_points[i])) {
+      S[xi][yi][0] = 0;
+      S[xi][yi][1] = 0;
+      S[xi][yi][2] = 255;
+    }
+  }
   for (i = 0; i < num_clusters; i++) {  // add superpixel keypoints
     for (j = 0; j < obs_data->obs_segments[i].num_surface_points; j++) {
       if (range_image_xyz2sub(&xi, &yi, obs_range_image, pcd_obs->points[ obs_data->obs_segments[i].surface_points[j] ])) {
@@ -2496,16 +2509,12 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	S[xi][yi][2] = 0;
       }
     }
+    if (range_image_xyz2sub(&xi, &yi, obs_range_image, pcd_obs->points[ obs_data->obs_segments[i].center_point ])) {
+      S[xi][yi][0] = 255;
+      S[xi][yi][1] = 255;
+      S[xi][yi][2] = 0;
+    }    
   }
-  /*
-  for (i = 0; i < obs_data->num_obs_edge_points; i++) {  // add obs_edge_points
-    if (range_image_xyz2sub(&xi, &yi, obs_range_image, obs_data->obs_edge_points[i])) {
-      S[xi][yi][0] = 0;
-      S[xi][yi][1] = 0;
-      S[xi][yi][2] = 255;
-    }
-  }
-  */
   FILE *f = fopen("super.ppm", "w");
   fprintf(f, "P6 %d %d 255\n", w, h);
   for (yi = h-1; yi >= 0; yi--)
@@ -2528,9 +2537,6 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
  */
 void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
-  //TODO: use 3D model distance transform
-  //TODO: use normals, colors
-
   //double t0 = get_time_ms();  //dbug
 
   double vis_thresh = params->vis_thresh;
@@ -2592,9 +2598,9 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	get_normal(obs_normal, pcd_obs, segment->surface_points[j]);
 	matrix_vec_mult(obs_normal, R_inv, obs_normal, 3, 3);
 
-	double xyzn_query[6];
-	mult(&xyzn_query[0], obs_xyz, xyz_weight, 3);
-	mult(&xyzn_query[3], obs_normal, normal_weight, 3);
+	//double xyzn_query[6];
+	//mult(&xyzn_query[0], obs_xyz, xyz_weight, 3);
+	//mult(&xyzn_query[3], obs_normal, normal_weight, 3);
 
 	//int nn_idx;
 	double nn_d2;
@@ -2613,6 +2619,10 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	  double obs_range = norm(obs_xyz, 3);
 	  double dR = model_range - obs_range;
 	  P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
+
+	  // multiply by color likelihood (TODO: use labdist)
+	  double d_lab = dist(segment->avg_lab_color, pcd_model->lab[nn_idx], 3) / params->lab_sigma;
+	  P[j] *= normpdf(d_lab, 0, 1) / .3989;
 	}
       }
       segment_probs[i] = sum(P, segment->num_surface_points) / (double)segment->num_surface_points;
