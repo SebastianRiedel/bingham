@@ -593,9 +593,41 @@ int bingham_is_uniform(bingham_t *B)
 }
 
 
+void bingham_mode(double *mode, bingham_t *B)
+{
+  int i, d = B->d;
+
+  if (bingham_is_uniform(B)) {
+    mode[0] = 1;
+    for (i = 1; i < d; i++)
+      mode[i] = 0.0;
+    return;
+  }
+
+  double **V = B->V;
+
+  double epsilon = 1e-16;
+  while (1) {
+    for (i = 0; i < d; i++)
+      mode[i] = frand() - .5;
+
+    double u[d];
+    for (i = 0; i < d-1; i++) {
+      proj(u, mode, V[i], d);
+      sub(mode, mode, u, d);
+    }
+
+    double n = norm(mode,d);
+    if (n > epsilon) {
+      mult(mode, mode, 1.0/n, d);
+      break;
+    }
+  }
+}
+
 /*
  * Computes the mode of a bingham distribution.
- */
+ *
 void bingham_mode(double *mode, bingham_t *B)
 {
   int i, j, k, d = B->d;
@@ -643,15 +675,6 @@ void bingham_mode(double *mode, bingham_t *B)
   // now solve Vcut * x = b
   double x[d-1];
 
-  /*dbug
-  printf("cut_axis = %d\n", cut_axis);
-  printf("Vcut = [\n%f %f %f ; \n%f %f %f ; \n%f %f %f]\n",
-	 Vcut[0][0], Vcut[0][1], Vcut[0][2],
-	 Vcut[1][0], Vcut[1][1], Vcut[1][2],
-	 Vcut[2][0], Vcut[2][1], Vcut[2][2]);
-  printf("b = [%f %f %f]\n", b[0], b[1], b[2]);
-  */
-
   solve(x, Vcut, b, d-1);
 
   //printf("x = [%f %f %f]\n\n", x[0], x[1], x[2]);
@@ -666,7 +689,7 @@ void bingham_mode(double *mode, bingham_t *B)
   
   normalize(mode, mode, d);
 }
-
+*/
 
 /*
  * Computes some statistics of a bingham.
@@ -1807,7 +1830,7 @@ void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F)
     for (j = 0; j < d-1; j++) {
       v = &B_array[i].V[j];
       for (k = 0; k < d; k++)
-	vt[k] = &v[0][k];
+        vt[k] = &v[0][k];
       matrix_mult(C2, vt, v, d, 1, d);
       mult(C2[0], C2[0], B_array[i].Z[j], d*d);
       matrix_add(C, C, C2, d, d);

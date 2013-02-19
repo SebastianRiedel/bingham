@@ -120,35 +120,39 @@ int main(int argc, char *argv[])
   }
   fprintf(f, "];\n");
 
-  fprintf(f, "C_obs = [");
+  fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
-    for (j = 0; j < params.num_correspondences; j++)
+    fprintf(f, "[");
+    for (j = 0; j < S->samples[i].nc; j++)
       fprintf(f, "%d ", 1 + S->samples[i].c_obs[j]);
-    fprintf(f, "; ");
+    fprintf(f, "], ");
   }
-  fprintf(f, "];\n");
+  fprintf(f, "};\n");
 
-  fprintf(f, "C_model = [");
+  fprintf(f, "C_model = {");
   for (i = 0; i < n; i++) {
-    for (j = 0; j < params.num_correspondences; j++)
+    fprintf(f, "[");
+    for (j = 0; j < S->samples[i].nc; j++)
       fprintf(f, "%d ", 1 + S->samples[i].c_model[j]);
-    fprintf(f, "; ");
+    fprintf(f, "], ");
   }
-  fprintf(f, "];\n");
+  fprintf(f, "};\n");
 
-  fprintf(f, "C_type = [");
+  fprintf(f, "C_type = {");
   for (i = 0; i < n; i++) {
-    for (j = 0; j < params.num_correspondences; j++)
+    fprintf(f, "[");
+    for (j = 0; j < S->samples[i].nc; j++)
       fprintf(f, "%d ", S->samples[i].c_type[j]);
-    fprintf(f, "; ");
+    fprintf(f, "], ");
   }
-  fprintf(f, "];\n");
+  fprintf(f, "};\n");
   
   fprintf(f, "C_num = [");
   for (i = 0; i < n; i++)
     fprintf(f, "%d ", S->samples[i].nc);
   fprintf(f, "];\n");
   
+  /*
   fprintf(f, "vis_probs = [");
   for (i = 0; i < n; i++) {
     for (j = 0; j < model.obj_pcd->num_points; j++)
@@ -164,6 +168,7 @@ int main(int argc, char *argv[])
     fprintf(f, "; ");
   }
   fprintf(f, "];\n");
+  */
 
   /***************************************************
 

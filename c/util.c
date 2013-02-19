@@ -532,6 +532,16 @@ int find_min(double x[], int n)
   return idx;
 }
 
+// computes the sum of x's elements
+int isum(int x[], int n)
+{
+  int i;
+  int y = 0;
+  for (i = 0; i < n; i++)
+    y += x[i];
+  return y;
+}
+
 // computes the max of x
 int imax(int x[], int n)
 {
