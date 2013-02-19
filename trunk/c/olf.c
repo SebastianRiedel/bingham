@@ -2009,7 +2009,7 @@ float **get_fsurf_features(double **fpfh, double **sdw, int n, int fpfh_length, 
 
 
 /*
- * returns the number of points
+ * returns the number of points in n_ptr
  */
 double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t *range_edges_model, int *model_idx)
 {
@@ -2044,7 +2044,7 @@ double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t
 
   //printf("n = %d, idx[0] = %d, idx[n-1] = %d\n", n, idx[0], idx[n-1]); //dbug
 
-  // get the actual points in the correct pose
+  // get the actual points
   double **P = new_matrix2(n,3);
   reorder_rows(P, range_edges_model->pcd->points, idx, n, 3);
 
@@ -2649,19 +2649,11 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
   quaternion_to_rotation_matrix(R_inv, q_inv);
 
   // realloc sample fields
-  safe_realloc(sample->c_obs, sample->num_segments, int);
-  safe_realloc(sample->c_model, sample->num_segments, int);
-  safe_realloc(sample->c_type, sample->num_segments, int);
-  safe_realloc(sample->c_score, sample->num_segments, double);
-  //int i;
-  //for (i = 0; i < sample->nc; i++) {
-  //  free_olf(&sample->obs_olfs[i]);
-  //  free_olf(&sample->model_olfs[i]);
-  //}
-  //safe_realloc(sample->obs_olfs, sample->num_segments, olf_t);
-  //safe_realloc(sample->model_olfs, sample->num_segments, olf_t);
-  //memset(sample->obs_olfs, 0, sample->num_segments * sizeof(olf_t));
-  //memset(sample->model_olfs, 0, sample->num_segments * sizeof(olf_t));
+  safe_realloc(sample->c_obs, 2*sample->num_segments, int);
+  safe_realloc(sample->c_model, 2*sample->num_segments, int);
+  safe_realloc(sample->c_type, 2*sample->num_segments, int);
+  safe_realloc(sample->c_score, 2*sample->num_segments, double);
+  sample->nc = 0;
 
   int iter, max_iter = 1;
   for (iter = 0; iter < max_iter; iter++) {
@@ -2669,86 +2661,79 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
     //double t1 = get_time_ms(); //dbug
 
     // get correspondences from obs segment centers to model
-    int *c_obs = sample->c_obs, *c_model = sample->c_model, *c_type = sample->c_type;
-    int i, cnt=0;
+    int i;
     for (i = 0; i < sample->num_segments; i++) {
-      c_type[cnt] = C_TYPE_SURFACE;
-      c_obs[cnt] = obs_data->obs_segments[ sample->segments_idx[i] ].center_point;
+      int c_obs = obs_data->obs_segments[ sample->segments_idx[i] ].center_point;
     
       double obs_xyz[3];
-      get_point(obs_xyz, pcd_obs, c_obs[cnt]);
+      get_point(obs_xyz, pcd_obs, c_obs);
       sub(obs_xyz, obs_xyz, sample->x, 3);
       matrix_vec_mult(obs_xyz, R_inv, obs_xyz, 3, 3);
 
       double obs_normal[3];
-      get_normal(obs_normal, pcd_obs, c_obs[cnt]);
+      get_normal(obs_normal, pcd_obs, c_obs);
       matrix_vec_mult(obs_normal, R_inv, obs_normal, 3, 3);
 
-      //double xyzn_query[6];
-      //mult(&xyzn_query[0], obs_xyz, xyz_weight, 3);
-      //mult(&xyzn_query[3], obs_normal, normal_weight, 3);
-      //int nn_idx;
-      //double nn_d2;
-      //flann_find_nearest_neighbors_index_double(model_data->model_xyzn_index, xyzn_query, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyzn_params);
-
-      //dbug
-      //double dx = (obs_xyz[0] - model_data->pcd_model->points[nn_idx][0]) / model_data->model_dist_grid->res;
-      //double dy = (obs_xyz[1] - model_data->pcd_model->points[nn_idx][1]) / model_data->model_dist_grid->res;
-      //double dz = (obs_xyz[2] - model_data->pcd_model->points[nn_idx][2]) / model_data->model_dist_grid->res;
-      //printf("flann dist = %f, nn_idx = %d, dx = %.1f, dy = %.1f, dz = %.1f\n", sqrt(nn_d2), nn_idx, dx, dy, dz); //dbug
-
-
       double nn_d2;
-      int search_radius = 4;
-      int nn_idx = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
+      int search_radius = 2;
+      int c_model = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
       //int nn_idx = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
 
-      //dbug
-      //if (nn_idx >= 0) {
-      //	dx = (obs_xyz[0] - model_data->pcd_model->points[nn_idx][0]) / model_data->model_dist_grid->res;
-      //	dy = (obs_xyz[1] - model_data->pcd_model->points[nn_idx][1]) / model_data->model_dist_grid->res;
-      //	dz = (obs_xyz[2] - model_data->pcd_model->points[nn_idx][2]) / model_data->model_dist_grid->res;
-      //	printf("dist_grid dist = %f, nn_idx = %d, dx = %.1f, dy = %.1f, dz = %.1f\n", sqrt(nn_d2), nn_idx, dx, dy, dz); //dbug
-      //}
-      //else
-      //	printf("dist_grid dist = %f, nn_idx = %d\n", sqrt(nn_d2), nn_idx); //dbug
-
-      //printf("(xyz = [%f, %f, %f]\n", obs_xyz[0], obs_xyz[1], obs_xyz[2]); //dbug
-
-      //dbug
-      //flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, obs_xyz, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
-      //dx = (obs_xyz[0] - model_data->pcd_model->points[nn_idx][0]) / model_data->model_dist_grid->res;
-      //dy = (obs_xyz[1] - model_data->pcd_model->points[nn_idx][1]) / model_data->model_dist_grid->res;
-      //dz = (obs_xyz[2] - model_data->pcd_model->points[nn_idx][2]) / model_data->model_dist_grid->res;
-      //printf("(xyz) flann dist = %f, nn_idx = %d, dx = %.1f, dy = %.1f, dz = %.1f\n", sqrt(nn_d2), nn_idx, dx, dy, dz); //dbug
-
-      //dbug
-      //nn_idx = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
-      //if (nn_idx >= 0) {
-      //	dx = (obs_xyz[0] - model_data->pcd_model->points[nn_idx][0]) / model_data->model_dist_grid->res;
-      //	dy = (obs_xyz[1] - model_data->pcd_model->points[nn_idx][1]) / model_data->model_dist_grid->res;
-      //	dz = (obs_xyz[2] - model_data->pcd_model->points[nn_idx][2]) / model_data->model_dist_grid->res;
-      //	printf("(xyz) dist_grid dist = %f, nn_idx = %d, dx = %.1f, dy = %.1f, dz = %.1f\n", sqrt(nn_d2), nn_idx, dx, dy, dz); //dbug
-      //}
-      //else
-      //	printf("(xyz) dist_grid dist = %f, nn_idx = %d\n", sqrt(nn_d2), nn_idx); //dbug
-
-      //printf("(xyz) dist_grid nn_dist[c] = %f\n", distance_grid_get_distance(obs_xyz, model_data->model_dist_grid));
-
-
-      if (nn_idx >= 0)
-	c_model[cnt++] = nn_idx;
+      if (c_model >= 0) {
+	int nc = sample->nc;
+	sample->c_type[nc] = C_TYPE_SURFACE;
+	sample->c_obs[nc] = c_obs;
+	sample->c_model[nc] = c_model;
+	sample->c_score[nc] = normpdf(sqrt(nn_d2), 0, 1);
+	sample->nc++;
+      }
     }
+
+    // get model edge points at current viewpoint
+    int model_edge_idx[model_data->pcd_model->num_points];
+    int num_model_edges = 0;
+    double **model_edge_points = get_range_edge_points(&num_model_edges, sample->x, sample->q, model_data->range_edges_model, model_edge_idx);
+
+    // get correspondences from obs segment edges to model
+    for (i = 0; i < sample->num_segments; i++) {
+      superpixel_t *segment = &obs_data->obs_segments[ sample->segments_idx[i] ];
+      int j, c_obs_best = -1, c_model_best = -1;
+      double d2_best = 1e16;
+      for (j = 0; j < segment->num_edge_points; j++) {  // find the best edge correspondence for this segment
+	int c_obs = segment->edge_points[j];
+	double obs_xyz[3];
+	get_point(obs_xyz, pcd_obs, c_obs);
+	sub(obs_xyz, obs_xyz, sample->x, 3);
+	matrix_vec_mult(obs_xyz, R_inv, obs_xyz, 3, 3);
+
+	// find the closest model edge point (TODO: use edge weights)
+	double d2[num_model_edges];
+	int k;
+	for (k = 0; k < num_model_edges; k++)
+	  d2[k] = dist2(model_edge_points[k], obs_xyz, 3);
+	k = find_min(d2, num_model_edges);
+
+	if (d2[k] < d2_best) {
+	  d2_best = d2[k];
+	  c_obs_best = c_obs;
+	  c_model_best = model_edge_idx[k];
+	}
+      }
+
+      if (d2_best < params->xyz_sigma * params->xyz_sigma) {  // accept edge correspondences within distance of xyz_sigma
+	int nc = sample->nc;
+	sample->c_type[nc] = C_TYPE_EDGE;
+	sample->c_obs[nc] = c_obs_best;
+	sample->c_model[nc] = c_model_best;
+	sample->c_score[nc] = normpdf(sqrt(d2_best), 0, params->xyz_sigma);
+	sample->nc++;
+      }
+    }
+
+    free_matrix2(model_edge_points);
+
     //printf(" - got correspondences in %f ms\n", get_time_ms() - t1); //dbug
     //t1 = get_time_ms(); //dbug
-
-    // get new olfs
-    //olf_t *obs_olfs = sample->obs_olfs, *model_olfs = sample->model_olfs;
-    //for (i = 0; i < sample->num_segments; i++) {
-    //  get_olf(&obs_olfs[i], pcd_obs, c_obs[i], 0);
-    //  get_olf(&model_olfs[i], pcd_model, c_model[i], 1);
-    //}
-    sample->nc = cnt; //sample->num_segments;
 
     //printf("%d segments  -->  %d correspondences\n", sample->num_segments, sample->nc); //dbug
   
