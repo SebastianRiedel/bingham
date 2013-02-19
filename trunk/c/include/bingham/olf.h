@@ -93,9 +93,23 @@ extern "C" {
 
 
   typedef struct {
+    int nx;
+    int ny;
+    int nz;
+    double res;
+    double min[3];
+    double *nn_dist;  // flattened NN distances
+    int *nn_cell;     // flattened NN grid indices
+    int **pcd_idx;    // flattened pcd indices (up to 2 points per cell)
+    pcd_t *pcd;
+  } dist_grid_t;
+
+
+  typedef struct {
     int center_point;
     int *surface_points;
     int *edge_points;
+    double *edge_weights;
     int num_surface_points;
     int num_edge_points;
     double max_radius;
@@ -126,6 +140,7 @@ extern "C" {
     pcd_t *shot_pcd;
     pcd_t *sift_pcd;
     pcd_t *range_edges_pcd;
+    dist_grid_t *dist_grid;
   } olf_model_t;
 
 
@@ -229,18 +244,26 @@ extern "C" {
     pcd_t *fpfh_model;
     pcd_t *shot_model;
     pcd_t *sift_model;
+    olf_t *pcd_model_olfs;
+    olf_t *fpfh_model_olfs;
+    olf_t *shot_model_olfs;
+    olf_t *sift_model_olfs;
+    olf_t *range_edges_model_olfs;
     int *model_to_fpfh_map;
     int *model_to_shot_map;
     pcd_color_model_t *color_model;
     multiview_pcd_t *range_edges_model;
+    dist_grid_t *model_dist_grid;
     double *fpfh_model_cmf;
     double *shot_model_cmf;
     struct FLANNParameters model_xyz_params;
+    struct FLANNParameters model_xyzn_params;
     struct FLANNParameters fpfh_model_f_params;
     struct FLANNParameters fpfh_model_xyzn_params;
     struct FLANNParameters shot_model_f_params;
     struct FLANNParameters shot_model_xyzn_params;
     flann_index_t model_xyz_index;
+    flann_index_t model_xyzn_index;
     flann_index_t fpfh_model_f_index;
     flann_index_t fpfh_model_xyzn_index;
     flann_index_t shot_model_f_index;
@@ -253,6 +276,9 @@ extern "C" {
     pcd_t *shot_obs;
     pcd_t *sift_obs;
     pcd_t *pcd_obs_bg;
+    olf_t *pcd_obs_olfs;
+    olf_t *shot_obs_olfs;
+    olf_t *sift_obs_olfs;
     int *obs_to_shot_map;
     range_image_t *obs_range_image;
     range_image_t *obs_fg_range_image;
@@ -272,7 +298,7 @@ extern "C" {
 
 
 
-  enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE};
+  enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE, C_TYPE_SURFACE};
 
 
   typedef struct {
@@ -284,8 +310,8 @@ extern "C" {
     int *c_type;
     double *c_score;
     int nc;
-    olf_t *obs_olfs;
-    olf_t *model_olfs;
+    //olf_t *obs_olfs;
+    //olf_t *model_olfs;
 
     // current superpixel segmentation
     int num_segments;

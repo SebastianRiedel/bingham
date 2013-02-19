@@ -78,6 +78,7 @@ int find_min(double x[], int n);                                      /* returns
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
 int find_first_lt(double *x, double a, int n);                        /* find the index of the first element of x such that x<a */
 int find_first_gt(double *x, double a, int n);                        /* find the index of the first element of x such that x>a */
+int isum(int x[], int n);                                             /* computes the sum of x's elements */
 int imax(int x[], int n);                                             /* computes the max of x */
 int imin(int x[], int n) ;                                            /* computes the min of x */
 double norm(double x[], int n);                                       /* computes the norm of x */
