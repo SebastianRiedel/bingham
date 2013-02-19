@@ -113,6 +113,9 @@ extern "C" {
     int num_surface_points;
     int num_edge_points;
     double max_radius;
+    double avg_point[3];
+    double avg_normal[3];
+    double avg_lab_color[3];
   } superpixel_t;
 
 
