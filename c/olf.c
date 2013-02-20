@@ -2178,6 +2178,7 @@ void free_olf(olf_t *olf);
 void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params);
 
 
+
 /*
  * Segment the observed scene into superpixels using k-means.
  */
@@ -2998,6 +2999,7 @@ void free_scope_obs_data(scope_obs_data_t *data)
   flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
 }
 
+
 void copy_olf(olf_t *olf2, olf_t *olf1)
 {
   if (olf1->x) {
@@ -3021,6 +3023,7 @@ void copy_olf(olf_t *olf2, olf_t *olf1)
   }
 }
 
+
 void free_olf(olf_t *olf)
 {
   if (olf->x)
@@ -3032,6 +3035,7 @@ void free_olf(olf_t *olf)
     free(olf->B);
   }
 }
+
 
 void scope_sample_alloc(scope_sample_t *sample, int nc)
 {
@@ -3046,6 +3050,7 @@ void scope_sample_alloc(scope_sample_t *sample, int nc)
   }
   bingham_alloc(&sample->B, 4);
 }
+
 
 void scope_sample_free(scope_sample_t *sample)
 {
@@ -3067,6 +3072,7 @@ void scope_sample_free(scope_sample_t *sample)
     free(sample->labdist_p_ratios);
   }
 }
+
 
 // assumes s2 is already allocated
 void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
@@ -3115,6 +3121,7 @@ void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
   }
 }
 
+
 scope_samples_t *create_scope_samples(int num_samples, int num_correspondences)
 {
   scope_samples_t *S;
@@ -3129,6 +3136,7 @@ scope_samples_t *create_scope_samples(int num_samples, int num_correspondences)
   return S;
 }
 
+
 void free_scope_samples(scope_samples_t *S)
 {
   int i;
@@ -3138,6 +3146,73 @@ void free_scope_samples(scope_samples_t *S)
   free(S->W);
   free(S);
 }
+
+
+void cluster_pose_samples(scope_samples_t *S, scope_params_t *params)
+{
+  double dx2_thresh = params->x_cluster_thresh * params->x_cluster_thresh;
+  double dq_thresh = params->q_cluster_thresh;
+  int cluster_idx[S->num_samples], cluster[S->num_samples], cluster_cnts[S->num_samples];
+  cluster_idx[0] = 0;
+  cluster_cnts[0] = S->samples[0].nc;
+  int num_clusters = 1;
+  int i, j;
+
+  // agglomerative clustering by pose
+  for (i = 1; i < S->num_samples; i++) {
+    int unique = 1;
+    for (j = 0; j < num_clusters; j++) {
+      int c = cluster_idx[j];
+      double dx2 = dist2(S->samples[i].x, S->samples[c].x, 3);
+      double dq = acos(fabs(dot(S->samples[i].q, S->samples[c].q, 4)));
+      if (dx2 < dx2_thresh && dq < dq_thresh) {
+	unique = 0;
+	cluster[i] = j;
+	cluster_cnts[j] += S->samples[i].nc;
+	break;
+      }
+    }
+    if (unique) {
+      cluster[i] = num_clusters;
+      cluster_cnts[num_clusters] = S->samples[i].nc;
+      cluster_idx[num_clusters++] = i;
+    }
+  }
+
+  // allocate space for the merged cluster correspondences (one correspondence per sample)
+  for (i = 0; i < num_clusters; i++) {
+    int c = cluster_idx[i];
+    safe_realloc(S->samples[c].c_type, cluster_cnts[i], int);
+    safe_realloc(S->samples[c].c_obs, cluster_cnts[i], int);
+    safe_realloc(S->samples[c].c_model, cluster_cnts[i], int);
+    safe_realloc(S->samples[c].c_score, cluster_cnts[i], double);
+  }
+
+  // merge correspondences for samples in the same cluster
+  for (i = 1; i < S->num_samples; i++) {
+    int c = cluster_idx[ cluster[i] ];
+    if (c != i) {
+      int nc = S->samples[c].nc;
+      for (j = 0; j < S->samples[i].nc; j++) {
+	S->samples[c].c_type[nc+j] = S->samples[i].c_type[j];
+	S->samples[c].c_obs[nc+j] = S->samples[i].c_obs[j];
+	S->samples[c].c_model[nc+j] = S->samples[i].c_model[j];
+	S->samples[c].c_score[nc+j] = S->samples[i].c_score[j];
+      }
+      S->samples[c].nc += S->samples[i].nc;
+    }
+  }
+
+  // reorder samples
+  for (i = 0; i < num_clusters; i++) {
+    int c = cluster_idx[i];
+    if (c != i)
+      scope_sample_copy(&S->samples[i], &S->samples[c]);
+  }
+  reorder(S->W, S->W, cluster_idx, num_clusters);
+  S->num_samples = num_clusters;
+}
+
 
 void remove_redundant_pose_samples(scope_samples_t *S, scope_params_t *params)
 {
@@ -3328,7 +3403,8 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   double outlier_vis_thresh = .2*max(vis_pmf, num_validation_points);
   double outlier_d_thresh = .9;
 
-  *num_outliers = 0;
+  if (outliers)
+    *num_outliers = 0;
   double score = 0.0;
   //double range_sigma = params->range_sigma;
   //double dmax = 2*range_sigma;
@@ -3351,7 +3427,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
       score += vis_pmf[i] * log(normpdf(d, 0, range_sigma));
 
       // update outliers
-      if (vis_pmf[i] > outlier_vis_thresh && d/dmax > outlier_d_thresh) {
+      if (outliers && vis_pmf[i] > outlier_vis_thresh && d/dmax > outlier_d_thresh) {
 	outliers[*num_outliers] = i;
 	(*num_outliers)++;
       }
@@ -4033,7 +4109,8 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 
 
   // compute obs_edge_image score for sampled model edges
-  *num_P_outliers = 0;
+  if (P_outliers)
+    *num_P_outliers = 0;
   double score = 0;
   int xi,yi;
   for (i = 0; i < n; i++) {
@@ -4041,7 +4118,7 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
       score += vis_pmf[i] * obs_edge_image[xi][yi];
 
       // update P_outliers
-      if (vis_prob[i] > .5 && obs_edge_image[xi][yi] < .5) {
+      if (P_outliers && vis_prob[i] > .5 && obs_edge_image[xi][yi] < .5) {
 	P_outliers[*num_P_outliers] = i;
 	(*num_P_outliers)++;
       }
@@ -5676,7 +5753,7 @@ void align_model_icp_dense(double *x, double *q, pcd_t *pcd_model, pcd_t *pcd_ob
     free_matrix2(cloud_normals);
   }
 }
-
+*/
 
 // get the jacobian of R*x w.r.t. q
 double **point_rotation_jacobian(double *q, double *x)
@@ -5691,7 +5768,7 @@ double **point_rotation_jacobian(double *q, double *x)
   double v3 = x[2];
 
   double dp_dq_data[12] = {2*(q1*v1 + q3*v3 - q4*v2),  2*(q2*v1 + q3*v2 + q4*v3),  2*(q1*v3 + q2*v2 - q3*v1),  2*(q2*v3 - q1*v2 - q4*v1),
-			   2*(q1*v2 - q2*v3 + q4*v1),  2*(q3*v1 - q2*v2 - q1*v3),  2*(q2*v1 + q3*v2 + q4*v3),  2*(q1*v1 + q3*v3 - q4*v2),
+	 		   2*(q1*v2 - q2*v3 + q4*v1),  2*(q3*v1 - q2*v2 - q1*v3),  2*(q2*v1 + q3*v2 + q4*v3),  2*(q1*v1 + q3*v3 - q4*v2),
 			   2*(q1*v3 + q2*v2 - q3*v1),  2*(q1*v2 - q2*v3 + q4*v1),  2*(q4*v2 - q3*v3 - q1*v1),  2*(q2*v1 + q3*v2 + q4*v3)};
 
   return new_matrix2_data(3, 4, dp_dq_data);
@@ -5739,7 +5816,7 @@ double **range_image_pixel_pose_jacobian(range_image_t *range_image, double *mod
   return dij_dxq;
 }
 
-double edge_score_gradient(double *G, double *x, double *q, double **P, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params)
+double edge_score_gradient(double *G, double *x, double *q, double **P, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
 {
   double **P2 = new_matrix2(n,3);
   transform_cloud(P2, P, n, x, q);
@@ -5790,12 +5867,14 @@ double edge_score_gradient(double *G, double *x, double *q, double **P, int n, r
   
   free_matrix2(P2);
 
-  mult(G, G, params->score2_edge_weight, 7);
+  double w = (score_round==2 ? params->score2_edge_weight : params->score3_edge_weight);    
 
-  return params->score2_edge_weight * score;
+  mult(G, G, w, 7);
+
+  return w * score;
 }
 
-double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, double **normals, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, scope_params_t *params)
+double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, double **normals, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
   //double range_sigma = params->range_sigma;
   //double normal_sigma = params->normal_sigma;
@@ -5847,8 +5926,10 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
       //d_normal /= noise_models[i].normal_sigma;
       d_normal = MIN(d_normal, dmax_normal);
     }
-    score += params->score2_xyz_weight * vis_pmf[i] * log(normpdf(d_xyz, 0, range_sigma));
-    score += params->score2_normal_weight * vis_pmf[i] * log(normpdf(d_normal, 0, normal_sigma));
+    double xyz_weight = (score_round == 2 ? params->score2_xyz_weight : params->score3_xyz_weight);
+    double normal_weight = (score_round == 2 ? params->score2_normal_weight : params->score3_normal_weight);
+    score += xyz_weight * vis_pmf[i] * log(normpdf(d_xyz, 0, range_sigma));
+    score += normal_weight * vis_pmf[i] * log(normpdf(d_normal, 0, normal_sigma));
 
     // get gradient of this point's xyz score w.r.t. model pose (x,q)
     if (d_xyz < dmax_xyz) {
@@ -5861,7 +5942,7 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
       memcpy(&G_xyz[0], df_dp, 3*sizeof(double));
       vec_matrix_mult(&G_xyz[3], df_dp, dp_dq, 3, 4);
       free_matrix2(dp_dq);
-      mult(G_xyz, G_xyz, params->score2_xyz_weight * vis_pmf[i], 7);
+      mult(G_xyz, G_xyz, xyz_weight * vis_pmf[i], 7);
       add(G, G, G_xyz, 7);
     }
 
@@ -5875,7 +5956,7 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
       double G_normal[7] = {0,0,0,0,0,0,0};
       vec_matrix_mult(&G_normal[3], df_dpn, dpn_dq, 3, 4);
       free_matrix2(dpn_dq);
-      mult(G_normal, G_normal, params->score2_normal_weight * vis_pmf[i], 7);
+      mult(G_normal, G_normal, normal_weight * vis_pmf[i], 7);
       add(G, G, G_normal, 7);
     }
   }
@@ -5887,9 +5968,22 @@ double xyzn_score_gradient(double *G, double *x, double *q, double **cloud, doub
 }
 
 
-void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
-			  range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int max_iter, int num_points)
+//void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_t *range_edges_model,
+// 			  range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int max_iter, int num_points)
+void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
 {
+  //TODO: make these params
+  int max_iter = 20;
+  int num_points = params->num_validation_points;
+
+  // unpack args
+  double *x = sample->x;
+  double *q = sample->q;
+  pcd_t *pcd_model = model_data->pcd_model;
+  multiview_pcd_t *range_edges_model = model_data->range_edges_model;
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+  double **obs_edge_image = obs_data->obs_edge_image;
+
   //double t0 = get_time_ms();  //dbug
 
   // compute model edge points
@@ -5911,44 +6005,44 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
   //dbug
   //printf("break 1, %.2f ms\n", get_time_ms() - t0);
   //t0 = get_time_ms();
-
+  
   double step = .01;  // step size in gradient ascent
   int i, j, iter;
   for (iter = 0; iter < max_iter; iter++) {
     
     // compute noise models
     scope_noise_model_t *noise_models = get_noise_models(x, q, idx, num_surface_points, pcd_model, range_edges_model);
-
+    
     //dbug
     //printf("break 1.5, %.2f ms\n", get_time_ms() - t0);
     //t0 = get_time_ms();
-
+    
     // compute score and its gradient w.r.t. model pose
     double G_edge[7], G_xyzn[7], G[7];
     double edge_score = edge_score_gradient(G_edge, x, q, P, num_edge_points, obs_range_image, obs_edge_image, params);
     double xyzn_score = xyzn_score_gradient(G_xyzn, x, q, cloud, normals, noise_models, num_surface_points, obs_range_image, params);
     //double current_score = edge_score + xyzn_score;
     add(G, G_edge, G_xyzn, 7);
-
+    
     //dbug
     //printf("break 2, %.2f ms\n", get_time_ms() - t0);
     //t0 = get_time_ms();
-
+    
     //dbug: disable orientation gradients
     //G[3] = G[4] = G[5] = G[6] = 0;
-
+    
     //printf("edge_score = %f, xyzn_score = %f\n", edge_score, xyzn_score);  //dbug
     //printf("G_edge = [%f, %f, %f, %f, %f, %f, %f]\n", G_edge[0], G_edge[1], G_edge[2], G_edge[3], G_edge[4], G_edge[5], G_edge[6]);
     //printf("G_xyzn = [%f, %f, %f, %f, %f, %f, %f]\n", G_xyzn[0], G_xyzn[1], G_xyzn[2], G_xyzn[3], G_xyzn[4], G_xyzn[5], G_xyzn[6]);
-
+    
     // line search
     double step_mult[3] = {.6, 1, 1.6};
     double best_score = -10000000.0;
     double best_step=0.0, best_x[3], best_q[4];
     for (j = 0; j < 3; j++) {
-
+      
       //double t1 = get_time_ms();  //dbug
-
+      
       // take a step in the direction of the gradient
       double x2[3], q2[4], dxq[7];
       normalize(G, G, 7);
@@ -5956,74 +6050,77 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
       add(x2, x, &dxq[0], 3);
       add(q2, q, &dxq[3], 4);
       normalize(q2, q2, 4);
-
+      
       //printf("x2 = [%f, %f, %f], q2 = [%f, %f, %f]\n", x2[0], x2[1], x2[2], q2[0], q2[1], q2[2], q2[3]); //dbug
-
+      
       // transform surface points by (x2,q2)
       transform_cloud(cloud2, cloud, num_surface_points, x2, q2);
       transform_cloud(normals2, normals, num_surface_points, NULL, q2);
-
+      
       //printf("transform_cloud: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
-
+      
       // compute p(visibile) for surface points
       double vis_prob[num_surface_points];
       for (i = 0; i < num_surface_points; i++)
-	vis_prob[i] = compute_visibility_prob(cloud2[i], normals2[i], obs_range_image, params->vis_thresh, 0);
+ 	vis_prob[i] = compute_visibility_prob(cloud2[i], normals2[i], obs_range_image, params->vis_thresh, 0);
       double vis_pmf[num_surface_points];
       normalize_pmf(vis_pmf, vis_prob, num_surface_points);
-
+      
       //printf("vis_prob: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
-
+      
       // transform edge points
       transform_cloud(P2, P, num_edge_points, x2, q2);
-
+      
       //printf("transform edge points: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
-
+      
       // evaluate the score
-      edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image, params, 1);
+      edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image, params, score_round, NULL, NULL);
       
       //printf("compute_edge_score: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
-
-      double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, 1);
-      double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, 1);
+      
+      double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, score_round, NULL, NULL);
+      double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, score_round);
       double score = edge_score + xyz_score + normal_score;
-
+      
       //printf("xyz/normal scores: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
-
+      
       if (score > best_score) {
-	best_score = score;
-	memcpy(best_x, x2, 3*sizeof(double));
-	memcpy(best_q, q2, 4*sizeof(double));
-	best_step = step*step_mult[j];
+ 	best_score = score;
+ 	memcpy(best_x, x2, 3*sizeof(double));
+ 	memcpy(best_q, q2, 4*sizeof(double));
+ 	best_step = step*step_mult[j];
       }
-
+      
       //dbug
       //printf("break 3, %.2f ms\n", get_time_ms() - t0);
       //t0 = get_time_ms();
     }
-
+    
     //printf("best_score = %f, current_score = %f\n", best_score, current_score); //dbug
-
+    
     // termination criterion
     //if (best_score <= current_score)
     //  break;
-
+    
     memcpy(x, best_x, 3*sizeof(double));
     memcpy(q, best_q, 4*sizeof(double));
     step = best_step;
-
+    
     //printf("iter = %d, best_score > current_score, step = %f\n", iter, step); //dbug
     //printf("step = %f\n", step);  //dbug
-
+    
     free(noise_models);
   }
 
-
+  memcpy(sample->x, x, 3*sizeof(double));
+  memcpy(sample->q, q, 4*sizeof(double));
+  
+  
   // cleanup
   free_matrix2(P);
   free_matrix2(P2);
@@ -6032,7 +6129,6 @@ void align_model_gradient(double *x, double *q, pcd_t *pcd_model, multiview_pcd_
   free_matrix2(normals);
   free_matrix2(normals2);
 }
-*/
 
 
 
