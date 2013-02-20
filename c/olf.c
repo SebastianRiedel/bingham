@@ -2766,6 +2766,7 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
       reorderi(sample->c_obs, sample->c_obs, idx, nc);
       reorderi(sample->c_model, sample->c_model, idx, nc);
       reorder(sample->c_score, sample->c_score, idx, nc);
+      sample->nc = nc;
     }
 
     // sample model pose given olf correspondences
@@ -4234,6 +4235,10 @@ double compute_segment_score(double *x, double *q, double **cloud, flann_index_t
 
 double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
 {
+  int num_validation_points_orig = params->num_validation_points;
+  if (score_round == 3)
+    params->num_validation_points = 0;  // use all the model points
+
   double *x = sample->x;
   double *q = sample->q;
 
@@ -4434,6 +4439,9 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   free_matrix2(fpfh_cloud);
   free_matrix2(fpfh_cloud_normals);
   free_matrix2(fpfh_cloud_f);
+
+  if (score_round == 3)
+    params->num_validation_points = num_validation_points_orig;
 
   return score;
 }
@@ -5988,7 +5996,7 @@ void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data
 
   // compute model edge points
   int num_edge_points = num_points;
-  double **P = get_range_edge_points(&num_edge_points, x, q, range_edges_model, obs_range_image);
+  double **P = get_range_edge_points(&num_edge_points, x, q, range_edges_model, NULL);
   double **P2 = new_matrix2(num_edge_points, 3);
   
   // get model surface points
@@ -6019,8 +6027,8 @@ void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data
     
     // compute score and its gradient w.r.t. model pose
     double G_edge[7], G_xyzn[7], G[7];
-    double edge_score = edge_score_gradient(G_edge, x, q, P, num_edge_points, obs_range_image, obs_edge_image, params);
-    double xyzn_score = xyzn_score_gradient(G_xyzn, x, q, cloud, normals, noise_models, num_surface_points, obs_range_image, params);
+    double edge_score = edge_score_gradient(G_edge, x, q, P, num_edge_points, obs_range_image, obs_edge_image, params, score_round);
+    double xyzn_score = xyzn_score_gradient(G_xyzn, x, q, cloud, normals, noise_models, num_surface_points, obs_range_image, params, score_round);
     //double current_score = edge_score + xyzn_score;
     add(G, G_edge, G_xyzn, 7);
     
@@ -6189,6 +6197,22 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   if (have_true_pose_)
     print_good_poses(S);
 
+  // group correspondences by sample pose, then sort samples by num. correspondences
+  cluster_pose_samples(S, params);
+  for (i = 0; i < S->num_samples; i++)
+    S->W[i] = S->samples[i].nc;
+  sort_pose_samples(S);
+  S->num_samples = find_first_lt(S->W, 2, S->num_samples);
+
+  // resample model poses given grouped correspondences
+  for (i = 0; i < S->num_samples; i++)
+    sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+
+  //dbug
+  printf("Grouped correspondences:\n");
+  if (have_true_pose_)
+    print_good_poses(S);  
+
   // score hypotheses
   t0 = get_time_ms();
   for (i = 0; i < num_samples_init; i++)
@@ -6210,7 +6234,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   return S;
 }
 
-
+/*
 void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   double t0;
@@ -6291,12 +6315,12 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   if (have_true_pose_)
     print_good_poses(S);
 }
-
+*/
 
 void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
   //TODO: make this a param
-  int num_alignment_iters = 10;
+  int num_alignment_iters = 5;
 
   double t0;
   int i, iter;
@@ -6343,6 +6367,43 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
 }
 
 
+void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  int i;
+
+  // cluster poses
+  if (params->pose_clustering)
+    remove_redundant_pose_samples(S, params);
+
+  // remove low-weight samples
+  S->num_samples = MIN(S->num_samples, params->num_samples_round3);
+
+  double t0 = get_time_ms();
+
+  // align with gradients
+  for (i = 0; i < S->num_samples; i++)
+    align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+
+  printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+  t0 = get_time_ms();
+
+  params->verbose = 1; //dbug
+  for (i = 0; i < S->num_samples; i++)
+    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
+  params->verbose = 0;
+  sort_pose_samples(S);
+
+  printf("Scored round 3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug  
+
+  //dbug
+  for (i = 0; i < 10; i++) {
+    align_model_gradient(&S->samples[0], model_data, obs_data, params, 2);
+    S->W[0] = model_placement_score(&S->samples[0], model_data, obs_data, params, 3);
+    printf("W[0] = %.2f\n", S->W[0]); //dbug
+  }
+}
+
+
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
  */
@@ -6377,22 +6438,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   S->num_samples = 1;
   */
 
-  // cluster poses
-  if (params->pose_clustering)
-    remove_redundant_pose_samples(S, params);
-
-  // remove low-weight samples
-  S->num_samples = MIN(S->num_samples, params->num_samples_round3);
-
-  //dbug
-  int n = params->num_validation_points;
-  params->verbose = 1;
-  params->num_validation_points = 0;
-  for (i = 0; i < S->num_samples; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
-  params->verbose = 0;
-  params->num_validation_points = n;
-  sort_pose_samples(S);
+  scope_round3(S, model_data, obs_data, params);
 
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
