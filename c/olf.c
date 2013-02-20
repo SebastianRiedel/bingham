@@ -348,8 +348,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_ved66 = pcd_channel(pcd, "ved66");
 
   //TODO: clean up these column names
-  int ch_labdist1 = pcd_channel(pcd, "ml1");
-  int ch_labdist20 = pcd_channel(pcd, "cnt2");
+  int ch_labdist1 = pcd_channel(pcd, "labdist1"); //"ml1");
+  int ch_labdist20 = pcd_channel(pcd, "labdist20"); //"cnt2");
 
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
@@ -3400,6 +3400,9 @@ double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t
 double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round,
 			 int *outliers, int *num_outliers)
 {
+  int w = obs_range_image->w;
+  int h = obs_range_image->h;
+
   //TODO: make these params
   double outlier_vis_thresh = .2*max(vis_pmf, num_validation_points);
   double outlier_d_thresh = .9;
@@ -3415,16 +3418,25 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
       int xi,yi;
       range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
       double range_sigma = params->range_sigma * noise_models[i].range_sigma;
+      double model_range = norm(cloud[i], 3);
       double dmax = 2*range_sigma;
-      double d = dmax;
-      if (obs_range_image->cnt[xi][yi] > 0) {
-	// get distance from model point to range image cell plane
-	double c[4];
-	xyzn_to_plane(c, obs_range_image->points[xi][yi], obs_range_image->normals[xi][yi]);
-	d = fabs(dot(c, cloud[i], 3) + c[3]);
-	//d /= noise_models[i].range_sigma;
-	d = MIN(d, dmax);
+      double dmin = dmax;
+      int x,y;
+      for (x = xi-1; x <= xi+1; x++) {
+	for (y = yi-1; y <= yi+1; y++) {
+	  if (x >= 0 && x < w && y >= 0 && y < h && obs_range_image->cnt[x][y] > 0) {
+	    // get distance from model point to range image cell plane
+	    //double c[4];
+	    //xyzn_to_plane(c, obs_range_image->points[xi][yi], obs_range_image->normals[xi][yi]);
+	    //d = fabs(dot(c, cloud[i], 3) + c[3]);
+	    double obs_range = obs_range_image->image[xi][yi];
+	    double d = fabs(model_range - obs_range);
+	    if (d < dmin)
+	      dmin = d;
+	  }
+	}
       }
+      double d = dmin;
       score += vis_pmf[i] * log(normpdf(d, 0, range_sigma));
 
       // update outliers
@@ -3444,13 +3456,13 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   if (params->verbose)
     xyz_score_ = score;
 
-  double w = 0;
+  double weight = 0;
   if (score_round == 2)
-    w = params->score2_xyz_weight;
+    weight = params->score2_xyz_weight;
   else
-    w = params->score3_xyz_weight;
+    weight = params->score3_xyz_weight;
 
-  return w * score;
+  return weight * score;
 }
 
 
@@ -6391,16 +6403,17 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   for (i = 0; i < S->num_samples; i++)
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
   params->verbose = 0;
-  sort_pose_samples(S);
+  //sort_pose_samples(S);
 
   printf("Scored round 3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug  
 
-  //dbug
+  /*dbug
   for (i = 0; i < 10; i++) {
     align_model_gradient(&S->samples[0], model_data, obs_data, params, 2);
     S->W[0] = model_placement_score(&S->samples[0], model_data, obs_data, params, 3);
     printf("W[0] = %.2f\n", S->W[0]); //dbug
   }
+  */
 }
 
 
@@ -6430,13 +6443,12 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   //scope_round2(S, model_data, obs_data, params);
   scope_round2_super(S, model_data, obs_data, params);
 
-  /*dbug: add true pose
+  //dbug: add true pose
   if (have_true_pose_) {
     memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
   }
-  S->num_samples = 1;
-  */
+  //S->num_samples = 1;
 
   scope_round3(S, model_data, obs_data, params);
 
