@@ -1,18 +1,16 @@
-
 #ifndef BINGHAM_OLF_H
 #define BINGHAM_OLF_H
-
-
-#ifdef __cplusplus
-extern "C" {
-#endif 
-
 
 
 #include "bingham.h"
 #include "hll.h"
 #include <flann/flann.h>
 
+#include "cuda_wrapper.h"
+
+/*#ifdef __cplusplus
+extern "C" {
+#endif*/
 
   // point cloud data structure
   typedef struct {
@@ -163,7 +161,7 @@ extern "C" {
   } scope_noise_model_t;
 
 
-  typedef struct {  // scope_params_t
+  typedef struct scope_params_struct {  // scope_params_t
 
     // GENERAL PARAMS
     int verbose;
@@ -242,7 +240,7 @@ extern "C" {
   } scope_params_t;
 
 
-  typedef struct {
+  typedef struct scope_model_data_struct {
     pcd_t *pcd_model;
     pcd_t *fpfh_model;
     pcd_t *shot_model;
@@ -274,7 +272,7 @@ extern "C" {
   } scope_model_data_t;
 
 
-  typedef struct {
+  typedef struct scope_obs_data_struct {
     pcd_t *pcd_obs;
     pcd_t *shot_obs;
     pcd_t *sift_obs;
@@ -304,7 +302,7 @@ extern "C" {
   enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE, C_TYPE_SURFACE};
 
 
-  typedef struct {
+  typedef struct scope_sample_struct {
     double x[3];
     double q[4];
     bingham_t B;
@@ -356,8 +354,66 @@ extern "C" {
     int num_samples_allocated;
   } mope_samples_t;
   
+// *************** CUDA ********************
+/*
+typedef struct {
+  int *ptr;
+  size_t n;
+} cu_int_arr_t;
+
+typedef struct {
+  double *ptr;
+  //size_t pitch;
+  size_t n, m;
+} cu_double_matrix_t;
+
+typedef struct {
+  int *ptr;
+  //size_t pitch;
+  size_t n, m;
+} cu_int_matrix_t;
+
+typedef struct {
+  //cudaPitchedPtr ptr;
+  //cudaExtent extent;
+  double *ptr;
+  size_t n, m, p;
+} cu_double_matrix3d_t;
+  
+typedef struct {
+  cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
+  cu_double_matrix3d_t color_cov1, color_cov2;
+  
+  cu_int_arr_t color_cnts1, color_cnts2, range_edges_view_idx, range_edges_view_cnt;
+
+  int num_points, num_views, max_num_edges;
+} cu_model_data_t;
+
+typedef struct {
+  double res, min0, min1;
+  int w, h;
+} cu_range_image_data_t;
+
+typedef struct {
+  cu_double_matrix_t range_image, range_image_pcd_obs_bg_lab, pcd_obs_fpfh, edge_image;
+  cu_double_matrix3d_t range_image_points, range_image_normals;
+
+  cu_range_image_data_t range_image_data;
+
+  cu_int_matrix_t range_image_cnt, range_image_idx;
+} cu_obs_data_t;
 
 
+void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
+		     cu_model_data_t *cu_model, cu_obs_data_t *cu_obs);
+void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs_data, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models);
+void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs);
+void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models);
+
+//void cu_noise_models_sigmas(double *range_sigma, double *normal_sigma, double *l_sigma, double *a_sigma, double *b_sigma, const double *surface_angles, const double *edge_dists, int n);
+void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *params, int score_round, int num_validation_points);
+*/
+// ************* END CUDA **************
 
   pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
   void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
@@ -376,14 +432,16 @@ extern "C" {
   void free_scope_model_data(scope_model_data_t *data);
   void free_scope_obs_data(scope_obs_data_t *data);
 
-  scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose);
+struct cu_model_data_struct;
+struct cu_obs_data_struct;
 
-  mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params);
+scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 
+mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 
-
-
-
+/*#ifdef __cplusplus
+extern "C" {
+#endif*/
 
 
 
@@ -487,9 +545,9 @@ extern "C" {
 
 
 
-#ifdef __cplusplus
+/*#ifdef __cplusplus
 }
-#endif 
+#endif */
 
 
 #endif

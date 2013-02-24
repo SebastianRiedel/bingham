@@ -2,12 +2,11 @@
 #ifndef BINGHAM_UTIL_H
 #define BINGHAM_UTIL_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif 
-
-
 #include <stdlib.h>
+
+/*#ifdef __cplusplus
+extern "C" {
+#endif*/
 
 
 #define MAXFACT 10000
@@ -71,8 +70,8 @@ int findinv(int *k, int x[], int n);                                  /* compute
 int findeq(int *k, int x[], int a, int n);                            /* computes a dense array of the indices of x==a */
 double sum(double x[], int n);                                        /* computes the sum of x's elements */
 double prod(double x[], int n);                                       /* computes the product of x's elements */
-double max(double x[], int n);                                        /* computes the max of x */
-double min(double x[], int n) ;                                       /* computes the min of x */
+double arr_max(double x[], int n);                                        /* computes the max of x */
+double arr_min(double x[], int n) ;                                       /* computes the min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
@@ -258,9 +257,9 @@ int kdtree_NN(kdtree_t *tree, double *x);
 
 
 
-#ifdef __cplusplus
+/*#ifdef __cplusplus
 }
-#endif 
+#endif*/
 
 
 #endif

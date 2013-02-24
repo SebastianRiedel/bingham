@@ -632,7 +632,7 @@ void octetramesh_subdivide_mres(octetramesh_t *dst, octetramesh_t *src,
 
     double F[4] = {f(v0, fdata), f(v1, fdata), f(v2, fdata), f(v3, fdata)};
 
-    if (max(F,4) - min(F,4) > resolution)
+    if (arr_max(F,4) - arr_min(F,4) > resolution)
       tetmask[i] = 1;
 
     //printf("F = (%f, %f, %f, %f) --> %d\n", F[0], F[1], F[2], F[3], tetmask[i]);
@@ -649,7 +649,7 @@ void octetramesh_subdivide_mres(octetramesh_t *dst, octetramesh_t *src,
 
     double F[6] = {f(v0, fdata), f(v1, fdata), f(v2, fdata), f(v3, fdata), f(v4, fdata), f(v5, fdata)};
 
-    if (max(F,6) - min(F,6) > resolution)
+    if (arr_max(F,6) - arr_min(F,6) > resolution)
       octmask[i] = 1;
 
     //printf("F = (%f, %f, %f, %f, %f, %f) --> %d\n", F[0], F[1], F[2], F[3], F[4], F[5], octmask[i]);
@@ -852,8 +852,8 @@ octetramesh_stats_t octetramesh_stats(octetramesh_t *T)
     double d23 = dist(p2, p3, d);
 
     double d_edge[6] = {d01, d02, d03, d12, d13, d23};
-    double dmax = max(d_edge, 6);
-    double dmin = min(d_edge, 6);
+    double dmax = arr_max(d_edge, 6);
+    double dmin = arr_min(d_edge, 6);
 
     double skewness = dmax/dmin;
     if (skewness < stats.min_tetra_skewness)
@@ -892,8 +892,8 @@ octetramesh_stats_t octetramesh_stats(octetramesh_t *T)
     double d23 = dist(p2, p3, d);
 
     double d_edge[6] = {d01, d02, d03, d12, d13, d23};
-    double dmax = max(d_edge, 6);
-    double dmin = min(d_edge, 6);
+    double dmax = arr_max(d_edge, 6);
+    double dmin = arr_min(d_edge, 6);
 
     double skewness = dmax/dmin;
     double ds = stats.avg_tetra_skewness - skewness;

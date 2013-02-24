@@ -6,12 +6,16 @@ INSTALL_DIR=/usr
 
 CC=gcc
 CPP=g++
+NVCC=nvcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-#CFLAGS=-Wall -I$(IDIR) -O3 -msse2
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
+CFLAGS=-Wall -I$(IDIR) -O3 -msse2
+#CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
+
+CUDAFLAGS=-O3 -lcuda -lcudart -arch=compute_20
+#CUDAFLAGS=-g -G -lcuda -lcudart -arch=compute_20
 
 #CYGWIN=1
 #WINDOWS=1
@@ -51,6 +55,8 @@ $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 $(ODIR)/%.o: %.cpp $(DEPS)
 	$(CPP) -c -o $@ $< $(CFLAGS)
+$(ODIR)/%.o: %.cu $(DEPS)
+	$(NVCC) -c -o $@ $< $(CUDAFLAGS)
 #endif
 
 libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
@@ -89,11 +95,11 @@ test_hll: test_hll.o hll.o libbingham.a
 #olf_pose_sample: olf_pose_sample.o olf.o libbingham.a
 #	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-scope: scope.o olf.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+scope: scope.o olf.o olf_cuda.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
-mope: mope.o olf.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+mope: mope.o olf.o olf_cuda.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
 #gauss_mix: gauss_mix.o libbingham.a
 #	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)

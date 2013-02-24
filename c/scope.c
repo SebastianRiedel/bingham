@@ -3,9 +3,9 @@
 #include <string.h>
 #include <math.h>
 #include "bingham.h"
+#include "bingham/cuda_wrapper.h"
 #include "bingham/util.h"
 #include "bingham/olf.h"
-
 
 int load_true_pose(char *pose_file, simple_pose_t *true_pose) {
   FILE *f = fopen(pose_file, "r");
@@ -82,7 +82,15 @@ int main(int argc, char *argv[])
   if (argc > 8)
     have_true_pose = load_true_pose(argv[8], &true_pose);
 
-  scope_samples_t *S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL));
+  cu_model_data_t cu_model;
+  cu_obs_data_t cu_obs;
+  printf("Initializing CUDA\n");
+  cu_init();
+  printf("CUDA initialized\n");
+  cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs);
+  printf("Data copied\n");
+  
+  scope_samples_t *S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs);
   int n = S->num_samples;
 
 
@@ -90,7 +98,7 @@ int main(int argc, char *argv[])
   free_scope_obs_data(&obs_data);
   free_scope_model_data(&model_data);
 
-
+  cu_free_all_the_things(&cu_model, &cu_obs);
 
   fprintf(f, "X = [");
   int i, j;
@@ -112,13 +120,13 @@ int main(int argc, char *argv[])
   //**************************************************
 
   //dbug
-  fprintf(f, "scores = [");
+  /*fprintf(f, "scores = [");
   for (i = 0; i < n; i++) {
     for (j = 0; j < S->samples[i].num_scores; j++)
       fprintf(f, "%f ", S->samples[i].scores[j]);
     fprintf(f, "; ");
   }
-  fprintf(f, "];\n");
+  fprintf(f, "];\n");*/
 
   fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
