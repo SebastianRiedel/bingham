@@ -2535,6 +2535,77 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 }
 
 
+void get_superpixel_affinity_graph(scope_obs_data_t *obs_data, scope_params_t *params)
+{
+  //TODO: make these params
+  double segment_affinity_keypoint_dist_thresh = .02;
+  double edge_weight = .5;
+  double normal_weight = 0;
+  double color_weight = 0;
+
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  range_image_t *obs_range_image = obs_data->obs_range_image;
+  double **obs_edge_image = obs_data->obs_edge_image;
+  superpixel_t *segments = obs_data->obs_segments;
+  int num_segments = obs_data->num_obs_segments;
+
+  // compute the affinity between each pair of segments
+  obs_data->obs_segment_affinities = new_matrix2(num_segments, num_segments);
+  double **A = obs_data->obs_segment_affinities;
+
+  int i,j;
+  for (i = 0; i < num_segments; i++) {
+    A[i][i] = 1.0;
+    for (j = i+1; j < num_segments; j++) {
+      
+      double affinity = 0;
+
+      // check if segments i and j are close enough
+      int i2,j2;
+      double dmin = segment_affinity_keypoint_dist_thresh + 1.0;
+      for (i2 = 0; i2 < segments[i].num_surface_points; i2++) {
+	for (j2 = 0; j2 < segments[j].num_surface_points; j2++) {
+	  double d = dist(pcd_obs->points[ segments[i].surface_points[i2] ], pcd_obs->points[ segments[j].surface_points[j2] ], 3);
+	  if (d < dmin)
+	    dmin = d;
+	}
+      }
+      if (dmin < segment_affinity_keypoint_dist_thresh) {
+
+	// check for image edges on the line between center pixels of segments i and j
+	int xi,yi,xj,yj;
+	range_image_xyz2sub(&xi, &yi, obs_range_image, pcd_obs->points[ segments[i].center_point ]);
+	range_image_xyz2sub(&xj, &yj, obs_range_image, pcd_obs->points[ segments[j].center_point ]);
+	double dx = xj-xi;
+	double dy = yj-yi;
+	double dij = sqrt(dx*dx+dy*dy);
+	dx = dx/dij;
+	dy = dy/dij;
+	int n = 0;
+	double logp = 0;
+	double d;
+	for (d = 0.0; d < dij; d += .1) {
+	  logp += obs_edge_image[ (int)round(x+d*dx) ][ (int)round(y+d*dy) ];
+	  n++;
+	}
+	double edge_cost = exp(logp / (double)n);
+	
+	// compute the difference between segment normals
+	double normal_cost = dist2(segments[i].avg_normal, segments[j].avg_normal, 3);
+
+	// compute the difference between segment color
+	double color_cost = dist2(segments[i].avg_lab_color, segments[j].avg_lab_color, 3);
+
+	double cost = edge_weight*edge_cost + normal_weight*normal_cost + color_weight*color_cost;
+	affinity = exp(-cost);
+      }
+      
+      A[i][j] = A[j][i] = affinity;
+    }
+  }
+}
+
+
 /*
  * Sample a candidate set of superpixel segments given a model placement.
  */
