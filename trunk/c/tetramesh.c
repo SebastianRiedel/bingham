@@ -643,8 +643,8 @@ tetramesh_stats_t tetramesh_stats(tetramesh_t *T)
     double d23 = dist(p2, p3, d);
 
     double d_edge[6] = {d01, d02, d03, d12, d13, d23};
-    double dmax = max(d_edge, 6);
-    double dmin = min(d_edge, 6);
+    double dmax = arr_max(d_edge, 6);
+    double dmin = arr_min(d_edge, 6);
 
     double skewness = dmax/dmin;
     if (skewness < stats.min_skewness)
@@ -683,8 +683,8 @@ tetramesh_stats_t tetramesh_stats(tetramesh_t *T)
     double d23 = dist(p2, p3, d);
 
     double d_edge[6] = {d01, d02, d03, d12, d13, d23};
-    double dmax = max(d_edge, 6);
-    double dmin = min(d_edge, 6);
+    double dmax = arr_max(d_edge, 6);
+    double dmin = arr_min(d_edge, 6);
 
     double skewness = dmax/dmin;
     double ds = stats.avg_skewness - skewness;

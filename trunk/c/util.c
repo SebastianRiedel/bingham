@@ -484,7 +484,7 @@ double prod(double x[], int n)
 
 
 // computes the max of x
-double max(double x[], int n)
+double arr_max(double x[], int n)
 {
   int i;
 
@@ -498,7 +498,7 @@ double max(double x[], int n)
 
 
 // computes the min of x
-double min(double x[], int n)
+double arr_min(double x[], int n)
 {
   int i;
 

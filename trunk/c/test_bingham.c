@@ -386,7 +386,7 @@ void test_bingham_discretize(int argc, char *argv[])
   int *colors; safe_malloc(colors, pmf.n, int);
   //printf("break 2\n");
 
-  double max_mass = max(pmf.mass, pmf.n);
+  double max_mass = arr_max(pmf.mass, pmf.n);
   for (i = 0; i < pmf.n; i++)
     colors[i] = (int)(255*(pmf.mass[i] / max_mass));
 

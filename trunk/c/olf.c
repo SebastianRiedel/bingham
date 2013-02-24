@@ -5,6 +5,8 @@
 #include <math.h>
 #include <float.h>
 
+#include "bingham/cuda_wrapper.h"
+
 #include "bingham/util.h"
 #include "bingham/olf.h"
 
@@ -348,8 +350,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_ved66 = pcd_channel(pcd, "ved66");
 
   //TODO: clean up these column names
-  int ch_labdist1 = pcd_channel(pcd, "labdist1"); //"ml1");
-  int ch_labdist20 = pcd_channel(pcd, "labdist20"); //"cnt2");
+  int ch_labdist1 = pcd_channel(pcd, "ml1");
+  int ch_labdist20 = pcd_channel(pcd, "cnt2");
 
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
@@ -1253,8 +1255,8 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int paddin
     Y[i] = acos(p[1]/D[i]);
   }
 
-  R->min[0] = min(X,n) - res/2.0 - res*padding;
-  R->min[1] = min(Y,n) - res/2.0 - res*padding;
+  R->min[0] = arr_min(X,n) - res/2.0 - res*padding;
+  R->min[1] = arr_min(Y,n) - res/2.0 - res*padding;
   int w0 = (int)ceil(2*M_PI/res);
   double **image = new_matrix2(w0,w0);
   int **idx = new_matrix2i(w0,w0);
@@ -2432,7 +2434,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       double d2_point = dist2(pcd_obs->points[ surface_points[j] ], pcd_obs->points[center_point], 3);
       cluster_d2[j] = d2_point;
     }
-    obs_data->obs_segments[i].max_radius = sqrt(max(cluster_d2, num_surface_points));
+    obs_data->obs_segments[i].max_radius = sqrt(arr_max(cluster_d2, num_surface_points));
 
 
     // find edge keypoints
@@ -3404,7 +3406,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   int h = obs_range_image->h;
 
   //TODO: make these params
-  double outlier_vis_thresh = .2*max(vis_pmf, num_validation_points);
+  double outlier_vis_thresh = .2*arr_max(vis_pmf, num_validation_points);
   double outlier_d_thresh = .9;
 
   if (outliers)
@@ -6160,7 +6162,8 @@ void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data
 //==============================================================================================//
 
 
-scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params,
+			      cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
 {
   double t0 = get_time_ms(); //dbug
 
@@ -6227,8 +6230,13 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // score hypotheses
   t0 = get_time_ms();
-  for (i = 0; i < num_samples_init; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
+  
+  // run CUDA
+  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points);
+
+  //for (i = 0; i < num_samples_init; i++)
+  //  S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
   // sort hypotheses
   sort_pose_samples(S);
@@ -6329,7 +6337,8 @@ void scope_round2(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 }
 */
 
-void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params,
+			cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
 {
   //TODO: make this a param
   int num_alignment_iters = 5;
@@ -6339,28 +6348,49 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
 
   // score hypotheses
   t0 = get_time_ms();
-  for (i = 0; i < S->num_samples; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
+  
+  // Call GPU
+  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+  /*for (i = 0; i < S->num_samples; i++)
+    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);*/
+
   sort_pose_samples(S);
   S->num_samples = MIN(S->num_samples, params->num_samples_round2);
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   t0 = get_time_ms();  //dbug
   for (iter = 0; iter < num_alignment_iters; iter++) {
+    
+    scope_sample_t samples[S->num_samples];
+    double new_scores[S->num_samples];
+
     for (i = 0; i < S->num_samples; ++i) {
-      scope_sample_t sample;
-      scope_sample_alloc(&sample, 0);
-      scope_sample_copy(&sample, &S->samples[i]);
-      sample_segments_given_model_pose(&sample, model_data, obs_data, params);
-      if (sample.num_segments > 0) {
-	align_model_to_segments(&sample, model_data, obs_data, params);
-	double w = model_placement_score(&sample, model_data, obs_data, params, 2);
+      //scope_sample_t sample;
+      scope_sample_alloc(&samples[i], 0);
+      scope_sample_copy(&samples[i], &S->samples[i]);
+      sample_segments_given_model_pose(&samples[i], model_data, obs_data, params);
+      if (samples[i].num_segments > 0) {
+	align_model_to_segments(&samples[i], model_data, obs_data, params);
+	/*double w = model_placement_score(&sample, model_data, obs_data, params, 2);
 	if (w > S->W[i]) {
 	  scope_sample_copy(&S->samples[i], &sample);
 	  S->W[i] = w;
-	}
+	  }*/
       }
-      scope_sample_free(&sample);
+      //scope_sample_free(&sample);
+    }
+    
+    // Call GPU
+    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+    cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+
+    for (i = 0; i < S->num_samples; ++i) {
+      if (new_scores[i] > S->W[i]) {
+	scope_sample_copy(&S->samples[i], &samples[i]);
+	S->W[i] = new_scores[i];
+      }
+      scope_sample_free(&samples[i]);
     }
     if (have_true_pose_)
       print_good_poses(S);
@@ -6379,7 +6409,7 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
 }
 
 
-void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
 {
   int i;
 
@@ -6399,11 +6429,16 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
 
-  params->verbose = 1; //dbug
+  /*params->verbose = 1; //dbug
   for (i = 0; i < S->num_samples; i++)
     S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
-  params->verbose = 0;
-  //sort_pose_samples(S);
+    params->verbose = 0;*/
+
+  // Call GPU
+  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
+
+  sort_pose_samples(S);
 
   printf("Scored round 3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug  
 
@@ -6420,7 +6455,8 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
  */
-scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose)
+//scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs)
+scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
 {
   int i;
   //const double MIN_SCORE = -100000.0;
@@ -6436,23 +6472,30 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   double t0 = get_time_ms();  //dbug
 
+  // Copy model and obs data to GPU - This is for single object
+  /*cu_model_data_t cu_model;
+    cu_obs_data_t cu_obs;
+    cu_init_scoring(model_data, obs_data, *cu_model, &cu_obs);*/
+
   // step 1: sample initial poses given single correspondences
-  scope_samples_t *S = scope_round1(model_data, obs_data, params);
+  scope_samples_t *S = scope_round1(model_data, obs_data, params, cu_model, cu_obs);
 
   // step 2: align with BPA
   //scope_round2(S, model_data, obs_data, params);
-  scope_round2_super(S, model_data, obs_data, params);
+  scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs);
 
   //dbug: add true pose
-  if (have_true_pose_) {
+  /*if (have_true_pose_) {
     memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
-  }
+    }*/
   //S->num_samples = 1;
 
-  scope_round3(S, model_data, obs_data, params);
+  scope_round3(S, model_data, obs_data, params, cu_model, cu_obs);
 
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
+
+  //cu_free_all_the_things(&cu_model, &cu_obs); - this is for single object
 
   // cluster poses
   //if (params->pose_clustering)
@@ -6543,6 +6586,15 @@ void remove_objects_from_obs_data(scope_obs_data_t *new_obs_data, scope_obs_data
   else
     obs.sift_pcd = clone_pcd(obs_data->sift_obs);
 
+  // remove model inliers from shot_pcd
+  if (M->num_objects > 0) {
+    n = get_pcd_mope_outliers(idx, obs_data->shot_obs, M, models, params);
+    obs.shot_pcd = filter_pcd(obs_data->shot_obs, idx, n);
+  }
+  else
+    obs.shot_pcd = clone_pcd(obs_data->shot_obs);
+
+
   // copy bg_pcd
   obs.bg_pcd = clone_pcd(obs_data->pcd_obs_bg);
 
@@ -6553,7 +6605,8 @@ void remove_objects_from_obs_data(scope_obs_data_t *new_obs_data, scope_obs_data
 /*
  * Greedy search for multiple objects.
  */
-mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params)
+//mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs)
+mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs)
 {
   int max_num_objects = 3;
 
@@ -6574,7 +6627,7 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
     int i;
     double wmax = -99999999;
     for (i = 0; i < num_models; i++) {
-      scope_samples_t *S = scope(&models[i], &new_obs, params, NULL);
+      scope_samples_t *S = scope(&models[i], &new_obs, params, NULL, &cu_model[i], cu_obs);
       if (S->W[0] > wmax) {
 	wmax = S->W[0];
 	scope_sample_copy(&M->objects[n], &S->samples[0]);

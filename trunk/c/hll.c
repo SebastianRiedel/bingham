@@ -193,7 +193,7 @@ void hll_sample(double **X, double ***S, double **Q, hll_t *hll, int n)
     //printf("]\n");
 
     // threshold weights
-    double wmax = max(w, hll->n);
+    double wmax = arr_max(w, hll->n);
     double wthresh = wmax/50;  //dbug: make this a parameter?
     for (j = 0; j < hll->n; j++)
       if (w[j] < wthresh)
