@@ -2585,7 +2585,7 @@ void get_superpixel_affinity_graph(scope_obs_data_t *obs_data, scope_params_t *p
 	double logp = 0;
 	double d;
 	for (d = 0.0; d < dij; d += .1) {
-	  logp += obs_edge_image[ (int)round(x+d*dx) ][ (int)round(y+d*dy) ];
+	  logp += obs_edge_image[ (int)round(xi+d*dx) ][ (int)round(yi+d*dy) ];
 	  n++;
 	}
 	double edge_cost = exp(logp / (double)n);
