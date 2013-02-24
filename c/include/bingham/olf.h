@@ -290,6 +290,7 @@ extern "C" {
     double **obs_edge_image;
     double ***obs_lab_image;
     superpixel_t *obs_segments;
+    double **obs_segment_affinities;
     int num_obs_segments;
     struct FLANNParameters obs_xyzn_params;
     struct FLANNParameters shot_obs_xyzn_params;
