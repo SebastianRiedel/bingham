@@ -351,8 +351,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_normalvar = pcd_channel(pcd, "normalvar");
 
   //TODO: clean up these column names
-  int ch_labdist1 = pcd_channel(pcd, "ml1");  //labdist1
-  int ch_labdist20 = pcd_channel(pcd, "cnt2");  //labdist20
+  int ch_labdist1 = pcd_channel(pcd, "labdist1");
+  int ch_labdist20 = pcd_channel(pcd, "labdist20");
 
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
@@ -686,6 +686,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->do_icp);
       else if (!wordcmp(name, "do_final_icp", "\t\n"))
 	sscanf(value, "%d", &params->do_final_icp);
+      else if (!wordcmp(name, "use_cuda", "\t\n"))
+	sscanf(value, "%d", &params->use_cuda);
 
       else if (!wordcmp(name, "dispersion_weight", "\t\n"))
 	sscanf(value, "%d", &params->dispersion_weight);
@@ -6311,13 +6313,13 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // score hypotheses
   t0 = get_time_ms();
-  
-  // run CUDA
-  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points);
-
-  //for (i = 0; i < num_samples_init; i++)
-  //  S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
+  if (params->use_cuda) {
+    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points);
+  }
+  else
+    for (i = 0; i < num_samples_init; i++)
+      S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
   // sort hypotheses
   sort_pose_samples(S);
@@ -6429,12 +6431,13 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
 
   // score hypotheses
   t0 = get_time_ms();
-  
-  // Call GPU
-  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
-  /*for (i = 0; i < S->num_samples; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);*/
+  if (params->use_cuda) {
+    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+  }
+  else
+    for (i = 0; i < S->num_samples; i++)
+      S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
 
   sort_pose_samples(S);
   S->num_samples = MIN(S->num_samples, params->num_samples_round2);
@@ -6462,9 +6465,13 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
       //scope_sample_free(&sample);
     }
     
-    // Call GPU
-    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-    cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+    if (params->use_cuda) {
+      int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+      cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+    }
+    else
+      for (i = 0; i < S->num_samples; ++i)
+	new_scores[i] = model_placement_score(&samples[i], model_data, obs_data, params, 2);
 
     for (i = 0; i < S->num_samples; ++i) {
       if (new_scores[i] > S->W[i]) {
@@ -6510,14 +6517,16 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
 
-  /*params->verbose = 1; //dbug
-  for (i = 0; i < S->num_samples; i++)
-    S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
-    params->verbose = 0;*/
-
-  // Call GPU
-  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
+  if (params->use_cuda) {
+    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
+  }
+  else {
+    params->verbose = 1; //dbug
+    for (i = 0; i < S->num_samples; i++)
+      S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
+    params->verbose = 0;
+  }
 
   sort_pose_samples(S);
 

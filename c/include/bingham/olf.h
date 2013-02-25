@@ -176,6 +176,7 @@ extern "C" {
     int use_range_image;
     int do_icp;
     int do_final_icp;
+    int use_cuda;
 
     // WEIGHT / DISTANCE PARAMS
     int dispersion_weight;
