@@ -79,6 +79,13 @@ int main(int argc, char *argv[])
   for (i = 0; i < num_models; i++)
     free_scope_model_data(&model_data[i]);
   free_scope_obs_data(&obs_data);
+
+  FILE *f = fopen(argv[7], "w");
+  if (f == NULL) {
+    printf("Can't open %s for writing\n", argv[7]);
+    return 1;
+  }
+
   
   printf("CPU cleanup: %f\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
@@ -86,8 +93,25 @@ int main(int argc, char *argv[])
   cu_free_all_the_things_mope(cu_model, &cu_obs, num_models);
 
   printf("GPU cleanup: %f\n", (get_time_ms() - t0) / 1000.0);  //dbug
-
   printf("Total time: %f\n", (get_time_ms() - tTotal) / 1000.0);
+
+  int n = M->num_objects;
+  fprintf(f, "X = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f, %f, %f;  ", M->objects[i].x[0], M->objects[i].x[1], M->objects[i].x[2]);
+  fprintf(f, "];\n");
+
+  fprintf(f, "Q = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f, %f, %f, %f;  ", M->objects[i].q[0], M->objects[i].q[1], M->objects[i].q[2], M->objects[i].q[3]);
+  fprintf(f, "];\n");
+
+  fprintf(f, "IDs = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%d ", M->model_ids[i]);
+  fprintf(f, "];\n");
+
+
   return 0;
 }
 

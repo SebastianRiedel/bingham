@@ -6716,16 +6716,73 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
   return M;
 }
 
+/*double score_samples_bitmap(byte *bitmap, int num_ones, mope_samples_t *M, int num_samples, scope_model_data_t *models, int num_models, scope_obs_data_t *obs_data, scope_params_t *params) {
+  int i;
+  score = 0;
+  for (i = 0; i < num_samples; ++i) {
+    if (bitmap[i]) { // TODO(sanja): add bitmap to MOPE structure
+      score += model_placement_score(&M->objects[i], models[S->model_ids[i]], obs_data, params, 3); // TODO(sanja): ask Jared which round to use here
+    }
+  }
+}
 
+double segment_agreement_score(byte *bitmap, int num_ones, mope_samples_t *M, int num_samples, int num_obs_segments, scope_params_t *params) {
+  // count unique and non-unique segments in across samples  
+  int seen[num_obs_segments];
+  int num_seen = 0;
+  // TODO(sanja): figure out how to make this faster...
+  int i, j, k;
+  int explained;
+  int overlap;
+  // TODO(sanja): write heap routines to keep these indices since heaps can be stored as arrays
+  for (i = 0; i < bitmap) {
+    if (bitmap[i]) {
+      for (j = 0; j < M->objects[i]->num_segments; ++j) {
+	for (k = 0; k < num_seen; ++k) {
+	  if (seen[k] == M->objects[i]->segments_idx[j]) {
+	    ++overlap;
+	    break;
+	  }
+	}
+	if (k == num_seen) {
+	  seen[num_seen++] = M->objects[i]->segments_idx[j];
+	  ++explained;
+	}
+      }
+    }
+  }
+  return (double) explained * params->explained_weight + (double) overlap * params->overlap_weight; // TODO(sanja): add these weights to params
+}
 
+double evaluate_assignment(byte *bitmap, int num_ones, mope_samples_t *samples, int num_samples, scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params) {
+  
+  double sample_score = score_samples_bitmap(bitmap, num_ones, samples, num_samples, models, num_models, obs, params);
+  double segment_agreement_score = score_segments_covered(bitmap, num_ones, samples, num_samples, obs->num_obs_segments, params);
 
+  return params->sample_weight * sample_score + segment_agreement_score;
+}
 
-
-
-
-
-
-
+void simulated_annealing(mope_samples_t *samples, int num_samples, scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params) {
+  byte bitmap[num_samples];
+  int num_ones = 0;
+  int ones[num_samples];
+  memset(bitmap, 0, num_samples * sizeof(byte));
+  memset(ones, 0, num_samples * sizeof(int));
+  int num_steps = num_samples / 2; // TODO(sanja): make these params
+  double prob_switch;
+  double prob_accept_worse;
+  int i;
+  for (i = 0; i < num_steps; ++i) {
+    prob_switch = num_ones/num_models; // It's more likely to do a switch as the time goes by // TODO(sanja): I'm not sure this is the best way to do it...
+    prob_accept_worse = 1.0 - (double) i / num_steps; //gets smaller as the time goes by, i.e. the system cools down
+    if (frand() < prob_switch) {
+      int i1 = rand() % num_ones;
+      int i2 = rand() % num_ones;
+      
+    }   
+  }
+}
+*/
 
 
 
