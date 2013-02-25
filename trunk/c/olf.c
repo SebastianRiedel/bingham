@@ -348,10 +348,11 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_img_edge = pcd_channel(pcd, "img_edge");
   int ch_ved1 = pcd_channel(pcd, "ved1");
   int ch_ved66 = pcd_channel(pcd, "ved66");
+  int ch_normalvar = pcd_channel(pcd, "normalvar");
 
   //TODO: clean up these column names
-  int ch_labdist1 = pcd_channel(pcd, "ml1");
-  int ch_labdist20 = pcd_channel(pcd, "cnt2");
+  int ch_labdist1 = pcd_channel(pcd, "ml1");  //labdist1
+  int ch_labdist20 = pcd_channel(pcd, "cnt2");  //labdist20
 
   if (ch_cluster>=0) {
     //pcd->clusters = pcd->data[ch_cluster];
@@ -458,7 +459,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->curv_edge = pcd->data[ch_curv_edge];
   if (ch_img_edge>=0)
     pcd->img_edge = pcd->data[ch_img_edge];
-
+  if (ch_normalvar>=0)
+    pcd->normalvar = pcd->data[ch_normalvar];
 
   // add quaternion orientation features
   if (ch_nx>=0 && ch_ny>=0 && ch_nz>=0 && ch_pcx>=0 && ch_pcy>=0 && ch_pcz>=0) {
@@ -3426,6 +3428,8 @@ scope_noise_model_t *get_noise_models(double *x, double *q, int *idx, int n, pcd
     noise_models[i].lab_sigma[1] = .5*sigmoid(surface_angles[i], b_SA) + .5*sigmoid(edge_dists[i], b_EA);
     noise_models[i].lab_sigma[2] = .5*sigmoid(surface_angles[i], b_SB) + .5*sigmoid(edge_dists[i], b_EB);
 
+    noise_models[i].normal_sigma = MAX(noise_models[i].normal_sigma, pcd_model->normalvar[idx[i]]);
+
     //dbug
     //if (i%100==0) {
     //  printf("sigmoid(S=%.2f, b_SL) = %.2f, sigmoid(E=%.2f, b_ER) = %.2f\n", surface_angles[i], sigmoid(surface_angles[i], b_SL), edge_dists[i], sigmoid(edge_dists[i], b_EL));
@@ -3541,12 +3545,16 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 
 double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
+  //TODO: make this a param
+  double normalvar_thresh = .3;
+
   double score = 0.0;
   //double normal_sigma = params->normal_sigma;
   //double dmax = 2*normal_sigma;  // TODO: make this a param
   int i;
+  double wtot = 0.0;
   for (i = 0; i < num_validation_points; i++) {
-    if (vis_pmf[i] > .01/(double)num_validation_points) {
+    if (vis_pmf[i] > .01/(double)num_validation_points && noise_models[i].normal_sigma <= normalvar_thresh) {
       int xi,yi;
       range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
       double normal_sigma = params->normal_sigma * noise_models[i].normal_sigma;
@@ -3559,12 +3567,14 @@ double compute_normal_score(double **cloud, double **cloud_normals, double *vis_
 	d = MIN(d, dmax);
       }
       score += vis_pmf[i] * log(normpdf(d, 0, normal_sigma));
+      wtot += vis_pmf[i];
 
       //dbug
       if (params->verbose)
 	mps_normal_dists_[i] = d / dmax;
     }
   }
+  score /= wtot;
   score -= log(normpdf(0, 0, params->normal_sigma));
 
   //dbug
