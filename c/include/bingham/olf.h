@@ -25,6 +25,7 @@ extern "C" {
     double *range_edge;
     double *curv_edge;
     double *img_edge;
+    double *normalvar;
 
     // transposed data
     double **points;

@@ -383,12 +383,16 @@ __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis
 __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, int *xi, int *yi,
 				       cu_int_matrix_t *range_image_cnt, cu_double_matrix3d_t *range_image_normals, scope_params_t *params, int score_round)
 {
+  //TODO: make this a param
+  double normalvar_thresh = .3;
+
   double score = 0.0;
   //double normal_sigma = params->normal_sigma;
   //double dmax = 2*normal_sigma;  // TODO: make this a param
   int i;
+  double wtot = 0.0;
   for (i = 0; i < num_validation_points; i++) {
-    if (vis_pmf[i] > .01/ (double) num_validation_points) {
+    if (vis_pmf[i] > .01/ (double) num_validation_points && noise_models[i].normal_sigma <= normalvar_thresh) {
       double normal_sigma = params->normal_sigma * noise_models[i].normal_sigma;
       double dmax = 2*normal_sigma;
       double d = dmax;
@@ -399,8 +403,10 @@ __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, s
 	d = MIN(d, dmax);
       }
       score += vis_pmf[i] * log(cu_normpdf(d, 0, normal_sigma));
+      wtot += vis_pmf[i];
     }
   }
+  score /= wtot;
   score -= log(cu_normpdf(0, 0, params->normal_sigma));
 
   double w = 0;
