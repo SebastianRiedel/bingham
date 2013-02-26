@@ -1210,6 +1210,16 @@ void copy_double_matrix3d_to_gpu(cu_double_matrix3d_t *dev_dest, double ***host_
   }
 }
 
+void copy_double_arr_to_gpu(cu_double_arr_t *dev_dest, double *host_src, int n) {
+  dev_dest->n = n;
+  if (cudaMalloc(&(dev_dest->ptr), n * sizeof(double)) != cudaSuccess) {
+    printf("double arr malloc\n");
+  }
+  if (cudaMemcpy(dev_dest->ptr, host_src, n * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("double arr copy\n");
+  }
+}
+
 void copy_int_arr_to_gpu(cu_int_arr_t *dev_dest, int *host_src, int n) {
   dev_dest->n = n;
   if (cudaMalloc(&(dev_dest->ptr), n * sizeof(int)) != cudaSuccess) {
@@ -1383,6 +1393,7 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   // Allocate all the memory
   copy_double_matrix_to_gpu(&(cu_model->points), model_data->pcd_model->points, model_data->pcd_model->num_points, 3);
   copy_double_matrix_to_gpu(&(cu_model->normals), model_data->pcd_model->normals, model_data->pcd_model->num_points, 3);
+  copy_double_arr_to_gpu(&(cu_model->normalvar), model_data->pcd_model->normalvar, model_data->pcd_model->num_points);
   copy_double_matrix_to_gpu(&(cu_model->lab), model_data->pcd_model->lab, model_data->pcd_model->num_points, 3);
   copy_double_matrix_to_gpu(&(cu_model->ved), model_data->pcd_model->ved, model_data->pcd_model->num_points, 66);
   copy_double_matrix_to_gpu(&(cu_model->color_avg_cov), model_data->color_model->avg_cov, 3, 3);
@@ -1432,6 +1443,7 @@ void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs
   for (int i = 0; i < num_models; ++i) {
     copy_double_matrix_to_gpu(&(cu_model[i].points), model_data[i].pcd_model->points, model_data[i].pcd_model->num_points, 3);
     copy_double_matrix_to_gpu(&(cu_model[i].normals), model_data[i].pcd_model->normals, model_data[i].pcd_model->num_points, 3);
+    copy_double_arr_to_gpu(&(cu_model[i].normalvar), model_data[i].pcd_model->normalvar, model_data[i].pcd_model->num_points);
     copy_double_matrix_to_gpu(&(cu_model[i].lab), model_data[i].pcd_model->lab, model_data[i].pcd_model->num_points, 3);
     copy_double_matrix_to_gpu(&(cu_model[i].ved), model_data[i].pcd_model->ved, model_data[i].pcd_model->num_points, 66);
     copy_double_matrix_to_gpu(&(cu_model[i].color_avg_cov), model_data[i].color_model->avg_cov, 3, 3);
@@ -1480,6 +1492,7 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
 
   cudaFree(cu_model->points.ptr);
   cudaFree(cu_model->normals.ptr);
+  cudaFree(cu_model->normalvar.ptr);
   cudaFree(cu_model->lab.ptr);
   cudaFree(cu_model->ved.ptr);
   cudaFree(cu_model->color_avg_cov.ptr);
@@ -1513,6 +1526,7 @@ void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_o
   for (int i = 0; i < num_models; ++i) {
     cudaFree(cu_model[i].points.ptr);
     cudaFree(cu_model[i].normals.ptr);
+    cudaFree(cu_model[i].normalvar.ptr);
     cudaFree(cu_model[i].lab.ptr);
     cudaFree(cu_model[i].ved.ptr);
     cudaFree(cu_model[i].color_avg_cov.ptr);

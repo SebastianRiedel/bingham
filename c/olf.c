@@ -3595,7 +3595,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
   //TODO: make this a param
-  double normalvar_thresh = .3;
+  double normalvar_thresh = 10000;
 
   double score = 0.0;
   //double normal_sigma = params->normal_sigma;
