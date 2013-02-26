@@ -346,7 +346,7 @@ __device__ void range_image_xyz2sub(int *i, int *j, cu_range_image_data_t *range
 }
 
 __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, 
-				    cu_int_matrix_t *range_image_cnt, cu_double_matrix3d_t *points, cu_double_matrix3d_t *normals, scope_params_t *params, int score_round)
+				    cu_double_matrix_t *range_image, cu_range_image_data_t *range_image_data, cu_int_matrix_t *range_image_cnt, scope_params_t *params, int score_round)
 {
   double score = 0.0;
   //double range_sigma = params->range_sigma;
@@ -355,16 +355,21 @@ __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis
   for (i = 0; i < num_validation_points; i++) {
     if (vis_pmf[i] > .01/(double)num_validation_points) {
       double range_sigma = params->range_sigma * noise_models[i].range_sigma;
+      double model_range = cu_norm(&cloud[3*i], 3);
       double dmax = 2*range_sigma;
-      double d = dmax;
-      if (range_image_cnt->ptr[xi[i] * range_image_cnt->m + yi[i]] > 0) {
-	// get distance from model point to range image cell plane
-	double c[4];
-	cu_xyzn_to_plane(c, &points->ptr[xi[i] * points->m * points->p + yi[i] * points->p], &normals->ptr[xi[i] * points->m * points->p + yi[i] * points->p]);
-	d = fabs(cu_dot(c, &cloud[3*i], 3) + c[3]);
-	//d /= noise_models[i].range_sigma;
-	d = MIN(d, dmax);
+      double dmin = dmax;
+      int x, y;
+      for (x = xi[i] - 1; x<=xi[i] + 1; ++x) {
+	for (y = yi[i] - 1; y <= yi[i] + 1; ++y) {
+	  if (x >= 0 && x < (range_image_data->w) && y>=0 && y<(range_image_data->h) && range_image_cnt->ptr[x * range_image_cnt->m + y] > 0) {
+	    double obs_range = range_image->ptr[x * range_image->m + y];
+	    double d = fabs(model_range - obs_range);
+	    if (d < dmin) 
+	      dmin = d;	    
+	  }
+	}
       }
+      double d = dmin;
       score += vis_pmf[i] * log(cu_normpdf(d, 0, range_sigma));
 
     }
@@ -1030,8 +1035,8 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   //range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud[i], 1, 3, pcd_obs->points, obs_range_image, search_radius);
   
   double normal_score = compute_normal_score(cloud_normals, vis_pmf, noise_models, num_validation_points, xi, yi, &(cu_obs->range_image_cnt), &(cu_obs->range_image_normals), cu_params, score_round);
-  double xyz_score = compute_xyz_score(cloud, xi, yi, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_cnt), 
-				       &(cu_obs->range_image_points), &(cu_obs->range_image_normals), cu_params, score_round);
+  double xyz_score = compute_xyz_score(cloud, xi, yi, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image), &(cu_obs->range_image_data), &(cu_obs->range_image_cnt), 
+				       cu_params, score_round);
   double lab_score = compute_lab_score(xi, yi, cloud_lab, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_idx), &(cu_obs->range_image_pcd_obs_bg_lab), cu_params, score_round);
   //double labdist_score = compute_labdist_score(cloud, cloud_labdist, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, cu_params, score_round);
