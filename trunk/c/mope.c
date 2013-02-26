@@ -69,7 +69,8 @@ int main(int argc, char *argv[])
   t0 = get_time_ms();*/
 
 
-  mope_sample_t *M = mope_greedy(model_data, num_models, &obs_data, &params, cu_model, &cu_obs);
+  //mope_sample_t *M = mope_greedy(model_data, num_models, &obs_data, &params, cu_model, &cu_obs);
+  mope_sample_t *M = mope_annealing(model_data, num_models, &obs_data, &params, cu_model, &cu_obs);
 
   //dbug
   for (i = 0; i < M->num_objects; i++)
@@ -86,7 +87,6 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  
   printf("CPU cleanup: %f\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
 
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 
   fprintf(f, "IDs = [");
   for (i = 0; i < n; i++)
-    fprintf(f, "%d ", M->model_ids[i]);
+    fprintf(f, "%d ", M->model_ids[i] + 1);
   fprintf(f, "];\n");
 
 

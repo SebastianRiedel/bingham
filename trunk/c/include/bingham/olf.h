@@ -241,6 +241,11 @@ extern "C" {
     //double surfwidth_sigma;
     //double fsurf_sigma;
 
+    // MOPE PARAMS
+    double mope_samples_weight;
+    double mope_explained_weight;
+    double mope_overlap_weight;    
+
   } scope_params_t;
 
 
@@ -444,6 +449,7 @@ struct cu_obs_data_struct;
 scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 
 mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
+mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 
 /*#ifdef __cplusplus
 extern "C" {
