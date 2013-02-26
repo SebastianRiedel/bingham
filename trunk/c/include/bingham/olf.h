@@ -195,7 +195,7 @@ extern "C" {
     double score2_xyz_weight;
     double score2_normal_weight;
     double score2_vis_weight;
-    double score2_segment_weight;
+    double score2_random_walk_weight;
     double score2_edge_weight;
     double score2_edge_vis_weight;
     double score2_edge_occ_weight;
@@ -204,12 +204,13 @@ extern "C" {
     double score2_B_weight;
     double score2_fpfh_weight;
     double score2_labdist_weight;
+    double score2_segment_affinity_weight;
 
     // SCORE3 PARAMS
     double score3_xyz_weight;
     double score3_normal_weight;
     double score3_vis_weight;
-    double score3_segment_weight;
+    double score3_random_walk_weight;
     double score3_edge_weight;
     double score3_edge_vis_weight;
     double score3_edge_occ_weight;
@@ -218,6 +219,7 @@ extern "C" {
     double score3_B_weight;
     double score3_fpfh_weight;
     double score3_labdist_weight;
+    double score3_segment_affinity_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
@@ -292,6 +294,7 @@ extern "C" {
     double **obs_edge_image;
     double ***obs_lab_image;
     superpixel_t *obs_segments;
+    int **obs_segment_image;
     double **obs_segment_affinities;
     int num_obs_segments;
     struct FLANNParameters obs_xyzn_params;

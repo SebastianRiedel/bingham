@@ -126,6 +126,7 @@ void free_matrix2(double **X);                                              /* f
 void free_matrix2f(float **X);                                              /* free a 2d matrix of floats */
 void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
 void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
+void save_matrixi(char *fout, int **X, int n, int m);                       /* save a matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                            /* load a matrix from a file */
 void transpose(double **Y, double **X, int n, int m);                       /* transpose a matrix */
 void solve(double *x, double **A, double *b, int n);                        /* solve the equation Ax = b, where A is a square n-by-n matrix */
