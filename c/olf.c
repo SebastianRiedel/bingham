@@ -6608,6 +6608,10 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
 
+  //NOTE(sanja): Add calculating segment score here
+  for (i = 0; i < S->num_samples; ++i)
+    sample_segments_given_model_pose(&S->samples[i], model_data, obs_data, params, 1);  
+
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
     cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
@@ -6618,14 +6622,6 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
     params->verbose = 0;
   }
-
-  //NOTE(sanja): Add calculating segment score here
-  for (i = 0; i < S->num_samples; ++i)
-    sample_segments_given_model_pose(&S->samples[i], model_data, obs_data, params, 1);  
-
-  // Call GPU
-  int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-  cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
 
   sort_pose_samples(S);
 
