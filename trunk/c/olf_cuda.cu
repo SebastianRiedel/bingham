@@ -673,7 +673,7 @@ __device__ inline double cu_sigmoid(double x, const double *b)
 }
 
 __device__ void get_noise_models(scope_noise_model_t *noise_models, double *cloud, double *cloud_normals, double x[], double q[], int *idx, int n, 
-				 cu_double_matrix_t *ved, cu_double_matrix_t *range_edges_model_views)
+				 cu_double_matrix_t *ved, cu_double_matrix_t *range_edges_model_views, cu_double_arr_t *normalvar)
 {
   int i;
 
@@ -704,6 +704,8 @@ __device__ void get_noise_models(scope_noise_model_t *noise_models, double *clou
     noise_models[i].lab_sigma[0] = .5*cu_sigmoid(surface_angles, b_SL) + .5*cu_sigmoid(edge_dists, b_EL);
     noise_models[i].lab_sigma[1] = .5*cu_sigmoid(surface_angles, b_SA) + .5*cu_sigmoid(edge_dists, b_EA);
     noise_models[i].lab_sigma[2] = .5*cu_sigmoid(surface_angles, b_SB) + .5*cu_sigmoid(edge_dists, b_EB);
+
+    noise_models[i].normal_sigma = MAX(noise_models[i].normal_sigma, normalvar->ptr[idx[i]]);
   }
   
 }
@@ -1010,7 +1012,7 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
     }*/
 
   // compute noise models
-  get_noise_models(noise_models, cloud, cloud_normals, x, q, idx, num_validation_points, &(cu_model->ved), &(cu_model->range_edges_model_views));
+  get_noise_models(noise_models, cloud, cloud_normals, x, q, idx, num_validation_points, &(cu_model->ved), &(cu_model->range_edges_model_views), &(cu_model->normalvar));
 
   /*
   if (dbg_timed) {
