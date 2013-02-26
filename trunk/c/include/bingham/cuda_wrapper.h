@@ -19,6 +19,11 @@ typedef struct {
 
 typedef struct {
   double *ptr;
+  size_t n;
+} cu_double_arr_t;
+
+typedef struct {
+  double *ptr;
   //size_t pitch;
   size_t n, m;
 } cu_double_matrix_t;
@@ -40,6 +45,7 @@ typedef struct cu_model_data_struct {
   cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
   cu_double_matrix3d_t color_cov1, color_cov2;
   
+  cu_double_arr_t normalvar;
   cu_int_arr_t color_cnts1, color_cnts2, range_edges_view_idx, range_edges_view_cnt;
 
   int num_points, num_views, max_num_edges;
