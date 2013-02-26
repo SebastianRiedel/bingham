@@ -37,7 +37,8 @@ int **range_edge_pixels_ = NULL;
 double *range_edge_vis_prob_ = NULL;
 int num_range_edge_points_;
 double edge_score_, edge_vis_score_, edge_occ_score_;
-double segment_score_;
+double random_walk_score_;
+double segment_affinity_score_;
 int mps_idx_[100000];
 double mps_vis_prob_[100000];
 double *x_true_, *q_true_;
@@ -715,8 +716,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score2_normal_weight);
       else if (!wordcmp(name, "score2_vis_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_vis_weight);
-      else if (!wordcmp(name, "score2_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score2_segment_weight);
+      else if (!wordcmp(name, "score2_random_walk_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_random_walk_weight);
       else if (!wordcmp(name, "score2_edge_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_edge_weight);
       else if (!wordcmp(name, "score2_edge_occ_weight", " \t\n"))
@@ -733,6 +734,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score2_fpfh_weight);
       else if (!wordcmp(name, "score2_labdist_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_labdist_weight);
+      else if (!wordcmp(name, "score2_segment_affinity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_segment_affinity_weight);
 
       else if (!wordcmp(name, "score3_xyz_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_xyz_weight);
@@ -740,8 +743,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score3_normal_weight);
       else if (!wordcmp(name, "score3_vis_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_vis_weight);
-      else if (!wordcmp(name, "score3_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->score3_segment_weight);
+      else if (!wordcmp(name, "score3_random_walk_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_random_walk_weight);
       else if (!wordcmp(name, "score3_edge_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_edge_weight);
       else if (!wordcmp(name, "score3_edge_occ_weight", " \t\n"))
@@ -758,6 +761,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score3_fpfh_weight);
       else if (!wordcmp(name, "score3_labdist_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_labdist_weight);
+      else if (!wordcmp(name, "score3_segment_affinity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_segment_affinity_weight);
 
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
@@ -2184,7 +2189,6 @@ void free_olf(olf_t *olf);
 void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params);
 
 
-
 /*
  * Segment the observed scene into superpixels using k-means.
  */
@@ -2216,7 +2220,8 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
   double **cluster_colors = new_matrix2(num_clusters, 3);
   num_clusters = 0;
 
-  int I[w][h];     // pixel cluster membership
+  obs_data->obs_segment_image = new_matrix2i(w,h);
+  int **I = obs_data->obs_segment_image;     // pixel cluster membership
   double D2[w][h];  // pixel cluster squared distances
   double d2_tot = 0;
 
@@ -2305,7 +2310,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
     }
 
     // update cluster memberships
-    memset(I, -1, w*h*sizeof(int));
+    memset(I[0], -1, w*h*sizeof(int));
     memset(D2, 0, w*h*sizeof(double));
 
     for (i = 0; i < num_clusters; i++) {
@@ -2475,6 +2480,10 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
   printf("Got superpixel keypoints in %f ms\n", get_time_ms() - t0);  //dbug
 
 
+  //dbug: save obs_segment_image
+  save_matrixi("obs_segment_image.txt", I, w, h);
+
+
   //dbug: save superpixel ppm file
   uchar S[w][h][3];
   memset(S, 0, w*h*3);
@@ -2543,9 +2552,10 @@ void get_superpixel_affinity_graph(scope_obs_data_t *obs_data, scope_params_t *p
 {
   //TODO: make these params
   double segment_affinity_keypoint_dist_thresh = .02;
-  double edge_weight = .5;
-  double normal_weight = 0;
-  double color_weight = 0;
+  double edge_weight = .1; //.5;
+  double dist_weight = 2; //10;
+  double normal_weight = .3; //1;
+  double color_weight = .001; //.005
 
   pcd_t *pcd_obs = obs_data->pcd_obs;
   range_image_t *obs_range_image = obs_data->obs_range_image;
@@ -2600,13 +2610,16 @@ void get_superpixel_affinity_graph(scope_obs_data_t *obs_data, scope_params_t *p
 	// compute the difference between segment color
 	double color_cost = dist2(segments[i].avg_lab_color, segments[j].avg_lab_color, 3);
 
-	double cost = edge_weight*edge_cost + normal_weight*normal_cost + color_weight*color_cost;
+	double cost = dist_weight*dmin + edge_weight*edge_cost + normal_weight*normal_cost + color_weight*color_cost;
 	affinity = exp(-cost);
       }
       
       A[i][j] = A[j][i] = affinity;
     }
   }
+
+  //dbug: save obs_segment_affinities
+  save_matrix("obs_segment_affinities.txt", A, num_segments, num_segments);
 }
 
 
@@ -3012,6 +3025,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
 
   // get superpixel segmentation
   get_superpixel_segmentation(data, params);
+  get_superpixel_affinity_graph(data, params);
 
   //cleanup
   free_matrix2(obs_xyzn);
@@ -4268,10 +4282,51 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 
 
 
+// compute the segment affinity score for a scope sample
+double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
+{
+  int *segments = sample->segments_idx;
+  double **A = obs_data->obs_segment_affinities;
+  int n = obs_data->num_obs_segments;
+
+  int i, mask[n];
+  memset(mask, 0, n*sizeof(int));
+  for (i = 0; i < sample->num_segments; i++)
+    mask[segments[i]] = 1;
+
+  int j, cnt = 0;  // normalize by the number of model boundary edges
+  double score = 0;
+  for (i = 0; i < sample->num_segments; i++) {
+    int s = segments[i];
+    for (j = 0; j < n; j++) {
+      if (mask[j] == 0) {
+	cnt++;
+	double a = MIN(A[s][j], .9);
+	if (a > 0.5)
+	  score += log((1-a)/a);
+      }
+    }
+  }
+  if (cnt > 0)
+    score = score/(double)cnt;
+
+  if (params->verbose)
+    segment_affinity_score_ = score;
+
+  double weight = 0;
+  if (score_round == 2)
+    weight = params->score2_segment_affinity_weight;
+  else
+    weight = params->score3_segment_affinity_weight;
+
+  return weight * score;
+  
+}
 
 
-double compute_segment_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
-			     double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
+
+double compute_random_walk_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
+				 double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
 {
   double range_sigma = params->range_sigma;
   double dmax = 2*range_sigma;
@@ -4317,13 +4372,13 @@ double compute_segment_score(double *x, double *q, double **cloud, flann_index_t
   free_matrix2(R_inv);
 
   if (params->verbose)
-    segment_score_ = score;
+    random_walk_score_ = score;
 
   double weight = 0;
   if (score_round == 2)
-    weight = params->score2_segment_weight;
+    weight = params->score2_random_walk_weight;
   else
-    weight = params->score3_segment_weight;
+    weight = params->score3_random_walk_weight;
 
   return weight * score;
 }
@@ -4496,19 +4551,21 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   //printf("break 6, %.2f ms\n", get_time_ms() - t0);  //dbug
   //t0 = get_time_ms();
 
-  double segment_score = 0;
+  double random_walk_score = 0;
   if (score_round >= 3)
-    segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
-					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
+    random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
+						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score + fpfh_score + labdist_score;
+  double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
+
+  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
 
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
   //  score += 100;
 
   //if (params->verbose) {
-  //  printf("score_comp = (%f, %f, %f, %f, %f, %f)\n", xyz_score, normal_score, edge_score, lab_score, vis_score, segment_score);
+  //  printf("score_comp = (%f, %f, %f, %f, %f, %f)\n", xyz_score, normal_score, edge_score, lab_score, vis_score, random_walk_score);
   //  printf("score = %f\n", score);
   //}
 
@@ -4516,9 +4573,10 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   
   if (params->verbose) {
-    double scores[12] = {xyz_score_, normal_score_, vis_score_, segment_score_, edge_score_, edge_vis_score_, edge_occ_score_, lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, labdist_score_};
+    double scores[13] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
+			 lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, labdist_score_, segment_affinity_score_};
     if (sample->scores == NULL) {
-      sample->num_scores = 12;
+      sample->num_scores = 13;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));

@@ -1499,6 +1499,23 @@ void save_matrix(char *fout, double **X, int n, int m)
   fclose(f);
 }
 
+void save_matrixi(char *fout, int **X, int n, int m)
+{
+  //fprintf(stderr, "saving matrix to %s\n", fout);
+
+  FILE *f = fopen(fout, "w");
+  int i, j;
+
+  fprintf(f, "%d %d\n", n, m);
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++)
+      fprintf(f, "%d ", X[i][j]);
+    fprintf(f, "\n");
+  }
+
+  fclose(f);
+}
+
 /*
  * Load a matrix in the following format.
  *
