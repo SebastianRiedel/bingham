@@ -4341,7 +4341,7 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
     }
   }
   if (cnt > 0)
-    score = score/(double)cnt;
+    score = 5*score/(double)cnt;
 
   if (params->verbose)
     segment_affinity_score_ = score;
