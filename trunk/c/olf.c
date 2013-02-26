@@ -3555,7 +3555,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 	    //double c[4];
 	    //xyzn_to_plane(c, obs_range_image->points[xi][yi], obs_range_image->normals[xi][yi]);
 	    //d = fabs(dot(c, cloud[i], 3) + c[3]);
-	    double obs_range = obs_range_image->image[xi][yi];
+	    double obs_range = obs_range_image->image[x][y];
 	    double d = fabs(model_range - obs_range);
 	    if (d < dmin)
 	      dmin = d;
@@ -6838,17 +6838,20 @@ mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs
   return M;
 }
 
-double score_taken_samples(int taken[][2], int num_taken, scope_samples_t *S[], int num_objects, scope_params_t *params) {
+double score_taken_samples(int taken[][2], int num_taken, scope_samples_t *S[], int num_objects, scope_params_t *params, int write) {
   int i;
   double score = 0;
   for (i = 0; i < num_taken; ++i) {
     score += S[taken[i][0]]->W[taken[i][1]];
+    if (write) {
+      printf("Score for %d is %lf\n", taken[i][0], S[taken[i][0]]->W[taken[i][1]]);
+    }
   }
   //return score * params->samples_weight;
-  return score;
+  return score/((double)num_taken);
 }
 
-double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *S[], int num_objects, scope_params_t *params, int num_segments) {
+double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *S[], int num_objects, scope_params_t *params, int num_segments, int write) {
   // count unique and non-unique segments in across samples  
   int seen[num_segments];
   memset(seen, 0, num_segments*sizeof(int));
@@ -6871,8 +6874,17 @@ double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *
     }
     }*/
   for (i = 0; i < num_taken; ++i) {
+    if (write) {
+      printf("********Segments for modelID = %d\n", taken[i][0]);
+    }
     for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
+      if (write) {
+	printf("%d ", S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]);
+      }
       ++seen[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]];      
+    }
+    if (write) {
+      printf("\n\n");
     }
   }
   
@@ -6886,14 +6898,22 @@ double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *
   double explained_score = ((double) explained) / ((double) num_segments);
   double overlap_score = ((double) overlap) / ((double) num_segments);
   //return (explained_score * params->explained_weight - overlap_score * params->overlap_weight; // TODO(sanja): add these weights to params
-  return 0.5 * explained_score - 1.5 * overlap_score;
+
+  if (write) {
+    printf("eplained score: %lf\n", explained_score);
+    printf("overlap score: %lf\n", overlap_score);
+  }
+  return 0.5 * explained_score - 1.0 * overlap_score;
 }
 
-double evaluate_assignment(int taken[][2], int num_taken, scope_samples_t *samples[], int num_objects, scope_params_t *params, int num_segments) {
+double evaluate_assignment(int taken[][2], int num_taken, scope_samples_t *samples[], int num_objects, scope_params_t *params, int num_segments, int write) {
   
-  double sample_score = score_taken_samples(taken, num_taken, samples, num_objects, params);
-  double segment_agreement_score = score_segments_agreement(taken, num_taken, samples, num_objects, params, num_segments);
+  double sample_score = score_taken_samples(taken, num_taken, samples, num_objects, params, write);
+  double segment_agreement_score = score_segments_agreement(taken, num_taken, samples, num_objects, params, num_segments, write);
 
+  if (write) {
+    printf("scope score: %lf\n", sample_score);
+  }
   return sample_score + segment_agreement_score;
 }
 
@@ -6923,7 +6943,7 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
     prob_accept_worse = MAX(0, 0.6 - (double) i / num_steps); //gets smaller as the time goes by, i.e. the system cools down
     for (j = 0; j < num_taken; ++j) {
       new_taken[j][0] = taken[j][0];
-      new_taken[j][1] = taken[j][1];
+      new_taken[j][1] = 0; //taken[j][1];
     }
     new_num_taken = num_taken;
     if (frand() < prob_switch) {
@@ -6931,45 +6951,56 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
       int i2 = rand() % num_objects;
       int i3 = rand() % S[i2]->num_samples;
       new_taken[i1][0] = i2;
-      new_taken[i1][1] = i3;
+      new_taken[i1][1] = 0; //i3;
     } else {
       int i1 = rand() % num_objects;
       int i2 = rand() % S[i1]->num_samples;
       for (j = 0; j < num_taken; ++j) {
 	if (new_taken[j][0] == i1 && new_taken[j][1] == i2) {
 	  new_taken[j][0] = new_taken[--new_num_taken][0];
-	  new_taken[j][1] = new_taken[new_num_taken][1];
+	  new_taken[j][1] = 0; //new_taken[new_num_taken][1];
 	  break;
 	}
       }
       if (j == num_taken) {
 	new_taken[new_num_taken][0] = i1;
-        new_taken[new_num_taken++][1] = i2;
+        new_taken[new_num_taken++][1] = 0; //i2;
       }
     }    
-    new_score = evaluate_assignment(new_taken, new_num_taken, S, num_objects, params, num_segments);
+    new_score = evaluate_assignment(new_taken, new_num_taken, S, num_objects, params, num_segments, 0);
     if (new_score < old_score && frand() > prob_accept_worse)
       continue;
     old_score = new_score;
     num_taken = new_num_taken;
     for (j = 0; j < num_taken; ++j) {
       taken[j][0] = new_taken[j][0];
-      taken[j][1] = new_taken[j][1];
+      taken[j][1] = 0; //new_taken[j][1];
     }
     if (new_score > best_score) {
       best_score = new_score;
       best_num_taken = num_taken;
       for (j = 0; j < num_taken; ++j) {
 	best_taken[j][0] = new_taken[j][0];
-	best_taken[j][1] = new_taken[j][1];
+	best_taken[j][1] = 0; //new_taken[j][1];
       }
     }
   }  
+
+  double final_score = evaluate_assignment(best_taken, best_num_taken, S, num_objects, params, num_segments, 1);
+  taken[0][0] = 0;
+  taken[0][1] = 0;
+  taken[1][0] = 15;
+  taken[1][1] = 0;
+  taken[2][0] = 16;
+  taken[2][1] = 0;
+  printf("--------------\n");
+  evaluate_assignment(taken, 3, S, num_objects, params, num_segments, 1);
+
   *num_best = best_num_taken;
   *best_arr = new_matrix2i(best_num_taken, 2);
   for (j = 0; j < best_num_taken; ++j) {
     (*best_arr)[j][0] = best_taken[j][0];
-    (*best_arr)[j][1] = best_taken[j][1];
+    (*best_arr)[j][1] = 0; //best_taken[j][1];
   }
 }
 
@@ -7004,7 +7035,6 @@ mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_
   for (i = 0; i < num_models; ++i) {
     free_scope_samples(S[i]);
   }
-  // NEXT(sanja): There is something segfaulting in MATLAB... /facepalm
 
   return M;
 }
