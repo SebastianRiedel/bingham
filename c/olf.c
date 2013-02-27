@@ -2333,7 +2333,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 
       for (xi = x0; xi <= x1; xi++) {
 	for (yi = y0; yi <= y1; yi++) {
-	  if (obs_fg_range_image->cnt[xi][yi] > 0) {  // only include foreground points in clusters
+	  if (obs_fg_range_image->cnt[xi][yi] > 0 && obs_range_image->cnt[xi][yi] > 0) {  // only include foreground points in clusters
 	    double d2_point = dist2(obs_range_image->points[xi][yi], cluster_points[i], 3);
 	    double d2_normal = dist2(obs_range_image->normals[xi][yi], cluster_normals[i], 3);
 	    double obs_lab[3] = {obs_lab_image[0][xi][yi], obs_lab_image[1][xi][yi], obs_lab_image[2][xi][yi]};
