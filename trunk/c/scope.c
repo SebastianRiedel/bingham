@@ -47,9 +47,9 @@ int main(int argc, char *argv[])
   short have_true_pose = 0;
   simple_pose_t true_pose;
   if (argc < 8 || argc > 9) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
     printf("or\n");
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
     return 1;
   }
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
   // load obs data
   olf_obs_t obs;
   obs.bg_pcd = load_pcd(argv[1]);
-  obs.fg_pcd = load_pcd(argv[2]);
+  obs.fpfh_pcd = load_pcd(argv[2]);
   obs.shot_pcd = load_pcd(argv[3]);
   obs.sift_pcd = load_pcd(argv[4]);
   scope_obs_data_t obs_data;
