@@ -11,7 +11,7 @@
 int main(int argc, char *argv[])
 {
   if (argc < 7) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fg> <pcd_obs_sift> <pcd_obs_shot> <model> <param_file> <samples_output>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_sift> <pcd_obs_shot> <model> <param_file> <samples_output>\n", argv[0]);
     return 1;
   }
   double tTotal = get_time_ms();
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
   // load obs data
   olf_obs_t obs;
   obs.bg_pcd = load_pcd(argv[1]);
-  obs.fg_pcd = load_pcd(argv[2]);
+  obs.fpfh_pcd = load_pcd(argv[2]);
   obs.shot_pcd = load_pcd(argv[3]);
   obs.sift_pcd = load_pcd(argv[4]);
   scope_obs_data_t obs_data;

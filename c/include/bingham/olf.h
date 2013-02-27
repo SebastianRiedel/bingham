@@ -147,11 +147,10 @@ extern "C" {
 
 
   typedef struct {
-    pcd_t *fg_pcd;
+    pcd_t *bg_pcd;
+    pcd_t *fpfh_pcd;
     pcd_t *shot_pcd;
     pcd_t *sift_pcd;
-    pcd_t *bg_pcd;
-    //range_image_t *range_image;
   } olf_obs_t;
 
 
@@ -283,10 +282,11 @@ extern "C" {
 
   typedef struct scope_obs_data_struct {
     pcd_t *pcd_obs;
+    pcd_t *fpfh_obs;
     pcd_t *shot_obs;
     pcd_t *sift_obs;
-    pcd_t *pcd_obs_bg;
     olf_t *pcd_obs_olfs;
+    olf_t *fpfh_obs_olfs;
     olf_t *shot_obs_olfs;
     olf_t *sift_obs_olfs;
     int *obs_to_shot_map;
@@ -302,9 +302,9 @@ extern "C" {
     int **obs_segment_image;
     double **obs_segment_affinities;
     int num_obs_segments;
-    struct FLANNParameters obs_xyzn_params;
+    struct FLANNParameters fpfh_obs_xyzn_params;
     struct FLANNParameters shot_obs_xyzn_params;
-    flann_index_t obs_xyzn_index;
+    flann_index_t fpfh_obs_xyzn_index;
     flann_index_t shot_obs_xyzn_index;
   } scope_obs_data_t;
 

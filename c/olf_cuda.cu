@@ -1427,7 +1427,7 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs_bg->lab, obs_data->pcd_obs_bg->num_points, 3);
+  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
 
@@ -1478,7 +1478,7 @@ void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs_bg->lab, obs_data->pcd_obs_bg->num_points, 3);
+  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
 
