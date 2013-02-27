@@ -411,7 +411,8 @@ __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, s
       wtot += vis_pmf[i];
     }
   }
-  score /= wtot;
+  if (wtot > 0.0)
+    score /= wtot;
   score -= log(cu_normpdf(0, 0, params->normal_sigma));
 
   double w = 0;
@@ -947,9 +948,45 @@ __device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pm
   return (w1 * score) + (w2 * vis_score) + (w3 * occ_score);
 }
 
+// compute the segment affinity score for a scope sample
+__device__ double compute_segment_affinity_score(int *segments, int num_segments, cu_double_matrix_t *segment_affinities, int num_obs_segments, int *mask, scope_params_t *params, int score_round)
+{
+  int n = num_obs_segments;
+
+  int i;
+  memset(mask, 0, n*sizeof(int));
+  for (i = 0; i < num_segments; i++)
+    mask[segments[i]] = 1;
+
+  int j, cnt = 0;  // normalize by the number of model boundary edges
+  double score = 0;
+  for (i = 0; i < num_segments; i++) {
+    int s = segments[i];
+    for (j = 0; j < n; j++) {
+      if (mask[j] == 0) {
+	cnt++;
+	double a = MIN(segment_affinities->ptr[s * segment_affinities->m + j], .9);
+	if (a > 0.5)
+	  score += log((1-a)/a);
+      }
+    }
+  }
+  if (cnt > 0)
+    score = 5*score/(double)cnt;
+
+  double weight = 0;
+  if (score_round == 2)
+    weight = params->score2_segment_affinity_weight;
+  else
+    weight = params->score3_segment_affinity_weight;
+
+  return weight * score;
+  
+}
+
 __device__ double cu_model_placement_score(double x[], double q[], cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 					   int *xi, int *yi, int *idx, double *cloud, double *cloud_normals, double *cloud_lab, int num_validation_points, double *vis_prob, double *vis_pmf, uint *r,
-					   scope_noise_model_t *noise_models,
+					   scope_noise_model_t *noise_models, int *segments_idx, int num_segments, int *segment_mask,
 					   int *idx_edge, double *P, double *V_edge, double *V2_edge, int *occ_edges, double *vis_prob_edge, double *vis_pmf_edge) {
   //int dbg_timed = 1;
   //double t0 = get_time_ms();  //dbug
@@ -1098,10 +1135,11 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
     segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
 					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
   */
+  
+  double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round);
 
-  // (Sanja) double score = xyz_score + normal_score + edge_score + lab_score + vis_score + segment_score + fpfh_score + labdist_score;
-  double score = xyz_score + normal_score + lab_score + vis_score + edge_score;
-
+  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score;
+  
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
   //  score += 100;
@@ -1113,13 +1151,14 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   return score;
 }
 
-__global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples, cu_model_data_t cu_model, cu_obs_data_t cu_obs, scope_params_t cu_params, 
+__global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples,
+			      cu_int_arr_t cu_segments_idx, cu_int_arr_t cu_num_segments, int *cu_segment_mask, 
+			      cu_model_data_t cu_model, cu_obs_data_t cu_obs, scope_params_t cu_params, 
 			      int score_round, int *cu_xi, int *cu_yi, int *cu_idx, double *cu_cloud, double *cu_cloud_normals, double *cu_cloud_lab, double *cu_vis_prob, double *cu_vis_pmf, uint *cu_rands, 
 			      scope_noise_model_t *cu_noise_models,
 			      int *cu_idx_edge, double *cu_P, double *cu_V_edge, double *cu_V2_edge, int *cu_occ_edge, double *cu_vis_prob_edge, double *cu_vis_pmf_edge) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < num_samples) {
-    //printf("*****************gpu sample %d\n", i);
     int n_edge = cu_model.max_num_edges;
     double x[3], q[4];
     int j;
@@ -1129,8 +1168,6 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
     row = get_row(&cu_samples_q, i);
     for (j = 0; j < 4; ++j)
       q[j] = row[j];
-    //printf("%d\n", cu_params.num_validation_points);
-    //printf("%d\n", cu_model.num_points);
     int num_validation_points = (cu_params.num_validation_points > 0 ? cu_params.num_validation_points : cu_model.num_points);
     int *xi, *yi, *idx;
     double *cloud, *cloud_normals, *cloud_lab;
@@ -1145,6 +1182,11 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
     vis_prob = &cu_vis_prob[i*num_validation_points];
     vis_pmf = &cu_vis_pmf[i*num_validation_points];
     noise_models = &cu_noise_models[i*num_validation_points];
+
+    int *segments_idx;
+    segments_idx = &cu_segments_idx.ptr[i * cu_obs.num_obs_segments];
+    int *segment_mask;
+    segment_mask = &cu_segment_mask[i * cu_obs.num_obs_segments];
 
     int w, h;
     w = cu_obs.range_image_data.w;
@@ -1161,7 +1203,7 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
     vis_pmf_edge = &cu_vis_pmf_edge[i*n_edge];
 
     cu_scores[i] = cu_model_placement_score(x, q, &cu_model, &cu_obs, &cu_params, score_round, xi, yi, idx, cloud, cloud_normals, cloud_lab, num_validation_points, 
-					    vis_prob, vis_pmf, &cu_rands[4*i], noise_models,
+					    vis_prob, vis_pmf, &cu_rands[4*i], noise_models, segments_idx, cu_num_segments.ptr[i], segment_mask,
 					    idx_edge, P, V_edge, V2_edge, occ_edge, vis_prob_edge, vis_pmf_edge);
 
     //printf("%lf\n", cu_scores[i]);
@@ -1237,7 +1279,8 @@ void copy_int_arr_to_gpu(cu_int_arr_t *dev_dest, int *host_src, int n) {
   }
 }
 
-void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, int num_validation_points) {
+void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
+		      int num_validation_points, int num_obs_segments) {
   double t0 = get_time_ms();  
   int *cu_xi, *cu_yi, *cu_idx;
   double *cu_cloud, *cu_normals, *cu_lab;
@@ -1329,11 +1372,35 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   copy_double_matrix_to_gpu(&cu_samples_x, samples_x, num_samples, 3);
   cu_double_matrix_t cu_samples_q;
   copy_double_matrix_to_gpu(&cu_samples_q, samples_q, num_samples, 4);
+
+  // segment stuff
+  cu_int_arr_t cu_segments_idx;
+  int *tmp_segments_idx;
+  safe_malloc(tmp_segments_idx, num_samples * num_obs_segments, int);
+  memset(tmp_segments_idx, -1, num_samples * num_obs_segments * sizeof(int));
+  for (int i = 0; i < num_samples; ++i) {
+    memcpy(&(tmp_segments_idx[i * num_obs_segments]), samples[i].segments_idx, samples[i].num_segments * sizeof(int));
+  }
+  copy_int_arr_to_gpu(&cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments);
+  free(tmp_segments_idx);
+  cu_int_arr_t cu_num_segments;
+  int *num_segments;
+  safe_calloc(num_segments, num_samples, int);
+  for (int i = 0; i < num_samples; ++i) {
+    num_segments[i] = samples[i].num_segments;
+  }  
+  copy_int_arr_to_gpu(&cu_num_segments, num_segments, num_samples);
+  free(num_segments);
+  int *cu_segment_mask;
+  if (cudaMalloc(&cu_segment_mask, num_samples * num_obs_segments * sizeof(int)) != cudaSuccess) {
+    printf("segment_mask\n");
+  }
   
   //cudaProfilerStart();
   int threads_per_block = 8;
   int blocks_per_grid = ceil(num_samples/(1.0*threads_per_block));
-  score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_samples_x, cu_samples_q, num_samples, *cu_model, *cu_obs, *cu_params, score_round, 
+
+  score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_samples_x, cu_samples_q, num_samples, cu_segments_idx, cu_num_segments, cu_segment_mask, *cu_model, *cu_obs, *cu_params, score_round, 
 							cu_xi, cu_yi, cu_idx, cu_cloud, cu_normals, cu_lab, cu_vis_prob, cu_vis_pmf, cu_rands, cu_noise_models,
 							cu_idx_edge, cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge);
   cudaDeviceSynchronize();
@@ -1381,12 +1448,17 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   if (cudaFree(cu_idx_edge) != cudaSuccess) {
     printf("free idx_edge\n");
   }
+
   cu_free(cu_P, "free P\n");
   cu_free(cu_V_edge, "free V\n");
   cu_free(cu_V2_edge, "free V2\n");
   cu_free(cu_occ_edges, "free occ_edges\n");
   cu_free(cu_vis_prob_edge, "free_vis_prob_edge\n");
   cu_free(cu_vis_pmf_edge, "free vis_pmf_edge\n");
+
+  cu_free(cu_segments_idx.ptr, "free segments_idx\n");
+  cu_free(cu_num_segments.ptr, "free num_segments\n");
+  cu_free(cu_segment_mask, "free segment mask\n");
 }
 
 void cu_init() {
@@ -1430,12 +1502,14 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
+  copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
 
   cu_obs->range_image_data.res = obs_data->obs_range_image->res;
   cu_obs->range_image_data.min0 = obs_data->obs_range_image->min[0];
   cu_obs->range_image_data.min1 = obs_data->obs_range_image->min[1];
   cu_obs->range_image_data.w = obs_data->obs_range_image->w;
   cu_obs->range_image_data.h = obs_data->obs_range_image->h;
+  cu_obs->num_obs_segments = obs_data->num_obs_segments;
 
   // CONTINUE HERE FOR OBS DATA COPYING ********************************
 
@@ -1481,12 +1555,14 @@ void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs
   copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
+  copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
 
   cu_obs->range_image_data.res = obs_data->obs_range_image->res;
   cu_obs->range_image_data.min0 = obs_data->obs_range_image->min[0];
   cu_obs->range_image_data.min1 = obs_data->obs_range_image->min[1];
   cu_obs->range_image_data.w = obs_data->obs_range_image->w;
   cu_obs->range_image_data.h = obs_data->obs_range_image->h;
+  cu_obs->num_obs_segments = obs_data->num_obs_segments;
 
   // CONTINUE HERE FOR OBS DATA COPYING ********************************
 
@@ -1523,6 +1599,7 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
   cudaFree(cu_obs->range_image_points.ptr);
   cudaFree(cu_obs->range_image_normals.ptr);
   cudaFree(cu_obs->range_image_cnt.ptr);
+  cudaFree(cu_obs->segment_affinities.ptr);
  
   curandDestroyGenerator(gen);
 }
@@ -1557,7 +1634,8 @@ void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_o
   cudaFree(cu_obs->range_image_points.ptr);
   cudaFree(cu_obs->range_image_normals.ptr);
   cudaFree(cu_obs->range_image_cnt.ptr);
- 
+  cudaFree(cu_obs->segment_affinities.ptr);
+
   curandDestroyGenerator(gen);
 }
 

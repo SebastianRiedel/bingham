@@ -57,12 +57,13 @@ typedef struct {
 } cu_range_image_data_t;
 
 typedef struct cu_obs_data_struct {
-  cu_double_matrix_t range_image, range_image_pcd_obs_bg_lab, pcd_obs_fpfh, edge_image;
+  cu_double_matrix_t range_image, range_image_pcd_obs_bg_lab, pcd_obs_fpfh, edge_image, segment_affinities;
   cu_double_matrix3d_t range_image_points, range_image_normals;
 
   cu_range_image_data_t range_image_data;
 
   cu_int_matrix_t range_image_cnt, range_image_idx;
+  int num_obs_segments;
 } cu_obs_data_t;
 
 
@@ -75,7 +76,7 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs);
 void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models);
 
 //void cu_noise_models_sigmas(double *range_sigma, double *normal_sigma, double *l_sigma, double *a_sigma, double *b_sigma, const double *surface_angles, const double *edge_dists, int n);
-void cu_score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params, int score_round, int num_validation_points);
+  void cu_score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params, int score_round, int num_validation_points, int num_obs_segments);
 
 #ifdef __cplusplus
 }

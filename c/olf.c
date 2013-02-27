@@ -3630,7 +3630,7 @@ double compute_normal_score(double **cloud, double **cloud_normals, double *vis_
 	mps_normal_dists_[i] = d / dmax;
     }
   }
-  if (wtot > 0)
+  if (wtot > 0.0)
     score /= wtot;
   score -= log(normpdf(0, 0, params->normal_sigma));
 
@@ -4600,7 +4600,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
   double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
-
+  
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
   //  score += 100;
@@ -5590,25 +5590,30 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   t0 = get_time_ms();
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points, obs_data->num_obs_segments);
   }
   else
     for (i = 0; i < num_samples_init; i++)
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 1 for i = %d\n", i);
+  }
+  
   // sort hypotheses
   sort_pose_samples(S);
-
+  
   //TODO: make this a param
   double round1_score_thresh = -.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
-
+  
   //dbug
   printf("Scored and sorted c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   if (have_true_pose_)
     print_good_poses(S);
-
+  
   return S;
 }
 
@@ -5625,13 +5630,23 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   t0 = get_time_ms();
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points, obs_data->num_obs_segments);
   }
   else
     for (i = 0; i < S->num_samples; i++)
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
-
+  
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 2 (first run, before sorting) for i = %d\n", i);
+  }
+  
   sort_pose_samples(S);
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 2 (first run, after sorting) for i = %d\n", i);
+  }
+  
   S->num_samples = MIN(S->num_samples, params->num_samples_round2);
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
@@ -5640,7 +5655,7 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
     
     scope_sample_t samples[S->num_samples];
     double new_scores[S->num_samples];
-
+    
     for (i = 0; i < S->num_samples; ++i) {
       //scope_sample_t sample;
       scope_sample_alloc(&samples[i], 0);
@@ -5659,16 +5674,27 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
     
     if (params->use_cuda) {
       int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-      cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points);
+      cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points, obs_data->num_obs_segments);
     }
     else
       for (i = 0; i < S->num_samples; ++i)
 	new_scores[i] = model_placement_score(&samples[i], model_data, obs_data, params, 2);
+    
+    for (i = 0; i < S->num_samples; ++i) {
+      if (isnan(new_scores[i]))
+	printf("NaN in round 2 (second run, before sorting) for i = %d\n", i);
+    }
 
     for (i = 0; i < S->num_samples; ++i) {
+      if (isnan(new_scores[i]))
+	printf("Copying? i = %d\n", i);
       if (new_scores[i] > S->W[i]) {
 	scope_sample_copy(&S->samples[i], &samples[i]);
 	S->W[i] = new_scores[i];
+	if (isnan(new_scores[i]))
+	  printf("Yes!\n");
+	if (isnan(S->W[i]))
+	  printf("S->W also NaN. i = %d\n", i);
       }
       scope_sample_free(&samples[i]);
     }
@@ -5683,6 +5709,11 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   //printf("Scored round 2 final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   sort_pose_samples(S);
+
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 2 (second run, after sorting) for i = %d\n", i);
+  }
 
   if (have_true_pose_)
     print_good_poses(S);
@@ -5709,13 +5740,24 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
 
-  //NOTE(sanja): Add calculating segment score here
   for (i = 0; i < S->num_samples; ++i)
     sample_segments_given_model_pose(&S->samples[i], model_data, obs_data, params, 1);  
 
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
-    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points);
+    cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points, obs_data->num_obs_segments);
+    
+    // Debugging individual score components on CUDA
+    /*double scores[S->num_samples];
+    for (i = 0; i < S->num_samples; i++)
+      scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
+
+    for (i = 0; i < S->num_samples; ++i) {
+      if (fabs(scores[i] - S->W[i]) > 0.00001)
+	printf("Big difference for i = %d\n", i);
+      else
+	printf("Good!\n");
+	}*/
   }
   else {
     params->verbose = 1; //dbug
@@ -5724,7 +5766,17 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     params->verbose = 0;
   }
 
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 3 (before sorting) for i = %d\n", i);
+  }
+
   sort_pose_samples(S);
+  
+  for (i = 0; i < S->num_samples; ++i) {
+    if (isnan(S->W[i]))
+      printf("NaN in round 3 (after sorting) for i = %d\n", i);
+  }
 
   printf("Scored round 3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug  
 
@@ -5807,12 +5859,14 @@ double score_taken_samples(int taken[][2], int num_taken, scope_samples_t *S[], 
   int i;
   double score = 0;
   for (i = 0; i < num_taken; ++i) {
-    score += S[taken[i][0]]->W[taken[i][1]];
+    score += S[taken[i][0]]->W[taken[i][1]] + 1;
     if (write) {
       printf("Score for %d is %lf\n", taken[i][0], S[taken[i][0]]->W[taken[i][1]]);
     }
   }
   //return score * params->samples_weight;
+  if (num_taken == 0 || isnan(score))
+    return -100.0;
   return score/((double)num_taken);
 }
 
@@ -5862,14 +5916,37 @@ double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *
   }
 
   double explained_score = ((double) explained) / ((double) num_segments);
-  double overlap_score = ((double) overlap) / ((double) num_segments);
+  /*double overlap_score = ((double) overlap) / ((double) num_segments);
   //return (explained_score * params->explained_weight - overlap_score * params->overlap_weight; // TODO(sanja): add these weights to params
 
   if (write) {
     printf("eplained score: %lf\n", explained_score);
     printf("overlap score: %lf\n", overlap_score);
   }
-  return 0.5 * explained_score - 1.0 * overlap_score;
+  return 0.5 * explained_score - 1.0 * overlap_score;*/
+
+  double overlap_score = 0;
+  for (i = 0; i < num_taken; ++i) {
+    int obj_overlap = 0;
+    for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
+      if (seen[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]] > 1) {
+	++obj_overlap;
+      }  
+    }
+    if (S[taken[i][0]]->samples[taken[i][1]].num_segments == 0) {
+      if (write) {
+	printf("This assignment contains a sample in empty space\n");
+      }
+      return -100.0;
+    }
+    overlap_score += ((double) obj_overlap) / ((double) S[taken[i][0]]->samples[taken[i][1]].num_segments);
+  }
+  overlap_score = -1.0 * overlap_score /5.0;
+  if (write) {
+    printf("overlap score: %lf\n", overlap_score);
+    printf("explained score: %lf\n", explained_score);
+  }
+  return overlap_score + explained_score;
 }
 
 
@@ -5881,12 +5958,26 @@ double evaluate_assignment(int taken[][2], int num_taken, scope_samples_t *sampl
   if (write) {
     printf("scope score: %lf\n", sample_score);
   }
-  return sample_score + segment_agreement_score;
+  double total_score;
+  total_score = 1.0 * sample_score + segment_agreement_score; // + 0.05 * num_taken;
+  if (write) {
+    printf("total score: %lf\n", total_score);
+  }
+
+  return total_score;
 }
 
+int sample_triangle(int n) {
+  int r1 = rand() % (2*n - 2);
+  int r2 = rand() % (2*n - 2);
+  r1 -= n-1;
+  r2 -= n-1;
+  r1 = abs(r1 + r2);
+  r1 = r1 / 2;
+}
 
 void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], int num_objects, scope_params_t *params, int num_segments) {
-  int i, j;
+  int i, j, r;
   int num_samples = 0;
   for (i = 0; i < num_objects; ++i) {
     num_samples += S[i]->num_samples;
@@ -5895,7 +5986,7 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
   int taken[num_samples][2];
   int num_taken = 0;
 
-  int num_steps = 10000; // TODO(sanja): make these params
+  int num_steps = 20000; // TODO(sanja): make these params
   double prob_switch;
   double prob_accept_worse;
   int new_taken[num_samples][2];
@@ -5906,69 +5997,73 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
   double new_score;
   double best_score = -10000.0;
   
-  for (i = 0; i < num_steps; ++i) {
-    prob_switch = num_taken/5; // It's more likely to do a switch as the time goes by // NOTE(sanja): I'm not sure this is the best way to do it...
-    prob_accept_worse = MAX(0, 0.6 - (double) i / num_steps); //gets smaller as the time goes by, i.e. the system cools down
-    for (j = 0; j < num_taken; ++j) {
-      new_taken[j][0] = taken[j][0];
-      new_taken[j][1] = 0; //taken[j][1];
-    }
-    new_num_taken = num_taken;
-    if (frand() < prob_switch) {
-      int i1 = rand() % num_taken;
-      int i2 = rand() % num_objects;
-      int i3 = rand() % S[i2]->num_samples;
-      new_taken[i1][0] = i2;
-      new_taken[i1][1] = 0; //i3;
-    } else {
-      int i1 = rand() % num_objects;
-      int i2 = rand() % S[i1]->num_samples;
+  int num_runs = 5;
+
+  for (r = 0; r < num_runs; ++r) {
+    num_taken = 0;
+    old_score = -10000.0;
+    for (i = 0; i < num_steps; ++i) {
+      prob_switch = ((double) num_taken)/8.0; // It's more likely to do a switch as the time goes by // NOTE(sanja): I'm not sure this is the best way to do it...
+      prob_accept_worse = MAX(0, 0.3 * (1 - i / (double) num_steps)); //gets smaller as the time goes by, i.e. the system cools down
       for (j = 0; j < num_taken; ++j) {
-	if (new_taken[j][0] == i1 && new_taken[j][1] == i2) {
-	  new_taken[j][0] = new_taken[--new_num_taken][0];
-	  new_taken[j][1] = 0; //new_taken[new_num_taken][1];
-	  break;
+	new_taken[j][0] = taken[j][0];
+	new_taken[j][1] = taken[j][1];
+      }
+      new_num_taken = num_taken;
+      if (frand() < prob_switch) {
+	int i1 = rand() % new_num_taken;
+	int i2 = rand() % num_objects;
+	int i3 = sample_triangle(S[i2]->num_samples);
+	new_taken[i1][0] = i2;
+	new_taken[i1][1] = i3;
+      } else {
+	if (new_num_taken > 0 && frand() < 0.5) { //remove
+	  int i1 = rand() % new_num_taken;
+	  new_taken[i1][0] = new_taken[--new_num_taken][0];
+	  new_taken[i1][1] = new_taken[new_num_taken][1];
+	} else { // add
+	  int i1 = rand() % num_objects;
+	  int i2 = sample_triangle(S[i1]->num_samples);
+	  new_taken[new_num_taken][0] = i1;
+	  new_taken[new_num_taken++][1] = i2;
+	}
+      }    
+      new_score = evaluate_assignment(new_taken, new_num_taken, S, num_objects, params, num_segments, 0);
+      if (new_score < old_score && frand() > prob_accept_worse)
+	continue;
+      old_score = new_score;
+      num_taken = new_num_taken;
+      for (j = 0; j < num_taken; ++j) {
+	taken[j][0] = new_taken[j][0];
+	taken[j][1] = new_taken[j][1];
+      }
+      if (new_score > best_score) {
+	best_score = new_score;
+	best_num_taken = num_taken;
+	printf("best\n");
+	for (j = 0; j < num_taken; ++j) {
+	  best_taken[j][0] = new_taken[j][0];
+	  best_taken[j][1] = new_taken[j][1];
 	}
       }
-      if (j == num_taken) {
-	new_taken[new_num_taken][0] = i1;
-        new_taken[new_num_taken++][1] = 0; //i2;
-      }
-    }    
-    new_score = evaluate_assignment(new_taken, new_num_taken, S, num_objects, params, num_segments, 0);
-    if (new_score < old_score && frand() > prob_accept_worse)
-      continue;
-    old_score = new_score;
-    num_taken = new_num_taken;
-    for (j = 0; j < num_taken; ++j) {
-      taken[j][0] = new_taken[j][0];
-      taken[j][1] = 0; //new_taken[j][1];
-    }
-    if (new_score > best_score) {
-      best_score = new_score;
-      best_num_taken = num_taken;
-      for (j = 0; j < num_taken; ++j) {
-	best_taken[j][0] = new_taken[j][0];
-	best_taken[j][1] = 0; //new_taken[j][1];
-      }
-    }
-  }  
+    }  
+  }
 
   double final_score = evaluate_assignment(best_taken, best_num_taken, S, num_objects, params, num_segments, 1);
-  taken[0][0] = 0;
+  /*taken[0][0] = 0; //5;
   taken[0][1] = 0;
-  taken[1][0] = 15;
+  taken[1][0] = 15; //8;
   taken[1][1] = 0;
-  taken[2][0] = 16;
+  taken[2][0] = 16; //13;
   taken[2][1] = 0;
   printf("--------------\n");
-  evaluate_assignment(taken, 3, S, num_objects, params, num_segments, 1);
-
+  evaluate_assignment(taken, 3, S, num_objects, params, num_segments, 1);*/
+  
   *num_best = best_num_taken;
   *best_arr = new_matrix2i(best_num_taken, 2);
   for (j = 0; j < best_num_taken; ++j) {
     (*best_arr)[j][0] = best_taken[j][0];
-    (*best_arr)[j][1] = 0; //best_taken[j][1];
+    (*best_arr)[j][1] = best_taken[j][1];
   }
 }
 
