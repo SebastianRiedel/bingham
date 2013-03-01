@@ -1840,6 +1840,15 @@ symmetries_t *load_symmetries(char *filename)
 
   fclose(f);
 
+  //dbug
+  //for (i = 0; i < S->n; i++) {
+  //  printf("%d %f", S->types[i], S->err[i]);
+  //  int j;
+  //  for (j = 0; j < 12; j++)
+  //    printf(" %f", S->params[i][j]);
+  //  printf("\n");
+  //}
+
   return S;
 }
 
@@ -3479,8 +3488,44 @@ void cluster_pose_samples(scope_samples_t *S, scope_params_t *params)
 }
 
 
-void remove_redundant_pose_samples(scope_samples_t *S, scope_params_t *params)
+/*
+ * return the axis (v,p) of rotationally symmetric models
+ */
+double *get_symmetry_axis(symmetries_t *symmetries)
 {
+  double rot_symm_thresh = .001;
+
+  int i;
+  for (i = 0; i < symmetries->n; i++)
+    if (symmetries->types[i] == LINE_SYMMETRY && symmetries->err[i] < rot_symm_thresh)
+      return symmetries->params[i];
+
+  return NULL;
+}
+
+
+double compute_q_err(double *q, double *q2, double *symm_axis)
+{
+  if (symm_axis) {
+    double **R = new_matrix2(3,3);
+    quaternion_to_rotation_matrix(R,q);
+    double v[3], v2[3];
+    matrix_vec_mult(v, R, symm_axis, 3, 3);
+    quaternion_to_rotation_matrix(R,q2);
+    matrix_vec_mult(v2, R, symm_axis, 3, 3);
+    double v_err = acos(dot(v, v2, 3));
+    free_matrix2(R);
+    return v_err / 2.0;
+  }
+
+  return acos(fabs(dot(q, q2, 4)));
+}
+
+
+void remove_redundant_pose_samples(scope_samples_t *S, scope_model_data_t *model_data, scope_params_t *params)
+{
+  double *rot_symm_axis = get_symmetry_axis(model_data->model_symmetries);
+
   double dx2_thresh = params->x_cluster_thresh * params->x_cluster_thresh;
   double dq_thresh = params->q_cluster_thresh;
   int idx[S->num_samples];
@@ -3492,7 +3537,7 @@ void remove_redundant_pose_samples(scope_samples_t *S, scope_params_t *params)
     int unique = 1;
     for (j = 0; j < cnt; j++) {
       double dx2 = dist2(S->samples[i].x, S->samples[idx[j]].x, 3);
-      double dq = acos(fabs(dot(S->samples[i].q, S->samples[idx[j]].q, 4)));
+      double dq = compute_q_err(S->samples[i].q, S->samples[idx[j]].q, rot_symm_axis);
       if (dx2 < dx2_thresh && dq < dq_thresh) {
 	unique = 0;
 	break;
@@ -3507,6 +3552,7 @@ void remove_redundant_pose_samples(scope_samples_t *S, scope_params_t *params)
   reorder(S->W, S->W, idx, cnt);
   S->num_samples = cnt;
 }
+
 
 void sort_pose_samples(scope_samples_t *S)
 {
@@ -5850,7 +5896,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 
   // cluster poses
   if (params->pose_clustering)
-    remove_redundant_pose_samples(S, params);
+    remove_redundant_pose_samples(S, model_data, params);
 
   // remove low-weight samples
   S->num_samples = MIN(S->num_samples, params->num_samples_round3);
@@ -5962,7 +6008,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   // cluster poses
   //if (params->pose_clustering)
-  //  remove_redundant_pose_samples(S, params);
+  //  remove_redundant_pose_samples(S, model_data, params);
 
   if (have_true_pose_)
     print_good_poses(S);
