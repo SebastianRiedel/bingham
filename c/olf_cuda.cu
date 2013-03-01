@@ -73,6 +73,57 @@ int arr_max_i(int *x, int n)
   return y;
 }
 
+// compute the determinant of the n-by-n matrix X
+__device__ double cu_det3(double X[][3])
+{
+  double a = X[0][0];
+  double b = X[0][1];
+  double c = X[0][2];
+  double d = X[1][0];
+  double e = X[1][1];
+  double f = X[1][2];
+  double g = X[2][0];
+  double h = X[2][1];
+  double i = X[2][2];
+  return a*e*i - a*f*h + b*f*g - b*d*i + c*d*h - c*e*g;
+}
+
+__device__ double cu_det3_flat(double *X) {
+  double a = X[0];
+  double b = X[1];
+  double c = X[2];
+  double d = X[3];
+  double e = X[4];
+  double f = X[5];
+  double g = X[6];
+  double h = X[7];
+  double i = X[8];
+  return a*e*i - a*f*h + b*f*g - b*d*i + c*d*h - c*e*g;
+}
+
+__device__ void cu_inv3(double Y[][3], double X[][3])
+{
+  double d = cu_det3(X);
+
+  Y[0][0] = (X[1][1]*X[2][2] - X[1][2]*X[2][1]) / d;
+  Y[0][1] = (X[0][2]*X[2][1] - X[0][1]*X[2][2]) / d;
+  Y[0][2] = (X[0][1]*X[1][2] - X[0][2]*X[1][1]) / d;
+  Y[1][0] = (X[1][2]*X[2][0] - X[1][0]*X[2][2]) / d;
+  Y[1][1] = (X[0][0]*X[2][2] - X[0][2]*X[2][0]) / d;
+  Y[1][2] = (X[0][2]*X[1][0] - X[0][0]*X[1][2]) / d;
+  Y[2][0] = (X[1][0]*X[2][1] - X[1][1]*X[2][0]) / d;
+  Y[2][1] = (X[0][1]*X[2][0] - X[0][0]*X[2][1]) / d;
+  Y[2][2] = (X[0][0]*X[1][1] - X[0][1]*X[1][0]) / d;
+}
+
+__device__ void cu_inv3_flat(double Y[][3], double *X) {
+  double X2[3][3];
+  X2[0][0] = X[0]; X2[0][1] = X[1]; X2[0][2] = X[2]; 
+  X2[1][0] = X[3]; X2[1][1] = X[4]; X2[0][2] = X[5]; 
+  X2[2][0] = X[6]; X2[2][1] = X[7]; X2[0][2] = X[8]; 
+  cu_inv3(Y, X2);
+}
+
 // create a new n-by-m 2d matrix of doubles
 __device__ double **cu_new_matrix2(int n, int m)
 {
@@ -190,6 +241,18 @@ __device__ double cu_norm(double x[], int n) {
   return sqrt(d);
 }
 
+// computes the norm^2 of x-y
+__device__ double cu_dist2(double x[], double y[], int n)
+{
+  double d = 0.0;
+  int i;
+
+  for (i = 0; i < n; i++)
+    d += (x[i]-y[i])*(x[i]-y[i]);
+
+  return d;
+}
+
 // compute the pdf of a normal random variable
 __device__ double cu_normpdf(double x, double mu, double sigma)
 {
@@ -205,6 +268,22 @@ __device__ void cu_normalize_pmf(double y[], double x[], int n)
   int i;
   for (i = 0; i < n; i++)
     y[i] = x[i]/d;
+}
+
+__device__ double cu_mvnpdf3(double *x, double *mu, double S[][3])
+{
+  int d = 3;
+  double S_inv[3][3];
+  cu_inv3(S_inv, S);
+  
+  double dx[3];
+  cu_sub(dx, x, mu, d);
+  double S_inv_dx[3];
+  cu_matrix_vec_mult_3(S_inv_dx, S_inv, dx, d, d);
+  double dm = cu_dot(dx, S_inv_dx, d);
+  
+  double p = exp(-.5*dm) / sqrt(pow(2*M_PI, d) * cu_det3(S));
+  return p;
 }
 
 // multiplies a vector by a scalar, y = c*x
@@ -424,8 +503,8 @@ __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, s
   return w * score;
 }
 
-__device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, cu_int_matrix_t *range_image_idx, cu_double_matrix_t *pcd_obs_bg_lab, 
-				    scope_params_t *params, int score_round) 
+__device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, cu_int_matrix_t *range_image_idx, cu_double_matrix3d_t *obs_lab_image, 
+				    scope_params_t *params, int score_round, double lab_scores[]) 
 {
   double scores[3] = {0, 0, 0};
   int i, j;
@@ -441,25 +520,12 @@ __device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_p
 	dmax[j] = 2*lab_sigma[j];
 	dlab[j] = dmax[j];
       }
-      int obs_idx = range_image_idx->ptr[xi[i] * range_image_idx->m + yi[i]];
-      if (obs_idx >= 0) {
-	double *obs_lab = &pcd_obs_bg_lab->ptr[obs_idx * pcd_obs_bg_lab->m];
-	cu_sub(dlab, &lab[3*i], obs_lab, 3);
-	//dlab[0] = L_weight * (lab[i][0] - obs_lab[0]) / noise_models[i].lab_sigma[0];
-	//dlab[1] = (lab[i][1] - obs_lab[1]) / noise_models[i].lab_sigma[1];
-	//dlab[2] = (lab[i][2] - obs_lab[2]) / noise_models[i].lab_sigma[2];
-	//dlab[2] = 0;
-	//d = norm(dlab, 3);
-	//d = MIN(d, dmax);
-	for (j = 0; j < 3; j++)	  
-	  dlab[j] = MIN(dlab[j], dmax[j]);
 
-	//dbug
-	//if (params->verbose && (i%100==0)) {
-	//  printf("model lab[%d] = [%.2f, %.2f, %.2f], obs_lab = [%.2f, %.2f, %.2f]\n", i, lab[i][0], lab[i][1], lab[i][2], obs_lab[0], obs_lab[1], obs_lab[2]);
-	//}
+      for (j = 0; j < 3; j++) {
+	double d = fabs(lab[3*i + j] - obs_lab_image->ptr[j * obs_lab_image->p * obs_lab_image->m + xi[i] * obs_lab_image->p + yi[i]]);
+	dlab[j] = MIN(d, dmax[j]);
       }
-      //score += vis_pmf[i] * log(normpdf(d, 0, lab_sigma));
+
       for (j = 0; j < 3; j++)
 	scores[j] += vis_pmf[i] * log(cu_normpdf(dlab[j], 0, lab_sigma[j]));
 
@@ -475,9 +541,245 @@ __device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_p
     w = lab_weights2;
   else
     w = lab_weights3;
+  
+  memcpy(lab_scores, scores, 3 * sizeof(double));
 
   return cu_dot(scores, w, 3);
 }
+
+__device__ double labdist_likelihood(cu_double_matrix_t *avg_cov, cu_double_matrix_t *means1, cu_double_matrix_t *means2, cu_double_matrix3d_t *cov1, cu_double_matrix3d_t *cov2, 
+			  cu_int_arr_t *cnts1, cu_int_arr_t *cnts2, int idx, double *lab, double pmin, scope_params_t *params)
+{
+  /*
+  double m1[3] = {labdist[0], labdist[1], labdist[2]};
+  double m2[3] = {labdist[3], labdist[4], labdist[5]};
+  double C1_data[9] = {labdist[6], labdist[7], labdist[8], labdist[7], labdist[9], labdist[10], labdist[8], labdist[10], labdist[11]};
+  double C2_data[9] = {labdist[12], labdist[13], labdist[14], labdist[13], labdist[15], labdist[16], labdist[14], labdist[16], labdist[17]};
+  double **C1 = new_matrix2_data(3, 3, C1_data);
+  double **C2 = new_matrix2_data(3, 3, C2_data);
+  double cnt1 = (labdist[18] < 4 ? 0 : labdist[18]);
+  double cnt2 = (labdist[19] < 4 ? 0 : labdist[19]);
+  */
+  int cnt1 = cnts1->ptr[idx];
+  int cnt2 = cnts2->ptr[idx];
+  if (cnt1 < 4)
+    cnt1 = 0;
+  if (cnt2 < 4)
+    cnt2 = 0;
+
+  if (cnt1 == 0 && cnt2 == 0) {
+    double z[3] = {0,0,0};
+    double avg[3][3];
+    avg[0][0] = avg_cov->ptr[0]; avg[0][1] = avg_cov->ptr[1]; avg[0][2] = avg_cov->ptr[2];
+    avg[1][0] = avg_cov->ptr[3]; avg[1][1] = avg_cov->ptr[4]; avg[1][2] = avg_cov->ptr[5];
+    avg[2][0] = avg_cov->ptr[6]; avg[2][1] = avg_cov->ptr[7]; avg[2][2] = avg_cov->ptr[8];
+    return log(pmin * cu_mvnpdf3(z, z, avg));
+  }
+
+  double w1 = cnt1 / (double)(cnt1+cnt2);
+  double w2 = cnt2 / (double)(cnt1+cnt2);
+
+  double *m1 = &(means1->ptr[idx * means1->m]);
+  double *m2 = &(means2->ptr[idx * means2->m]);
+  //double *C1 = &(cov1->ptr[idx * cov1->m * cov1->p]);
+  //double *C2 = &(cov2->ptr[idx * cov2->m * cov2->p]);
+
+  double C1[3][3];
+  C1[0][0] = cov1->ptr[idx * cov1->m * cov1->p + 0]; C1[0][1] = cov1->ptr[idx * cov1->m * cov1->p + 1]; C1[0][2] = cov1->ptr[idx * cov1->m * cov1->p + 2];
+  C1[1][0] = cov1->ptr[idx * cov1->m * cov1->p + 3]; C1[1][1] = cov1->ptr[idx * cov1->m * cov1->p + 4]; C1[1][2] = cov1->ptr[idx * cov1->m * cov1->p + 5];
+  C1[2][0] = cov1->ptr[idx * cov1->m * cov1->p + 6]; C1[2][1] = cov1->ptr[idx * cov1->m * cov1->p + 7]; C1[2][2] = cov1->ptr[idx * cov1->m * cov1->p + 8];
+  
+  double C2[3][3];
+  C2[0][0] = cov2->ptr[idx * cov2->m * cov2->p + 0]; C2[0][1] = cov2->ptr[idx * cov2->m * cov2->p + 1]; C2[0][2] = cov2->ptr[idx * cov2->m * cov2->p + 2];
+  C2[1][0] = cov2->ptr[idx * cov2->m * cov2->p + 3]; C2[1][1] = cov2->ptr[idx * cov2->m * cov2->p + 4]; C2[1][2] = cov2->ptr[idx * cov2->m * cov2->p + 5];
+  C2[2][0] = cov2->ptr[idx * cov2->m * cov2->p + 6]; C2[2][1] = cov2->ptr[idx * cov2->m * cov2->p + 7]; C2[2][2] = cov2->ptr[idx * cov2->m * cov2->p + 8];
+
+
+  double *maxm = (w1 > w2 ? m1 : m2);
+  double w1mult = cu_mvnpdf3(maxm, m1, C1);
+  double w2mult = cu_mvnpdf3(maxm, m2, C2);
+  //double maxp = (w1 > 0 ? w1*cu_mvnpdf3(maxm, m1, C1) : 0) + (w2 > 0 ? w2*cu_mvnpdf3_flat_o(maxm, m2, C2) : 0);
+  double maxp = (w1 > 0 ? w1 * w1mult : 0) + (w2 > 0 ? w2 * w2mult : 0);
+  
+  w1mult = cu_mvnpdf3(lab, m1, C1);
+  w2mult = cu_mvnpdf3(lab, m2, C2);
+
+  //double p = (w1 > 0 ? w1*cu_mvnpdf3_flat(lab, m1, C1) : 0) + (w2 > 0 ? w2*cu_mvnpdf3_flat(lab, m2, C2) : 0);
+  double p = (w1 > 0 ? w1*w1mult : 0) + (w2 > 0 ? w2*w2mult : 0);
+  p = MAX(p, maxp*pmin);
+
+  if (!isfinite(p) && isnan(maxp)) {
+    printf("p = %f, cnt1 = %d, cnt2 = %d, idx = %d\n", p, cnt1, cnt2, idx); //dbug
+    printf("det(C1) = %f, det(C2) = %f\n", cu_det3(C1), cu_det3(C2));
+    printf("C1 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C1[0][0], C1[0][1], C1[0][2], C1[1][0], C1[1][1], C1[1][2], C1[2][0], C1[2][1], C1[2][2]);
+    printf("C2 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C2[0][0], C2[0][1], C2[0][2], C2[1][0], C2[1][1], C2[1][2], C2[2][0], C2[2][1], C2[2][2]);
+  }
+
+  return log(p);
+}
+
+
+__device__ void labdist_color_shift(double *shift, cu_double_matrix_t *avg_cov, cu_double_matrix_t *means1, cu_double_matrix_t *means2, cu_double_matrix3d_t *cov1, cu_double_matrix3d_t *cov2, 
+				    cu_int_arr_t *cnts1, cu_int_arr_t *cnts2, int *idx, int n, double *obs_lab, double *obs_weights, int w, int h, double pmin, scope_params_t *params)
+{
+  //TODO: make these params
+  double lambda = 1.0;
+  double shift_threshold = 0.1;
+  
+  double C_inv[3][3];
+  double B[3][3];
+  cu_inv3_flat(B, avg_cov->ptr);
+  double A[3][3];
+  double z[3];  // m-bar
+  double ww;
+
+  memset(shift, 0, 3*sizeof(double));
+
+  int i, j, iter, max_iter = 10;
+  for (iter = 0; iter < max_iter; iter++) {
+
+    // reset shift statistics
+    memset(A[0], 0, 9*sizeof(double));
+    memset(z, 0, 3*sizeof(double));
+    ww = 0;
+
+    for (i = 0; i < n; i++) {
+
+      if (obs_weights[i] == 0.0)
+	continue;
+
+      int cnt1 = cnts1->ptr[idx[i]];
+      int cnt2 = cnts2->ptr[idx[i]];
+      if (cnt1 < 4)
+	cnt1 = 0;
+      if (cnt2 < 4)
+	cnt2 = 0;
+      if (cnt1 == 0 && cnt2 == 0)
+	continue;
+
+      double C1[3][3];
+      C1[0][0] = cov1->ptr[idx[i] * cov1->m * cov1->p + 0]; C1[0][1] = cov1->ptr[idx[i] * cov1->m * cov1->p + 1]; C1[0][2] = cov1->ptr[idx[i] * cov1->m * cov1->p + 2];
+      C1[1][0] = cov1->ptr[idx[i] * cov1->m * cov1->p + 3]; C1[1][1] = cov1->ptr[idx[i] * cov1->m * cov1->p + 4]; C1[1][2] = cov1->ptr[idx[i] * cov1->m * cov1->p + 5];
+      C1[2][0] = cov1->ptr[idx[i] * cov1->m * cov1->p + 6]; C1[2][1] = cov1->ptr[idx[i] * cov1->m * cov1->p + 7]; C1[2][2] = cov1->ptr[idx[i] * cov1->m * cov1->p + 8];
+      
+      double C2[3][3];
+      C2[0][0] = cov2->ptr[idx[i] * cov2->m * cov2->p + 0]; C2[0][1] = cov2->ptr[idx[i] * cov2->m * cov2->p + 1]; C2[0][2] = cov2->ptr[idx[i] * cov2->m * cov2->p + 2];
+      C2[1][0] = cov2->ptr[idx[i] * cov2->m * cov2->p + 3]; C2[1][1] = cov2->ptr[idx[i] * cov2->m * cov2->p + 4]; C2[1][2] = cov2->ptr[idx[i] * cov2->m * cov2->p + 5];
+      C2[2][0] = cov2->ptr[idx[i] * cov2->m * cov2->p + 6]; C2[2][1] = cov2->ptr[idx[i] * cov2->m * cov2->p + 7]; C2[2][2] = cov2->ptr[idx[i] * cov2->m * cov2->p + 8];
+
+      double *m1 = &(means1->ptr[idx[i] * means1->m]);
+      double *m2 = &(means2->ptr[idx[i] * means2->m]);
+
+      // assign observed color to a cluster
+      double y[3];  // current obs_lab[i]
+      cu_add(y, &obs_lab[i * 3], shift, 3);
+      
+      double p1 = (cnt1 > 0 ? cu_mvnpdf3(y, m1, C1) : 0);
+      double p2 = (cnt2 > 0 ? cu_mvnpdf3(y, m2, C2) : 0);
+
+      // check if assigned cluster could be a specularity cluster (i.e., has higher L-value)
+      if ((p1 > p2 && p2 > 0 && m1[0] > m2[0]) || (p2 > p1 && p1 > 0 && m2[0] > m1[0]))
+	continue;
+
+      double *m = (p1 > p2 ? m1 : m2);
+      double C[3][3];
+      if (p1 > p2) {
+	C[0][0] = C1[0][0]; C[0][1] = C1[0][1]; C[0][2] = C1[0][2];
+	C[0][0] = C1[1][0]; C[1][1] = C1[1][1]; C[2][2] = C1[1][2];
+	C[0][0] = C1[2][0]; C[2][1] = C1[2][1]; C[1][2] = C1[2][2];
+      } else {
+	C[0][0] = C2[0][0]; C[0][1] = C2[0][1]; C[0][2] = C2[0][2];
+	C[0][0] = C2[1][0]; C[1][1] = C2[1][1]; C[2][2] = C2[1][2];
+	C[0][0] = C2[2][0]; C[2][1] = C2[2][1]; C[1][2] = C2[2][2];
+      }
+
+      double maxp = cu_mvnpdf3(m, m, C);
+      double p = cu_mvnpdf3(y, m, C);
+
+      // check if point is an outlier of the cluster
+      if (p < pmin*maxp)
+	continue;
+
+      // add observed color and color model covariance matrix to the shift statistics
+      for (j = 0; j < 3; j++)
+	z[j] = z[j] + obs_weights[i]*(m[j] - obs_lab[i * 3 + j]);
+      cu_inv3(C_inv, C);
+      for (j = 0; j < 9; j++)
+	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
+      ww += obs_weights[i];
+    }
+    
+    if (ww == 0.0)
+      break;
+
+    cu_mult(z, z, 1/ww, 3);  // avg. z
+    cu_mult(A[0], A[0], lambda/ww, 9);  // avg. A and multiply by lambda
+
+    // solve for best shift = inv(lambda*A+B)*lambda*A*z
+    double new_shift[3];
+    double tmp[3];
+    memcpy(tmp, z, sizeof(double) * 3);
+    cu_matrix_vec_mult_flat(z, A[0], tmp, 3, 3);
+    cu_add(A[0], A[0], B[0], 9);
+    cu_inv3(C_inv, A);
+    cu_matrix_vec_mult_3(new_shift, C_inv, z, 3, 3);
+    double d2 = cu_dist2(shift, new_shift, 3);
+    memcpy(shift, new_shift, 3*sizeof(double));
+
+    //printf("shift = [%f, %f, %f]\n", shift[0], shift[1], shift[2]);  //dbug
+
+    if (d2 < shift_threshold*shift_threshold)
+      break;
+  }
+
+  // apply shift to obs_lab
+  for (i = 0; i < n; i++)
+    if (obs_weights[i] > 0.0)
+      cu_add(&obs_lab[i * 3], &obs_lab[i * 3], shift, 3);
+
+}
+
+__device__ double compute_labdist_score(int *xi, int *yi, cu_double_matrix_t *color_avg_cov, cu_double_matrix_t *color_means1, cu_double_matrix_t *color_means2, 
+					cu_double_matrix3d_t *color_cov1, cu_double_matrix3d_t *color_cov2, cu_int_arr_t *color_cnts1, cu_int_arr_t *color_cnts2, int *idx, double *vis_pmf,
+					scope_noise_model_t *noise_models, int n, cu_double_matrix_t *range_image, int w, int h, cu_double_matrix3d_t *obs_lab_image, 
+					double *obs_lab, double *obs_weights, scope_params_t *params, int score_round) {
+
+  //TODO: make this a param
+  double pmin = .1;
+
+  // get obs colors
+  memset(obs_weights, 0, n*sizeof(double));
+  int i, j;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      for (j = 0; j < 3; j++)
+	obs_lab[i * 3 + j] = obs_lab_image->ptr[j * h * w + xi[i] * h + yi[i]];
+      obs_weights[i] = vis_pmf[i];
+    }
+  }
+
+  // get color shift (and apply it to obs_lab)
+  double color_shift[3];
+  labdist_color_shift(color_shift, color_avg_cov, color_means1, color_means2, color_cov1, color_cov2, color_cnts1, color_cnts2, idx, n, obs_lab, obs_weights, w, h, pmin, params);
+
+  double zero[3] = {0,0,0};
+  double score = 0.0;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      double logp = labdist_likelihood(color_avg_cov, color_means1, color_means2, color_cov1, color_cov2, color_cnts1, color_cnts2, idx[i], (obs_weights[i] > 0 ? &obs_lab[i * 3] : zero), pmin, params);
+      score += vis_pmf[i] * logp;
+    }
+  }
+  double ww = 0;
+  if (score_round == 2)
+    ww = params->score2_labdist_weight;
+  else
+    ww = params->score3_labdist_weight;
+
+  return ww * score;
+}
+
+
 
 __device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round)
 {
@@ -491,157 +793,6 @@ __device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *par
 
   return w * score;
 }
-
-/*void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx, int n, double **obs_lab, double *obs_weights, double pmin, scope_params_t *params)
-{
-  //TODO: make these params
-  double lambda = 1.0;
-  double shift_threshold = 0.1;
-
-  double **C_inv = new_matrix2(3,3);
-  double **B = new_matrix2(3,3);
-  inv(B, color_model->avg_cov, 3);
-  double **A = new_matrix2(3,3);
-  double z[3];  // m-bar
-  double w;
-
-  memset(shift, 0, 3*sizeof(double));
-
-  int i, j, iter, max_iter = 10;
-  for (iter = 0; iter < max_iter; iter++) {
-
-    // reset shift statistics
-    memset(A[0], 0, 9*sizeof(double));
-    memset(z, 0, 3*sizeof(double));
-    w = 0;
-
-    for (i = 0; i < n; i++) {
-
-      if (obs_weights[i] == 0.0)
-	continue;
-
-      int cnt1 = color_model->cnts[0][idx[i]];
-      int cnt2 = color_model->cnts[1][idx[i]];
-      if (cnt1 < 4)
-	cnt1 = 0;
-      if (cnt2 < 4)
-	cnt2 = 0;
-      if (cnt1 == 0 && cnt2 == 0)
-	continue;
-
-      double *m1 = color_model->means[0][idx[i]];
-      double *m2 = color_model->means[1][idx[i]];
-      double **C1 = color_model->covs[0][idx[i]];
-      double **C2 = color_model->covs[1][idx[i]];
-
-      // assign observed color to a cluster
-      double y[3];  // current obs_lab[i]
-      add(y, obs_lab[i], shift, 3);
-      double p1 = (cnt1 > 0 ? mvnpdf(y, m1, C1, 3) : 0);
-      double p2 = (cnt2 > 0 ? mvnpdf(y, m2, C2, 3) : 0);
-      
-      // check if assigned cluster could be a specularity cluster (i.e., has higher L-value)
-      if ((p1 > p2 && p2 > 0 && m1[0] > m2[0]) || (p2 > p1 && p1 > 0 && m2[0] > m1[0]))
-	continue;
-
-      double *m = (p1 > p2 ? m1 : m2);
-      double **C = (p1 > p2 ? C1 : C2);
-
-      double maxp = mvnpdf(m, m, C, 3);
-      double p = mvnpdf(y, m, C, 3);
-
-      // check if point is an outlier of the cluster
-      if (p < pmin*maxp)
-	continue;
-
-      // add observed color and color model covariance matrix to the shift statistics
-      for (j = 0; j < 3; j++)
-	z[j] = z[j] + obs_weights[i]*(m[j] - obs_lab[i][j]);
-      inv(C_inv, C, 3);
-      for (j = 0; j < 9; j++)
-	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
-      w += obs_weights[i];
-    }
-
-    mult(z, z, 1/w, 3);  // avg. z
-    mult(A[0], A[0], lambda/w, 9);  // avg. A and multiply by lambda
-
-    // solve for best shift = inv(lambda*A+B)*lambda*A*z
-    double new_shift[3];
-    matrix_vec_mult(z, A, z, 3, 3);
-    add(A[0], A[0], B[0], 9);
-    inv(C_inv, A, 3);
-    matrix_vec_mult(new_shift, C_inv, z, 3, 3);
-    double d2 = dist2(shift, new_shift, 3);
-    memcpy(shift, new_shift, 3*sizeof(double));
-
-    //printf("shift = [%f, %f, %f]\n", shift[0], shift[1], shift[2]);  //dbug
-
-    if (d2 < shift_threshold*shift_threshold)
-      break;
-  }
-
-  // apply shift to obs_lab
-  for (i = 0; i < n; i++)
-    if (obs_weights[i] > 0.0)
-      add(obs_lab[i], obs_lab[i], shift, 3);
-
-  free_matrix2(A);
-  free_matrix2(B);
-  free_matrix2(C_inv);
-}
-
-double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
-			     range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
-{
-  //TODO: make this a param
-  double pmin = .1;
-
-  // get obs colors
-  double **obs_lab = new_matrix2(n,3);
-  double obs_weights[n];
-  memset(obs_weights, 0, n*sizeof(double));
-  int i;
-  for (i = 0; i < n; i++) {
-    if (vis_pmf[i] > .01/(double)n) {
-      int xi,yi;
-      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
-
-      int obs_idx = obs_range_image->idx[xi][yi];
-      if (obs_idx >= 0) {
-	memcpy(obs_lab[i], pcd_obs->lab[obs_idx], 3*sizeof(double));
-	obs_weights[i] = vis_pmf[i];
-      }
-    }
-  }
-
-  // get color shift (and apply it to obs_lab)
-  double color_shift[3];
-  labdist_color_shift(color_shift, color_model, idx, n, obs_lab, obs_weights, pmin, params);
-
-  if (params->verbose) {
-    memset(mps_labdist_p_ratios_, 0, n*sizeof(double));
-  }
-
-  double zero[3] = {0,0,0};
-  double score = 0.0;
-  for (i = 0; i < n; i++) {
-    if (vis_pmf[i] > .01/(double)n) {
-      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin, params);
-      score += vis_pmf[i] * logp;
-    }
-  }
-
-  double w = 0;
-  if (score_round == 2)
-    w = params->score2_labdist_weight;
-  else
-    w = params->score3_labdist_weight;
-
-  free_matrix2(obs_lab);
-
-  return w * score;
-}*/
 
 __device__ double compute_visibility_prob(double *point, double *normal, int xi, int yi, cu_range_image_data_t *ri_data, cu_double_matrix_t *range_image, double vis_thresh, int search_radius)
 //double compute_visibility_prob(double *point, double *normal, range_image_t *obs_range_image, double vis_thresh, int search_radius)
@@ -987,24 +1138,10 @@ __device__ double compute_segment_affinity_score(int *segments, int num_segments
 __device__ double cu_model_placement_score(double x[], double q[], cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 					   int *xi, int *yi, int *idx, double *cloud, double *cloud_normals, double *cloud_lab, int num_validation_points, double *vis_prob, double *vis_pmf, uint *r,
 					   scope_noise_model_t *noise_models, int *segments_idx, int num_segments, int *segment_mask,
-					   int *idx_edge, double *P, double *V_edge, double *V2_edge, int *occ_edges, double *vis_prob_edge, double *vis_pmf_edge) {
-  //int dbg_timed = 1;
-  //double t0 = get_time_ms();  //dbug
-  
-  // get model validation points
-  
+					   int *idx_edge, double *P, double *V_edge, double *V2_edge, int *occ_edges, double *vis_prob_edge, double *vis_pmf_edge, double *obs_lab, double *obs_weights) {
+  // get validation points
   int i;
   get_validation_points(idx, cu_model->num_points, num_validation_points, r);
-  
-  /*if (dbg_timed) {
-    printf("break 0, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
-  
-  /*if (dbg_timed) {
-    printf("break 1, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
   
   // extract transformed model validation features
   get_sub_cloud_at_pose(&(cu_model->points), cloud, idx, num_validation_points, x, q);
@@ -1028,16 +1165,7 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   }
     
   get_sub_cloud_normals_rotated(&(cu_model->normals), cloud_normals, idx, num_validation_points, q);
-  
-  //double **cloud_sdw = get_sub_cloud_sdw(model_data->pcd_model, idx, num_validation_points, params);
   get_sub_cloud_lab(&(cu_model->lab), cloud_lab, idx, num_validation_points);
-  //double **cloud_labdist = get_sub_cloud_labdist(model_data->pcd_model, idx, num_validation_points);
-  //double **cloud_xyzn = get_xyzn_features(cloud, cloud_normals, num_validation_points, params);
-
-  /*if (dbg_timed) {
-    printf("break 2, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
 
   // compute p(visibile)
   for (i = 0; i < num_validation_points; i++) {
@@ -1045,74 +1173,24 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   }
   cu_normalize_pmf(vis_pmf, vis_prob, num_validation_points);
 
-  //if (params->verbose)
-  //  memcpy(mps_vis_prob_, vis_prob, num_validation_points*sizeof(double));
-  
-  /*if (dbg_timed) {
-    printf("break 3, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
-
   // compute noise models
   get_noise_models(noise_models, cloud, cloud_normals, x, q, idx, num_validation_points, &(cu_model->ved), &(cu_model->range_edges_model_views), &(cu_model->normalvar));
 
-  /*
-  if (dbg_timed) {
-    printf("break 4, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
-  
-  // compute nearest neighbors
-  //int nn_idx[num_validation_points];  memset(nn_idx, 0, num_validation_points*sizeof(int));
-  //double nn_d2[num_validation_points];  memset(nn_d2, 0, num_validation_points*sizeof(double));
-  //int search_radius = 0;  // pixels
-  //for (i = 0; i < num_validation_points; i++)
-  //if (vis_prob[i] > .01)
-  //range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud_xyzn[i], 1, 6, obs_xyzn, obs_range_image, search_radius);
-  //range_image_find_nn(&nn_idx[i], &nn_d2[i], &cloud[i], &cloud[i], 1, 3, pcd_obs->points, obs_range_image, search_radius);
-  
   double normal_score = compute_normal_score(cloud_normals, vis_pmf, noise_models, num_validation_points, xi, yi, &(cu_obs->range_image_cnt), &(cu_obs->range_image_normals), cu_params, score_round);
   double xyz_score = compute_xyz_score(cloud, xi, yi, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image), &(cu_obs->range_image_data), &(cu_obs->range_image_cnt), 
 				       cu_params, score_round);
-  double lab_score = compute_lab_score(xi, yi, cloud_lab, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_idx), &(cu_obs->range_image_pcd_obs_bg_lab), cu_params, score_round);
-  //double labdist_score = compute_labdist_score(cloud, cloud_labdist, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
+  double lab_scores[3];
+  double lab_score = compute_lab_score(xi, yi, cloud_lab, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_idx), &(cu_obs->obs_lab_image), cu_params, score_round, lab_scores);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, cu_params, score_round);
-
-  /* ----- Sanja's comment --------
+  /*double labdist_score = compute_labdist_score(xi, yi, &(cu_model->color_avg_cov), &(cu_model->color_means1), &(cu_model->color_means2), &(cu_model->color_cov1), &(cu_model->color_cov2), 
+					       &(cu_model->color_cnts1), &(cu_model->color_cnts2), idx, vis_pmf, noise_models, num_validation_points, 
+					       &(cu_obs->range_image), cu_obs->range_image_data.w, cu_obs->range_image_data.h, &(cu_obs->obs_lab_image), obs_lab, obs_weights, cu_params, score_round);*/
   double labdist_score = 0;
-  if (round > 2)
-    labdist_score = compute_labdist_score(cloud, model_data->color_model, idx, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->pcd_obs_bg, params, score_round);
-  
-  // get fpfh score (TODO: add fpfh features to occ_model)
-  int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
-  int fpfh_idx[fpfh_num_validation_points];
-  get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
-  double **fpfh_cloud = get_sub_cloud_at_pose(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, x, q);
-  double **fpfh_cloud_normals = get_sub_cloud_normals_rotated(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, q);
-  double **fpfh_cloud_f = get_sub_cloud_fpfh(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points);
-  double fpfh_vis_prob[fpfh_num_validation_points];
-  for (i = 0; i < fpfh_num_validation_points; i++)
-    fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
-  double fpfh_vis_pmf[fpfh_num_validation_points];
-  normalize_pmf(fpfh_vis_pmf, fpfh_vis_prob, fpfh_num_validation_points);
-  double fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image, obs_data->pcd_obs, params, score_round);
-  
-  double fpfh_score = 0;
-  //double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
-  //double xyz_score = compute_xyz_score(cloud, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
-  //double sdw_score = compute_sdw_score(cloud_sdw, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
-  //double lab_score = compute_lab_score(cloud_lab, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
-
-  if (dbg_timed) {
-    printf("break 5, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-  }
-  */ // End Sanja's comment
   
   //TODO: move this to compute_edge_score()
   double edge_score = 0.0;
   if (cu_obs->edge_image.ptr) {
-    int n = cu_params->num_validation_points;
+    int n = num_validation_points;
     get_range_edge_points(P, idx_edge, &n, x, q, &(cu_model->range_edges_model_views), &(cu_model->range_edges_view_cnt), &(cu_model->range_edges_view_idx), &(cu_model->range_edges_points), &r[2]);
     cu_transform_cloud(P, P, n, x, q);
     /*
@@ -1125,11 +1203,6 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
     edge_score = compute_edge_score(P, vis_prob_edge, vis_pmf_edge, n, NULL, 0, &(cu_obs->range_image_data), &(cu_obs->range_image), &(cu_obs->edge_image), cu_params, score_round);
   }
 
-  /*if (dbg_timed) {
-    printf("break 6, %.2f ms\n", get_time_ms() - t0);  //dbug
-    t0 = get_time_ms();
-    }*/
-
   /*double segment_score = 0;
   if (score_round >= 3)
     segment_score = compute_segment_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
@@ -1138,25 +1211,19 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   
   double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round);
 
-  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score;
-  
-  //dbug
-  //if (sample->c_type[0] == C_TYPE_SIFT)
-  //  score += 100;
+  double score = xyz_score + normal_score + vis_score + edge_score + lab_score + segment_affinity_score + labdist_score;
 
-  /*if (dbg_timed) {
-    printf("break 7, %.2f ms\n", get_time_ms() - t0);  //dbug
-    } */
+  double scores[8] = {xyz_score, normal_score, vis_score, edge_score, lab_scores[0], lab_scores[1], lab_scores[2], segment_affinity_score};
     
   return score;
 }
 
-__global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples,
+__global__ void device_score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples,
 			      cu_int_arr_t cu_segments_idx, cu_int_arr_t cu_num_segments, int *cu_segment_mask, 
 			      cu_model_data_t cu_model, cu_obs_data_t cu_obs, scope_params_t cu_params, 
 			      int score_round, int *cu_xi, int *cu_yi, int *cu_idx, double *cu_cloud, double *cu_cloud_normals, double *cu_cloud_lab, double *cu_vis_prob, double *cu_vis_pmf, uint *cu_rands, 
-			      scope_noise_model_t *cu_noise_models,
-			      int *cu_idx_edge, double *cu_P, double *cu_V_edge, double *cu_V2_edge, int *cu_occ_edge, double *cu_vis_prob_edge, double *cu_vis_pmf_edge) {
+			      scope_noise_model_t *cu_noise_models, int *cu_idx_edge, double *cu_P, double *cu_V_edge, double *cu_V2_edge, int *cu_occ_edge, double *cu_vis_prob_edge, double *cu_vis_pmf_edge, 
+			      double *cu_obs_lab, double *cu_obs_weights, int num_validation_points) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < num_samples) {
     int n_edge = cu_model.max_num_edges;
@@ -1168,7 +1235,6 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
     row = get_row(&cu_samples_q, i);
     for (j = 0; j < 4; ++j)
       q[j] = row[j];
-    int num_validation_points = (cu_params.num_validation_points > 0 ? cu_params.num_validation_points : cu_model.num_points);
     int *xi, *yi, *idx;
     double *cloud, *cloud_normals, *cloud_lab;
     double *vis_pmf, *vis_prob;
@@ -1182,6 +1248,10 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
     vis_prob = &cu_vis_prob[i*num_validation_points];
     vis_pmf = &cu_vis_pmf[i*num_validation_points];
     noise_models = &cu_noise_models[i*num_validation_points];
+
+    double *obs_lab, *obs_weights;
+    obs_lab = &cu_obs_lab[3*i*num_validation_points];
+    obs_weights = &cu_obs_weights[i*num_validation_points];
 
     int *segments_idx;
     segments_idx = &cu_segments_idx.ptr[i * cu_obs.num_obs_segments];
@@ -1204,7 +1274,7 @@ __global__ void score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x
 
     cu_scores[i] = cu_model_placement_score(x, q, &cu_model, &cu_obs, &cu_params, score_round, xi, yi, idx, cloud, cloud_normals, cloud_lab, num_validation_points, 
 					    vis_prob, vis_pmf, &cu_rands[4*i], noise_models, segments_idx, cu_num_segments.ptr[i], segment_mask,
-					    idx_edge, P, V_edge, V2_edge, occ_edge, vis_prob_edge, vis_pmf_edge);
+					    idx_edge, P, V_edge, V2_edge, occ_edge, vis_prob_edge, vis_pmf_edge, obs_lab, obs_weights);
 
     //printf("%lf\n", cu_scores[i]);
   }
@@ -1345,6 +1415,15 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
     printf("vis_pmf_edge\n");
   }
 
+  double *cu_obs_lab;
+  if (cudaMalloc(&cu_obs_lab, num_samples * num_validation_points * 3 * sizeof(double)) != cudaSuccess) {
+    printf("obs_lab\n");
+  }
+  double *cu_obs_weights;
+  if (cudaMalloc(&cu_obs_weights, num_samples * num_validation_points * sizeof(double)) != cudaSuccess) {
+    printf("obs_weights\n");
+  }
+
   double *cu_scores;
   if (cudaMalloc(&cu_scores, num_samples * sizeof(double)) != cudaSuccess) {
     printf("scores\n");
@@ -1400,9 +1479,9 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   int threads_per_block = 8;
   int blocks_per_grid = ceil(num_samples/(1.0*threads_per_block));
 
-  score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_samples_x, cu_samples_q, num_samples, cu_segments_idx, cu_num_segments, cu_segment_mask, *cu_model, *cu_obs, *cu_params, score_round, 
+  device_score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_samples_x, cu_samples_q, num_samples, cu_segments_idx, cu_num_segments, cu_segment_mask, *cu_model, *cu_obs, *cu_params, score_round, 
 							cu_xi, cu_yi, cu_idx, cu_cloud, cu_normals, cu_lab, cu_vis_prob, cu_vis_pmf, cu_rands, cu_noise_models,
-							cu_idx_edge, cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge);
+							cu_idx_edge, cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge, cu_obs_lab, cu_obs_weights, num_validation_points);
   cudaDeviceSynchronize();
   //cudaProfilerStop();
   printf("scoring: %.2f ms\n", get_time_ms() - t0);
@@ -1456,6 +1535,9 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   cu_free(cu_vis_prob_edge, "free_vis_prob_edge\n");
   cu_free(cu_vis_pmf_edge, "free vis_pmf_edge\n");
 
+  cu_free(cu_obs_lab, "obs_lab\n");
+  cu_free(cu_obs_weights, "obs_weights\n");
+
   cu_free(cu_segments_idx.ptr, "free segments_idx\n");
   cu_free(cu_num_segments.ptr, "free num_segments\n");
   cu_free(cu_segment_mask, "free segment mask\n");
@@ -1498,8 +1580,9 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   copy_int_matrix_to_gpu(&(cu_obs->range_image_cnt), obs_data->obs_range_image->cnt, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
+  copy_double_matrix3d_to_gpu(&(cu_obs->obs_lab_image), obs_data->obs_lab_image, 3, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
+  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
@@ -1552,7 +1635,8 @@ void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_bg_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
+  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
+  copy_double_matrix3d_to_gpu(&(cu_obs->obs_lab_image), obs_data->obs_lab_image, 3, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
@@ -1593,12 +1677,13 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
   
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);
-  cudaFree(cu_obs->range_image_pcd_obs_bg_lab.ptr);
+  cudaFree(cu_obs->range_image_pcd_obs_lab.ptr);
   //cudaFree(cu_obs->pcd_obs_fpfh.ptr);
   cudaFree(cu_obs->edge_image.ptr);
   cudaFree(cu_obs->range_image_points.ptr);
   cudaFree(cu_obs->range_image_normals.ptr);
   cudaFree(cu_obs->range_image_cnt.ptr);
+  cudaFree(cu_obs->obs_lab_image.ptr);
   cudaFree(cu_obs->segment_affinities.ptr);
  
   curandDestroyGenerator(gen);
@@ -1628,12 +1713,13 @@ void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_o
   }
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);
-  cudaFree(cu_obs->range_image_pcd_obs_bg_lab.ptr);
+  cudaFree(cu_obs->range_image_pcd_obs_lab.ptr);
   //cudaFree(cu_obs->pcd_obs_fpfh.ptr);
   cudaFree(cu_obs->edge_image.ptr);
   cudaFree(cu_obs->range_image_points.ptr);
   cudaFree(cu_obs->range_image_normals.ptr);
   cudaFree(cu_obs->range_image_cnt.ptr);
+  cudaFree(cu_obs->obs_lab_image.ptr);
   cudaFree(cu_obs->segment_affinities.ptr);
 
   curandDestroyGenerator(gen);

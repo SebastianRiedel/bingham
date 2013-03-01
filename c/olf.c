@@ -3879,13 +3879,14 @@ void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx
   memset(shift, 0, 3*sizeof(double));
 
   int i, j, iter, max_iter = 10;
+  
   for (iter = 0; iter < max_iter; iter++) {
 
     // reset shift statistics
     memset(A[0], 0, 9*sizeof(double));
     memset(z, 0, 3*sizeof(double));
     w = 0;
-
+    
     for (i = 0; i < n; i++) {
 
       if (obs_weights[i] == 0.0)
@@ -3933,6 +3934,8 @@ void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx
 	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
       w += obs_weights[i];
     }
+    if (w == 0.0)
+      break;
 
     mult(z, z, 1/w, 3);  // avg. z
     mult(A[0], A[0], lambda/w, 9);  // avg. A and multiply by lambda
@@ -3967,6 +3970,9 @@ void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx
 double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
 			     range_image_t *obs_range_image, double ***obs_lab_image, scope_params_t *params, int score_round)
 {
+  double tmp = sum(vis_pmf, n);
+  if (tmp < 0.001)
+    printf("tiny pmf\n");
   //TODO: make this a param
   double pmin = .1;
 
@@ -4626,14 +4632,14 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     int P_outliers[n];
     int num_P_outliers;
     transform_cloud(P, P, n, x, q);
-    if (params->num_validation_points == 0) {
+    /*if (params->num_validation_points == 0) {
       int num_occ_edges;
       int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
       edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
       if (occ_edges)
 	free_matrix2i(occ_edges);
     }
-    else
+    else*/
       edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
     free_matrix2(P);
 
@@ -4656,7 +4662,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
-  double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
+  //double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
+  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score + labdist_score;
   
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
@@ -5653,11 +5660,6 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     for (i = 0; i < num_samples_init; i++)
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 1 for i = %d\n", i);
-  }
-  
   // sort hypotheses
   sort_pose_samples(S);
   
@@ -5701,17 +5703,8 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
     for (i = 0; i < S->num_samples; i++)
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 2);
   
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 2 (first run, before sorting) for i = %d\n", i);
-  }
-  
   sort_pose_samples(S);
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 2 (first run, after sorting) for i = %d\n", i);
-  }
-  
+
   S->num_samples = MIN(S->num_samples, params->num_samples_round2);
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
@@ -5746,20 +5739,9 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
 	new_scores[i] = model_placement_score(&samples[i], model_data, obs_data, params, 2);
     
     for (i = 0; i < S->num_samples; ++i) {
-      if (isnan(new_scores[i]))
-	printf("NaN in round 2 (second run, before sorting) for i = %d\n", i);
-    }
-
-    for (i = 0; i < S->num_samples; ++i) {
-      if (isnan(new_scores[i]))
-	printf("Copying? i = %d\n", i);
       if (new_scores[i] > S->W[i]) {
 	scope_sample_copy(&S->samples[i], &samples[i]);
 	S->W[i] = new_scores[i];
-	if (isnan(new_scores[i]))
-	  printf("Yes!\n");
-	if (isnan(S->W[i]))
-	  printf("S->W also NaN. i = %d\n", i);
       }
       scope_sample_free(&samples[i]);
     }
@@ -5774,11 +5756,6 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   //printf("Scored round 2 final poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   sort_pose_samples(S);
-
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 2 (second run, after sorting) for i = %d\n", i);
-  }
 
   if (have_true_pose_)
     print_good_poses(S);
@@ -5811,7 +5788,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     sample_segments_given_model_pose(&S->samples[i], model_data, obs_data, params, 1);  
 
   if (params->use_cuda) {
-    int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
+    int num_validation_points = model_data->pcd_model->num_points;
     cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points, obs_data->num_obs_segments);
     
     // Debugging individual score components on CUDA
@@ -5820,8 +5797,10 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
     for (i = 0; i < S->num_samples; ++i) {
+      if (isnan(S->W[i]))
+	printf("Crap!\n");
       if (fabs(scores[i] - S->W[i]) > 0.00001)
-	printf("Big difference for i = %d\n", i);
+	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
 	}*/
@@ -5833,18 +5812,8 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     params->verbose = 0;
   }
 
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 3 (before sorting) for i = %d\n", i);
-  }
-
   sort_pose_samples(S);
   
-  for (i = 0; i < S->num_samples; ++i) {
-    if (isnan(S->W[i]))
-      printf("NaN in round 3 (after sorting) for i = %d\n", i);
-  }
-
   printf("Scored round 3 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug  
 
   /*dbug
@@ -5897,9 +5866,9 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //for (i = 0; i < 3; i++)
     //  S->samples[0].x[i] += .1*(frand()-.5);
     //dbug: add q noise
-    for (i = 0; i < 4; i++)
-      S->samples[0].q[i] = normrand(0,1);
-    normalize(S->samples[0].q, S->samples[0].q, 4);
+    //for (i = 0; i < 4; i++)
+    //  S->samples[0].q[i] = normrand(0,1);
+    //normalize(S->samples[0].q, S->samples[0].q, 4);
   }
   //S->num_samples = 1;
 
@@ -5933,7 +5902,7 @@ double score_taken_samples(int taken[][2], int num_taken, scope_samples_t *S[], 
   int i;
   double score = 0;
   for (i = 0; i < num_taken; ++i) {
-    score += S[taken[i][0]]->W[taken[i][1]] + 1;
+    score += S[taken[i][0]]->W[taken[i][1]];
     if (write) {
       printf("Score for %d is %lf\n", taken[i][0], S[taken[i][0]]->W[taken[i][1]]);
     }
@@ -5968,17 +5937,8 @@ double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *
     }
     }*/
   for (i = 0; i < num_taken; ++i) {
-    if (write) {
-      printf("********Segments for modelID = %d\n", taken[i][0]);
-    }
     for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
-      if (write) {
-	printf("%d ", S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]);
-      }
       ++seen[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]];      
-    }
-    if (write) {
-      printf("\n\n");
     }
   }
   
@@ -6015,7 +5975,7 @@ double score_segments_agreement(int taken[][2], int num_taken, scope_samples_t *
     }
     overlap_score += ((double) obj_overlap) / ((double) S[taken[i][0]]->samples[taken[i][1]].num_segments);
   }
-  overlap_score = -1.0 * overlap_score /5.0;
+  overlap_score = -1.0 * overlap_score /8.0;
   if (write) {
     printf("overlap score: %lf\n", overlap_score);
     printf("explained score: %lf\n", explained_score);
@@ -6060,7 +6020,7 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
   int taken[num_samples][2];
   int num_taken = 0;
 
-  int num_steps = 20000; // TODO(sanja): make these params
+  int num_steps = 30000; // TODO(sanja): make these params
   double prob_switch;
   double prob_accept_worse;
   int new_taken[num_samples][2];
@@ -6071,7 +6031,7 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
   double new_score;
   double best_score = -10000.0;
   
-  int num_runs = 5;
+  int num_runs = 15;
 
   for (r = 0; r < num_runs; ++r) {
     num_taken = 0;
@@ -6114,7 +6074,6 @@ void simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], i
       if (new_score > best_score) {
 	best_score = new_score;
 	best_num_taken = num_taken;
-	printf("best\n");
 	for (j = 0; j < num_taken; ++j) {
 	  best_taken[j][0] = new_taken[j][0];
 	  best_taken[j][1] = new_taken[j][1];
