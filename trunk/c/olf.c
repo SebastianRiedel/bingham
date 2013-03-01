@@ -2852,6 +2852,8 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
   if (n > 0) {
     safe_realloc(sample->segments_idx, n, int);
     memcpy(sample->segments_idx, idx, n*sizeof(int));
+    safe_realloc(sample->segment_probs, n, int);
+    memcpy(sample->segment_probs, segment_probs, n*sizeof(double));
   }
   sample->num_segments = n;
 
@@ -3371,11 +3373,14 @@ void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
   if (s1->num_segments > 0) {
     if (s2->num_segments == 0) {
       safe_calloc(s2->segments_idx, s1->num_segments, int);
+      safe_calloc(s2->segment_probs, s1->num_segments, double);
     } else {
       safe_realloc(s2->segments_idx, s1->num_segments, int);
+      safe_realloc(s2->segment_probs, s1->num_segments, double);
     }
     s2->num_segments = s1->num_segments;
     memcpy(s2->segments_idx, s1->segments_idx, s2->num_segments * sizeof(int));
+    memcpy(s2->segment_probs, s1->segment_probs, s2->num_segments * sizeof(double));
   } else {
     s2->num_segments = 0;
   }
@@ -4520,21 +4525,22 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
   for (i = 0; i < sample->num_segments; i++)
     mask[segments[i]] = 1;
 
-  int j, cnt = 0;  // normalize by the number of model boundary edges
+  int j;
+  //double cnt = 0;  // normalize by the number of model boundary edges
   double score = 0;
   for (i = 0; i < sample->num_segments; i++) {
     int s = segments[i];
     for (j = 0; j < n; j++) {
       if (mask[j] == 0) {
-	cnt++;
+	//cnt++;
 	double a = MIN(A[s][j], .9);
 	if (a > 0.5)
 	  score += log((1-a)/a);
       }
     }
   }
-  if (cnt > 0)
-    score = 5*score/(double)cnt;
+  //if (cnt > 0)
+  //  score = 5*score/(double)cnt;
 
   if (params->verbose)
     segment_affinity_score_ = score;
