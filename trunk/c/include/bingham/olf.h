@@ -104,6 +104,22 @@ extern "C" {
   } dist_grid_t;
 
 
+#define MAX_SYMMETRY_PARAM_LENGTH 12  // three planes
+
+#define PLANE_SYMMETRY 1
+#define LINE_SYMMETRY 2
+#define POINT_SYMMETRY 3
+#define DUAL_PLANE_SYMMETRY 4
+#define TRIPLE_PLANE_SYMMETRY 5
+
+  typedef struct {
+    int n;
+    int *types;
+    double **params;
+    double *err;
+  } symmetries_t;
+
+
   typedef struct {
     int center_point;
     int *surface_points;
@@ -143,6 +159,7 @@ extern "C" {
     pcd_t *sift_pcd;
     pcd_t *range_edges_pcd;
     dist_grid_t *dist_grid;
+    symmetries_t *symmetries;
   } olf_model_t;
 
 
@@ -257,6 +274,7 @@ extern "C" {
     pcd_t *fpfh_model;
     pcd_t *shot_model;
     pcd_t *sift_model;
+    symmetries_t *model_symmetries;
     olf_t *pcd_model_olfs;
     olf_t *fpfh_model_olfs;
     olf_t *shot_model_olfs;

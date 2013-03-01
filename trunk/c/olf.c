@@ -535,6 +535,7 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 //---------------------------- EXTERNAL API ---------------------------//
 
 dist_grid_t *load_distance_grid(char *filename, pcd_t *pcd);
+symmetries_t *load_symmetries(char *filename);
 
 
 void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params)
@@ -556,8 +557,8 @@ void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params
   }
   fclose(f);
 
-  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], shot_pcd[1024], sift_pcd[1024], range_edges_pcd[1024], dist_grid[1024];
-  if (sscanf(line, "%s %s %s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, shot_pcd, sift_pcd, range_edges_pcd, dist_grid) < 7) {
+  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], shot_pcd[1024], sift_pcd[1024], range_edges_pcd[1024], dist_grid[1024], symmetries[1024];
+  if (sscanf(line, "%s %s %s %s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, shot_pcd, sift_pcd, range_edges_pcd, dist_grid, symmetries) < 8) {
     fprintf(stderr, "Error parsing model file: %s\n", model_file);
     return;
   }
@@ -588,6 +589,9 @@ void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params
 
   sprintf(line, "%s/%s", dirname, dist_grid);
   model->dist_grid = load_distance_grid(line, model->obj_pcd);
+
+  sprintf(line, "%s/%s", dirname, symmetries);
+  model->symmetries = load_symmetries(line);
 
   //cleanup
   free(dirname);
@@ -1771,6 +1775,83 @@ int distance_grid_find_nn_xyzn(double *nn_d2, double *xyz, double *normal, doubl
 
  //==============================================================================================//
 
+ //----------------------------------------  Symmetries  ----------------------------------------//
+
+ //==============================================================================================//
+
+symmetries_t *load_symmetries(char *filename)
+{
+  FILE *f = fopen(filename, "r");
+  if (f == NULL) {
+    fprintf(stderr, "Invalid filename: %s\n", filename);
+    return NULL;
+  }
+
+  symmetries_t *S;
+  safe_calloc(S, 1, symmetries_t);
+
+  // get the number and types of symmetries
+  char line[1024];
+  int i = 0;
+  while (!feof(f)) {
+    if (fgets(line, 1024, f)) {
+      int xxx;
+      if (sscanf(line, "%d", &xxx) > 0)
+	i++;
+    }
+  }
+  rewind(f);
+
+  // alloc S
+  S->n = i;
+  safe_calloc(S->types, S->n, int);
+  S->params = new_matrix2(S->n, MAX_SYMMETRY_PARAM_LENGTH);
+  safe_calloc(S->err, S->n, double);
+
+  // load params
+  i = 0;
+  while (!feof(f)) {
+    if (fgets(line, 1024, f) && sscanf(line, "%d %lf", &S->types[i], &S->err[i]) == 2) {
+      char *s = sword(line, " \t", 2);
+      int n = 0;
+      if (S->types[i] == PLANE_SYMMETRY)
+	n = 4;
+      else if (S->types[i] == LINE_SYMMETRY)
+	n = 6;
+      else if (S->types[i] == POINT_SYMMETRY)
+	n = 3;
+      else if (S->types[i] == DUAL_PLANE_SYMMETRY)
+	n = 8;
+      else if (S->types[i] == TRIPLE_PLANE_SYMMETRY)
+	n = 12;
+
+      int j;
+      for (j = 0; j < n; j++) {
+	sscanf(s, "%lf", &S->params[i][j]);
+	s = sword(s, " \t", 1);
+      }
+
+      i++;
+    }
+  }
+
+  if (i != S->n)
+    printf("ERROR: i != S->n in load_symmetries()\n");
+
+  fclose(f);
+
+  return S;
+}
+
+
+void free_symmetries(symmetries_t *S)
+{
+  //STUB
+}
+
+
+ //==============================================================================================//
+
  //-----------------------------------  PCD Helper Functions  -----------------------------------//
 
  //==============================================================================================//
@@ -2919,6 +3000,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   data->color_model = get_pcd_color_model(model->obj_pcd);
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
   data->model_dist_grid = model->dist_grid;
+  data->model_symmetries = model->symmetries;
 
   // compute model olfs
   int i;
