@@ -1230,6 +1230,12 @@ double mvnpdf(double *x, double *mu, double **S, int d)
   matrix_vec_mult(S_inv_dx, S_inv, dx, d, d);
   double dm = dot(dx, S_inv_dx, d);
 
+  if (isnan(dm))
+    printf("Dm is nan\n");
+
+  if (det(S, d) < 0)
+    printf("Negative determinant!\n");
+
   double p = exp(-.5*dm) / sqrt(pow(2*M_PI, d) * det(S,d));
 
   free_matrix2(S_inv);

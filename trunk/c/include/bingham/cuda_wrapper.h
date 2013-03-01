@@ -57,8 +57,8 @@ typedef struct {
 } cu_range_image_data_t;
 
 typedef struct cu_obs_data_struct {
-  cu_double_matrix_t range_image, range_image_pcd_obs_bg_lab, pcd_obs_fpfh, edge_image, segment_affinities;
-  cu_double_matrix3d_t range_image_points, range_image_normals;
+  cu_double_matrix_t range_image, range_image_pcd_obs_lab, pcd_obs_fpfh, edge_image, segment_affinities;
+  cu_double_matrix3d_t range_image_points, range_image_normals, obs_lab_image;
 
   cu_range_image_data_t range_image_data;
 
