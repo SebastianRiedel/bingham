@@ -537,7 +537,7 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 dist_grid_t *load_distance_grid(char *filename, pcd_t *pcd);
 
 
-void load_olf_model(olf_model_t *model, char *model_file)
+void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params)
 {
   printf("model_file = %s\n", model_file); //dbug
 
@@ -568,14 +568,20 @@ void load_olf_model(olf_model_t *model, char *model_file)
   sprintf(line, "%s/%s", dirname, obj_pcd);
   model->obj_pcd = load_pcd(line);
 
-  sprintf(line, "%s/%s", dirname, fpfh_pcd);
-  model->fpfh_pcd = load_pcd(line);
+  if (params->use_fpfh) {
+    sprintf(line, "%s/%s", dirname, fpfh_pcd);
+    model->fpfh_pcd = load_pcd(line);
+  }
 
-  sprintf(line, "%s/%s", dirname, shot_pcd);
-  model->shot_pcd = load_pcd(line);
+  if (params->use_shot) {
+    sprintf(line, "%s/%s", dirname, shot_pcd);
+    model->shot_pcd = load_pcd(line);
+  }
 
-  sprintf(line, "%s/%s", dirname, sift_pcd);
-  model->sift_pcd = load_pcd(line);
+  if (params->use_sift) {
+    sprintf(line, "%s/%s", dirname, sift_pcd);
+    model->sift_pcd = load_pcd(line);
+  }
 
   sprintf(line, "%s/%s", dirname, range_edges_pcd);
   model->range_edges_pcd = load_pcd(line);
@@ -588,7 +594,7 @@ void load_olf_model(olf_model_t *model, char *model_file)
 }
 
 
-olf_model_t *load_olf_models(int *n, char *models_file)
+olf_model_t *load_olf_models(int *n, char *models_file, scope_params_t *params)
 {
   char *dirname = get_dirname(models_file);
 
@@ -628,7 +634,7 @@ olf_model_t *load_olf_models(int *n, char *models_file)
   olf_model_t *models;
   safe_calloc(models, num_models, olf_model_t);
   for (i = 0; i < num_models; i++)
-    load_olf_model(&models[i], model_files[i]);
+    load_olf_model(&models[i], model_files[i], params);
 
   //cleanup
   free(dirname);
@@ -689,6 +695,14 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->do_final_icp);
       else if (!wordcmp(name, "use_cuda", "\t\n"))
 	sscanf(value, "%d", &params->use_cuda);
+      else if (!wordcmp(name, "use_true_pose", "\t\n"))
+	sscanf(value, "%d", &params->use_true_pose);
+      else if (!wordcmp(name, "use_fpfh", "\t\n"))
+	sscanf(value, "%d", &params->use_fpfh);
+      else if (!wordcmp(name, "use_shot", "\t\n"))
+	sscanf(value, "%d", &params->use_shot);
+      else if (!wordcmp(name, "use_sift", "\t\n"))
+	sscanf(value, "%d", &params->use_sift);
 
       else if (!wordcmp(name, "dispersion_weight", "\t\n"))
 	sscanf(value, "%d", &params->dispersion_weight);
@@ -2898,11 +2912,10 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
 
 void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_params_t *params)
 {
+  memset(data, 0, sizeof(scope_model_data_t));
+
   // unpack model arguments
   data->pcd_model = model->obj_pcd;
-  data->fpfh_model = model->fpfh_pcd;
-  data->shot_model = model->shot_pcd;
-  data->sift_model = model->sift_pcd;
   data->color_model = get_pcd_color_model(model->obj_pcd);
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
   data->model_dist_grid = model->dist_grid;
@@ -2912,93 +2925,96 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   safe_calloc(data->pcd_model_olfs, data->pcd_model->num_points, olf_t);
   for (i = 0; i < data->pcd_model->num_points; i++)
     get_olf(&data->pcd_model_olfs[i], data->pcd_model, i, 1);
-  safe_calloc(data->fpfh_model_olfs, data->fpfh_model->num_points, olf_t);
-  for (i = 0; i < data->fpfh_model->num_points; i++)
-    get_olf(&data->fpfh_model_olfs[i], data->fpfh_model, i, 1);
-  safe_calloc(data->shot_model_olfs, data->shot_model->num_points, olf_t);
-  for (i = 0; i < data->shot_model->num_points; i++)
-    get_olf(&data->shot_model_olfs[i], data->shot_model, i, 1);
-  safe_calloc(data->sift_model_olfs, data->sift_model->num_points, olf_t);
-  for (i = 0; i < data->sift_model->num_points; i++)
-    get_olf(&data->sift_model_olfs[i], data->sift_model, i, 1);
   safe_calloc(data->range_edges_model_olfs, data->range_edges_model->pcd->num_points, olf_t);
   for (i = 0; i < data->range_edges_model->pcd->num_points; i++)
     get_olf(&data->range_edges_model_olfs[i], data->range_edges_model->pcd, i, 0);
 
-  // compute fpfh model feature saliency
-  double *p = compute_model_saliency(data->fpfh_model);
-  cumsum(p, p, data->fpfh_model->num_points);
-  data->fpfh_model_cmf = p;
-
-  // compute shot model feature saliency
-  p = compute_model_saliency(data->shot_model);
-  cumsum(p, p, data->shot_model->num_points);
-  data->shot_model_cmf = p;
-
   // get combined feature matrices for FLANN
   double **model_xyzn = get_xyzn_features(data->pcd_model, params);
-  double **fpfh_model_xyzn = get_xyzn_features(data->fpfh_model, params);
-  double **shot_model_xyzn = get_xyzn_features(data->shot_model, params);
 
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
   flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
   struct FLANNParameters flann_params = DEFAULT_FLANN_PARAMETERS;
   flann_params.algorithm = FLANN_INDEX_KDTREE;
-  //flann_params.trees = 8;
-  //flann_params.checks = 64;
   data->model_xyz_params = flann_params_single;
   data->model_xyzn_params = flann_params_single;
-  data->fpfh_model_f_params = flann_params;
-  data->fpfh_model_xyzn_params = flann_params_single;
-  data->shot_model_f_params = flann_params;
-  data->shot_model_xyzn_params = flann_params_single;
 
   // build flann indices
   float speedup;
   data->model_xyz_index = flann_build_index_double(data->pcd_model->points[0], data->pcd_model->num_points, 3, &speedup, &data->model_xyz_params);
   data->model_xyzn_index = flann_build_index_double(model_xyzn[0], data->pcd_model->num_points, 6, &speedup, &data->model_xyzn_params);
-  data->fpfh_model_xyzn_index = flann_build_index_double(fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
-  data->shot_model_xyzn_index = flann_build_index_double(shot_model_xyzn[0], data->shot_model->num_points, 6, &speedup, &data->shot_model_xyzn_params);
-  data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->fpfh[0], data->fpfh_model->num_points, data->fpfh_model->fpfh_length, &speedup, &data->fpfh_model_f_params);
-  data->shot_model_f_index = flann_build_index_double(data->shot_model->shot[0], data->shot_model->num_points, data->shot_model->shot_length, &speedup, &data->shot_model_f_params);
 
-  // build model-to-feature maps
-  safe_calloc(data->model_to_fpfh_map, data->pcd_model->num_points, int);
-  safe_calloc(data->model_to_shot_map, data->pcd_model->num_points, int);
-  double nn_d2[data->pcd_model->num_points];
-  flann_find_nearest_neighbors_index_double(data->fpfh_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points, data->model_to_fpfh_map, nn_d2, 1, &data->fpfh_model_xyzn_params);
-  flann_find_nearest_neighbors_index_double(data->shot_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points, data->model_to_shot_map, nn_d2, 1, &data->shot_model_xyzn_params);
+  // fpfh data
+  if (params->use_fpfh) {
+    data->fpfh_model = model->fpfh_pcd;
+    safe_calloc(data->fpfh_model_olfs, data->fpfh_model->num_points, olf_t);
+    for (i = 0; i < data->fpfh_model->num_points; i++)
+      get_olf(&data->fpfh_model_olfs[i], data->fpfh_model, i, 1);
+    double *p = compute_model_saliency(data->fpfh_model);
+    cumsum(p, p, data->fpfh_model->num_points);
+    data->fpfh_model_cmf = p;
+    double **fpfh_model_xyzn = get_xyzn_features(data->fpfh_model, params);
+    data->fpfh_model_f_params = flann_params;
+    data->fpfh_model_xyzn_params = flann_params_single;
+    data->fpfh_model_xyzn_index = flann_build_index_double(fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
+    data->fpfh_model_f_index = flann_build_index_double(data->fpfh_model->fpfh[0], data->fpfh_model->num_points, data->fpfh_model->fpfh_length,
+							&speedup, &data->fpfh_model_f_params);
+    safe_calloc(data->model_to_fpfh_map, data->pcd_model->num_points, int);
+    double nn_d2[data->pcd_model->num_points];
+    flann_find_nearest_neighbors_index_double(data->fpfh_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points,
+					      data->model_to_fpfh_map, nn_d2, 1, &data->fpfh_model_xyzn_params);
+    free_matrix2(fpfh_model_xyzn);
+  }
+
+  //shot data
+  if (params->use_shot) {
+    data->shot_model = model->shot_pcd;
+    safe_calloc(data->shot_model_olfs, data->shot_model->num_points, olf_t);
+    for (i = 0; i < data->shot_model->num_points; i++)
+      get_olf(&data->shot_model_olfs[i], data->shot_model, i, 1);
+    double *p = compute_model_saliency(data->shot_model);
+    cumsum(p, p, data->shot_model->num_points);
+    data->shot_model_cmf = p;
+    double **shot_model_xyzn = get_xyzn_features(data->shot_model, params);
+    data->shot_model_f_params = flann_params;
+    data->shot_model_xyzn_params = flann_params_single;
+    data->shot_model_xyzn_index = flann_build_index_double(shot_model_xyzn[0], data->shot_model->num_points, 6, &speedup, &data->shot_model_xyzn_params);
+    data->shot_model_f_index = flann_build_index_double(data->shot_model->shot[0], data->shot_model->num_points, data->shot_model->shot_length,
+							&speedup, &data->shot_model_f_params);
+    safe_calloc(data->model_to_shot_map, data->pcd_model->num_points, int);
+    double nn_d2[data->pcd_model->num_points];
+    flann_find_nearest_neighbors_index_double(data->shot_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points,
+					      data->model_to_shot_map, nn_d2, 1, &data->shot_model_xyzn_params);
+    free_matrix2(shot_model_xyzn);
+  }
+
+  //sift data
+  if (params->use_sift) {
+    data->sift_model = model->sift_pcd;
+    safe_calloc(data->sift_model_olfs, data->sift_model->num_points, olf_t);
+    for (i = 0; i < data->sift_model->num_points; i++)
+      get_olf(&data->sift_model_olfs[i], data->sift_model, i, 1);
+  }
 
   //cleanup
   free_matrix2(model_xyzn);
-  free_matrix2(fpfh_model_xyzn);
-  free_matrix2(shot_model_xyzn);
 }
 
 
 void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *params)
 {
+  memset(data, 0, sizeof(scope_obs_data_t));
+
   // unpack obs arguments
   data->pcd_obs = obs->bg_pcd;
-  data->shot_obs = obs->shot_pcd;
-  data->sift_obs = obs->sift_pcd;
-  data->fpfh_obs = obs->fpfh_pcd;
+  data->fpfh_obs = obs->fpfh_pcd;  // need this for obs_fg_range_image
 
   // compute obs olfs
   int i;
   safe_calloc(data->pcd_obs_olfs, data->pcd_obs->num_points, olf_t);
   for (i = 0; i < data->pcd_obs->num_points; i++)
     get_olf(&data->pcd_obs_olfs[i], data->pcd_obs, i, 0);
-  safe_calloc(data->fpfh_obs_olfs, data->fpfh_obs->num_points, olf_t);
-  for (i = 0; i < data->fpfh_obs->num_points; i++)
-    get_olf(&data->fpfh_obs_olfs[i], data->fpfh_obs, i, 0);
-  safe_calloc(data->shot_obs_olfs, data->shot_obs->num_points, olf_t);
-  for (i = 0; i < data->shot_obs->num_points; i++)
-    get_olf(&data->shot_obs_olfs[i], data->shot_obs, i, 0);
-  safe_calloc(data->sift_obs_olfs, data->sift_obs->num_points, olf_t);
-  for (i = 0; i < data->sift_obs->num_points; i++)
-    get_olf(&data->sift_obs_olfs[i], data->sift_obs, i, 0);
 
   // compute range images
   data->obs_range_image = pcd_to_range_image(data->pcd_obs, 0, M_PI/1000.0, 4);  //TODO: make this a parameter?
@@ -3021,33 +3037,49 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   //printf("obs_edge_image_height_ = %d\n", data->obs_edge_image_height_);
   obs_edge_image_ = matrix_clone(data->obs_edge_image, obs_edge_image_width_, obs_edge_image_height_);  //dbug
 
-  // get combined feature matrices
-  double **fpfh_obs_xyzn = get_xyzn_features(data->fpfh_obs, params);
-  double **shot_obs_xyzn = get_xyzn_features(data->shot_obs, params);
-
-  // flann params
-  struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
-  flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
-  data->fpfh_obs_xyzn_params = flann_params_single;
-  data->shot_obs_xyzn_params = flann_params_single;
-
-  // build flann indices
-  float speedup;
-  data->fpfh_obs_xyzn_index = flann_build_index_double(fpfh_obs_xyzn[0], data->fpfh_obs->num_points, 6, &speedup, &data->fpfh_obs_xyzn_params);
-  data->shot_obs_xyzn_index = flann_build_index_double(shot_obs_xyzn[0], data->shot_obs->num_points, 6, &speedup, &data->shot_obs_xyzn_params);
-
-  // build obs-to-feature maps
-  //safe_calloc(data->obs_to_shot_map, data->pcd_obs->num_points, int);
-  //double nn_d2[data->pcd_obs->num_points];
-  //flann_find_nearest_neighbors_index_double(data->shot_obs_xyzn_index, obs_xyzn[0], data->pcd_obs->num_points, data->obs_to_shot_map, nn_d2, 1, &data->shot_obs_xyzn_params);
-
   // get superpixel segmentation
   get_superpixel_segmentation(data, params);
   get_superpixel_affinity_graph(data, params);
 
-  //cleanup
-  free_matrix2(fpfh_obs_xyzn);
-  free_matrix2(shot_obs_xyzn);
+  // fpfh data
+  if (params->use_fpfh) {
+    safe_calloc(data->fpfh_obs_olfs, data->fpfh_obs->num_points, olf_t);
+    for (i = 0; i < data->fpfh_obs->num_points; i++)
+      get_olf(&data->fpfh_obs_olfs[i], data->fpfh_obs, i, 0);
+    double **fpfh_obs_xyzn = get_xyzn_features(data->fpfh_obs, params);
+    struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
+    flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
+    float speedup;
+    data->fpfh_obs_xyzn_params = flann_params_single;
+    data->fpfh_obs_xyzn_index = flann_build_index_double(fpfh_obs_xyzn[0], data->fpfh_obs->num_points, 6, &speedup, &data->fpfh_obs_xyzn_params);
+    free_matrix2(fpfh_obs_xyzn);
+  }
+
+  // shot data
+  if (params->use_shot) {
+    data->shot_obs = obs->shot_pcd;
+    safe_calloc(data->shot_obs_olfs, data->shot_obs->num_points, olf_t);
+    for (i = 0; i < data->shot_obs->num_points; i++)
+      get_olf(&data->shot_obs_olfs[i], data->shot_obs, i, 0);
+    double **shot_obs_xyzn = get_xyzn_features(data->shot_obs, params);
+    struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
+    flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
+    float speedup;
+    data->shot_obs_xyzn_params = flann_params_single;
+    data->shot_obs_xyzn_index = flann_build_index_double(shot_obs_xyzn[0], data->shot_obs->num_points, 6, &speedup, &data->shot_obs_xyzn_params);
+    //safe_calloc(data->obs_to_shot_map, data->pcd_obs->num_points, int);
+    //double nn_d2[data->pcd_obs->num_points];
+    //flann_find_nearest_neighbors_index_double(data->shot_obs_xyzn_index, obs_xyzn[0], data->pcd_obs->num_points, data->obs_to_shot_map, nn_d2, 1, &data->shot_obs_xyzn_params);
+    //free_matrix2(shot_obs_xyzn);
+  }
+
+  // sift data
+  if (params->use_sift) {
+    data->sift_obs = obs->sift_pcd;
+    safe_calloc(data->sift_obs_olfs, data->sift_obs->num_points, olf_t);
+    for (i = 0; i < data->sift_obs->num_points; i++)
+      get_olf(&data->sift_obs_olfs[i], data->sift_obs, i, 0);
+  }
 }
 
 
@@ -3057,31 +3089,41 @@ void free_scope_model_data(scope_model_data_t *data)
   for (i = 0; i < data->pcd_model->num_points; i++)
     free_olf(&data->pcd_model_olfs[i]);
   free(data->pcd_model_olfs);
-  for (i = 0; i < data->fpfh_model->num_points; i++)
-    free_olf(&data->fpfh_model_olfs[i]);
-  free(data->fpfh_model_olfs);
-  for (i = 0; i < data->shot_model->num_points; i++)
-    free_olf(&data->shot_model_olfs[i]);
-  free(data->shot_model_olfs);
-  for (i = 0; i < data->sift_model->num_points; i++)
-    free_olf(&data->sift_model_olfs[i]);
-  free(data->sift_model_olfs);
+
   for (i = 0; i < data->range_edges_model->pcd->num_points; i++)
     free_olf(&data->range_edges_model_olfs[i]);
   free(data->range_edges_model_olfs);
 
   free_pcd_color_model(data->color_model);
   free_multiview_pcd(data->range_edges_model);
-  free(data->fpfh_model_cmf);
-  free(data->shot_model_cmf);
-  free(data->model_to_fpfh_map);
-  free(data->model_to_shot_map);
   flann_free_index(data->model_xyz_index, &data->model_xyz_params);
   flann_free_index(data->model_xyzn_index, &data->model_xyzn_params);
-  flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
-  flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
-  flann_free_index(data->shot_model_f_index, &data->shot_model_f_params);
-  flann_free_index(data->shot_model_xyzn_index, &data->shot_model_xyzn_params);
+
+  if (data->fpfh_model) {
+    for (i = 0; i < data->fpfh_model->num_points; i++)
+      free_olf(&data->fpfh_model_olfs[i]);
+    free(data->fpfh_model_olfs);
+    free(data->fpfh_model_cmf);
+    free(data->model_to_fpfh_map);
+    flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
+    flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
+  }
+
+  if (data->shot_model) {
+    for (i = 0; i < data->shot_model->num_points; i++)
+      free_olf(&data->shot_model_olfs[i]);
+    free(data->shot_model_olfs);
+    free(data->shot_model_cmf);
+    free(data->model_to_shot_map);
+    flann_free_index(data->shot_model_f_index, &data->shot_model_f_params);
+    flann_free_index(data->shot_model_xyzn_index, &data->shot_model_xyzn_params);
+  }
+
+  if (data->sift_model) {
+    for (i = 0; i < data->sift_model->num_points; i++)
+      free_olf(&data->sift_model_olfs[i]);
+    free(data->sift_model_olfs);
+  }
 }
 
 
@@ -3091,15 +3133,6 @@ void free_scope_obs_data(scope_obs_data_t *data)
   for (i = 0; i < data->pcd_obs->num_points; i++)
     free_olf(&data->pcd_obs_olfs[i]);
   free(data->pcd_obs_olfs);
-  for (i = 0; i < data->fpfh_obs->num_points; i++)
-    free_olf(&data->fpfh_obs_olfs[i]);
-  free(data->fpfh_obs_olfs);
-  for (i = 0; i < data->shot_obs->num_points; i++)
-    free_olf(&data->shot_obs_olfs[i]);
-  free(data->shot_obs_olfs);
-  for (i = 0; i < data->sift_obs->num_points; i++)
-    free_olf(&data->sift_obs_olfs[i]);
-  free(data->sift_obs_olfs);
 
   free_range_image(data->obs_range_image);
   free_range_image(data->obs_fg_range_image);
@@ -3108,8 +3141,26 @@ void free_scope_obs_data(scope_obs_data_t *data)
   free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
   free_matrix3(data->obs_lab_image);
-  flann_free_index(data->fpfh_obs_xyzn_index, &data->fpfh_obs_xyzn_params);
-  flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
+
+  if (data->fpfh_obs_olfs) {
+    for (i = 0; i < data->fpfh_obs->num_points; i++)
+      free_olf(&data->fpfh_obs_olfs[i]);
+    free(data->fpfh_obs_olfs);
+    flann_free_index(data->fpfh_obs_xyzn_index, &data->fpfh_obs_xyzn_params);
+  }
+
+  if (data->shot_obs_olfs) {
+    for (i = 0; i < data->shot_obs->num_points; i++)
+      free_olf(&data->shot_obs_olfs[i]);
+    free(data->shot_obs_olfs);
+    flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
+  }
+
+  if (data->sift_obs_olfs) {
+    for (i = 0; i < data->sift_obs->num_points; i++)
+      free_olf(&data->sift_obs_olfs[i]);
+    free(data->sift_obs_olfs);
+  }
 }
 
 
@@ -4538,18 +4589,24 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   }
 
   // get fpfh score (TODO: add fpfh features to occ_model)
-  int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
-  int fpfh_idx[fpfh_num_validation_points];
-  get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
-  double **fpfh_cloud = get_sub_cloud_at_pose(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, x, q);
-  double **fpfh_cloud_normals = get_sub_cloud_normals_rotated(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, q);
-  double **fpfh_cloud_f = get_sub_cloud_fpfh(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points);
-  double fpfh_vis_prob[fpfh_num_validation_points];
-  for (i = 0; i < fpfh_num_validation_points; i++)
-    fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
-  double fpfh_vis_pmf[fpfh_num_validation_points];
-  normalize_pmf(fpfh_vis_pmf, fpfh_vis_prob, fpfh_num_validation_points);
-  double fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image, obs_data->fpfh_obs, params, score_round);
+  double fpfh_score = 0;
+  if (params->use_fpfh) {
+    int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
+    int fpfh_idx[fpfh_num_validation_points];
+    get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
+    double **fpfh_cloud = get_sub_cloud_at_pose(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, x, q);
+    double **fpfh_cloud_normals = get_sub_cloud_normals_rotated(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, q);
+    double **fpfh_cloud_f = get_sub_cloud_fpfh(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points);
+    double fpfh_vis_prob[fpfh_num_validation_points];
+    for (i = 0; i < fpfh_num_validation_points; i++)
+      fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
+    double fpfh_vis_pmf[fpfh_num_validation_points];
+    normalize_pmf(fpfh_vis_pmf, fpfh_vis_prob, fpfh_num_validation_points);
+    fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image, obs_data->fpfh_obs, params, score_round);
+    free_matrix2(fpfh_cloud);
+    free_matrix2(fpfh_cloud_normals);
+    free_matrix2(fpfh_cloud_f);
+  }
 
   //double xyzn_score = compute_xyzn_score(nn_d2, vis_pmf, num_validation_points, params);
   //double xyz_score = compute_xyz_score(cloud, nn_idx, vis_pmf, num_validation_points, pcd_obs, params);
@@ -4632,9 +4689,6 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   //free_matrix2(cloud_labdist);
   //free_matrix2(cloud_xyzn);
   free(noise_models);
-  free_matrix2(fpfh_cloud);
-  free_matrix2(fpfh_cloud_normals);
-  free_matrix2(fpfh_cloud_f);
 
   if (score_round == 3)
     params->num_validation_points = num_validation_points_orig;
@@ -5526,8 +5580,13 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   double t0 = get_time_ms(); //dbug
 
   // find sift matches
-  int sift_match_obs_idx[obs_data->sift_obs->num_points], sift_match_model_idx[obs_data->sift_obs->num_points];
-  int num_sift_matches = find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, obs_data->sift_obs, model_data->sift_model, params->sift_dthresh);
+  int num_sift_matches = 0;
+  int *sift_match_obs_idx=NULL, *sift_match_model_idx=NULL;
+  if (params->use_sift) {
+    safe_calloc(sift_match_obs_idx, obs_data->sift_obs->num_points, int);
+    safe_calloc(sift_match_model_idx, obs_data->sift_obs->num_points, int);
+    num_sift_matches = find_obs_sift_matches(sift_match_obs_idx, sift_match_model_idx, obs_data->sift_obs, model_data->sift_model, params->sift_dthresh);
+  }
 
   // get the max number of samples
   int num_samples_init = num_sift_matches + (params->num_samples_round1 == 0 ? obs_data->pcd_obs->num_points : params->num_samples_round1);
@@ -5541,7 +5600,6 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   for (i = 0; i < num_samples_init; i++) {
 
     if (i < num_sift_matches) {  // sift correspondence
-
       int c_obs = sift_match_obs_idx[i];
       int c_model = sift_match_model_idx[i];
       S->samples[i].c_obs[0] = c_obs;
@@ -5549,15 +5607,12 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
       S->samples[i].c_score[0] = 1.0;            //TODO: compute SIFT correspondence likelihood
       S->samples[i].c_type[0] = C_TYPE_SIFT;
       S->samples[i].nc = 1;
-
-      //get_olf(&S->samples[i].model_olfs[0], model_data->sift_model, c_model, 1);
-      //get_olf(&S->samples[i].obs_olfs[0], obs_data->sift_obs, c_obs, 0);
     }
     else {
       double fpfh_ratio = .5;
-      if (frand() < fpfh_ratio)
+      if (params->use_fpfh && (!params->use_shot || frand() < fpfh_ratio))
 	sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, params);
-      else
+      else if (params->use_shot)
 	sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
     }
 
@@ -5571,20 +5626,22 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     print_good_poses(S);
 
   // group correspondences by sample pose, then sort samples by num. correspondences
-  cluster_pose_samples(S, params);
-  for (i = 0; i < S->num_samples; i++)
-    S->W[i] = S->samples[i].nc;
-  sort_pose_samples(S);
-  S->num_samples = find_first_lt(S->W, 2, S->num_samples);
+  if (params->pose_clustering) {
+    cluster_pose_samples(S, params);
+    for (i = 0; i < S->num_samples; i++)
+      S->W[i] = S->samples[i].nc;
+    sort_pose_samples(S);
+    S->num_samples = find_first_lt(S->W, 2, S->num_samples);
 
-  // resample model poses given grouped correspondences
-  for (i = 0; i < S->num_samples; i++)
-    sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+    // resample model poses given grouped correspondences
+    for (i = 0; i < S->num_samples; i++)
+      sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
 
-  //dbug
-  printf("Grouped correspondences:\n");
-  if (have_true_pose_)
-    print_good_poses(S);  
+    //dbug
+    printf("Grouped correspondences:\n");
+    if (have_true_pose_)
+      print_good_poses(S);  
+  }
 
   // score hypotheses
   t0 = get_time_ms();
@@ -5608,11 +5665,19 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   double round1_score_thresh = -.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
+  if (S->num_samples == 0)
+    S->num_samples = 1;
   
   //dbug
   printf("Scored and sorted c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   if (have_true_pose_)
     print_good_poses(S);
+
+  //cleanup
+  if (params->use_sift) {
+    free(sift_match_obs_idx);
+    free(sift_match_model_idx);
+  }
   
   return S;
 }
@@ -5734,8 +5799,10 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   double t0 = get_time_ms();
 
   // align with gradients
-  for (i = 0; i < S->num_samples; i++)
-    align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+  if (params->do_final_icp) {
+    for (i = 0; i < S->num_samples; i++)
+      align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+  }
 
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
@@ -5823,10 +5890,17 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs);
 
   //dbug: add true pose
-  /*if (have_true_pose_) {
+  if (have_true_pose_ && params->use_true_pose) {
     memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
-    }*/
+    //dbug: add x noise
+    //for (i = 0; i < 3; i++)
+    //  S->samples[0].x[i] += .1*(frand()-.5);
+    //dbug: add q noise
+    for (i = 0; i < 4; i++)
+      S->samples[0].q[i] = normrand(0,1);
+    normalize(S->samples[0].q, S->samples[0].q, 4);
+  }
   //S->num_samples = 1;
 
   scope_round3(S, model_data, obs_data, params, cu_model, cu_obs);
