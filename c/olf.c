@@ -2852,7 +2852,7 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
   if (n > 0) {
     safe_realloc(sample->segments_idx, n, int);
     memcpy(sample->segments_idx, idx, n*sizeof(int));
-    safe_realloc(sample->segment_probs, n, int);
+    safe_realloc(sample->segment_probs, n, double);
     memcpy(sample->segment_probs, segment_probs, n*sizeof(double));
   }
   sample->num_segments = n;
@@ -4539,6 +4539,7 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
       }
     }
   }
+  score *= .05;
   //if (cnt > 0)
   //  score = 5*score/(double)cnt;
 
