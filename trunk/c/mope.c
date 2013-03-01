@@ -25,15 +25,18 @@ int main(int argc, char *argv[])
   // load obs data
   olf_obs_t obs;
   obs.bg_pcd = load_pcd(argv[1]);
-  obs.fpfh_pcd = load_pcd(argv[2]);
-  obs.shot_pcd = load_pcd(argv[3]);
-  obs.sift_pcd = load_pcd(argv[4]);
+  if (params.use_fpfh)
+    obs.fpfh_pcd = load_pcd(argv[2]);
+  if (params.use_shot)
+    obs.shot_pcd = load_pcd(argv[3]);
+  if (params.use_sift)
+    obs.sift_pcd = load_pcd(argv[4]);
   scope_obs_data_t obs_data;
   get_scope_obs_data(&obs_data, &obs, &params);
 
   // load model data
   int num_models;
-  olf_model_t *models = load_olf_models(&num_models, argv[5]);
+  olf_model_t *models = load_olf_models(&num_models, argv[5], &params);
   scope_model_data_t model_data[num_models];
   int i;
   for (i = 0; i < num_models; i++)

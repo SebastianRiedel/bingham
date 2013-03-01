@@ -165,6 +165,10 @@ extern "C" {
 
     // GENERAL PARAMS
     int verbose;
+    int use_true_pose;
+    int use_fpfh;
+    int use_shot;
+    int use_sift;
     int num_samples_round1;
     int num_samples_round2;
     int num_samples_round3;
@@ -433,8 +437,8 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
 
   range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
 
-  void load_olf_model(olf_model_t *model, char *model_file);
-  olf_model_t *load_olf_models(int *n, char *models_file);
+  void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params);
+  olf_model_t *load_olf_models(int *n, char *models_file, scope_params_t *params);
 
   void load_scope_params(scope_params_t *params, char *param_file);
   void get_scope_model_data(scope_model_data_t *model_data, olf_model_t *model, scope_params_t *params);

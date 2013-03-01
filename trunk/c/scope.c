@@ -61,15 +61,18 @@ int main(int argc, char *argv[])
   // load obs data
   olf_obs_t obs;
   obs.bg_pcd = load_pcd(argv[1]);
-  obs.fpfh_pcd = load_pcd(argv[2]);
-  obs.shot_pcd = load_pcd(argv[3]);
-  obs.sift_pcd = load_pcd(argv[4]);
+  if (params.use_fpfh)
+    obs.fpfh_pcd = load_pcd(argv[2]);
+  if (params.use_shot)
+    obs.shot_pcd = load_pcd(argv[3]);
+  if (params.use_sift)
+    obs.sift_pcd = load_pcd(argv[4]);
   scope_obs_data_t obs_data;
   get_scope_obs_data(&obs_data, &obs, &params);
 
   // load model data
   olf_model_t model;
-  load_olf_model(&model, argv[5]);
+  load_olf_model(&model, argv[5], &params);
   scope_model_data_t model_data;
   get_scope_model_data(&model_data, &model, &params);
 
