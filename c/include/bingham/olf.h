@@ -350,6 +350,7 @@ extern "C" {
     // current superpixel segmentation
     int num_segments;
     int *segments_idx;
+    double *segment_probs;
 
     // validation memory
     int num_edge_outliers;
