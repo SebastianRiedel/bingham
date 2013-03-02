@@ -690,22 +690,22 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->knn);
       else if (!wordcmp(name, "num_validation_points", " \t\n"))
 	sscanf(value, "%d", &params->num_validation_points);
-      else if (!wordcmp(name, "round2_alignment_iter", "\t\n"))
+      else if (!wordcmp(name, "round2_alignment_iter", " \t\n"))
 	sscanf(value, "%d", &params->round2_alignment_iter);
-      else if (!wordcmp(name, "final_alignment_iter", "\t\n"))
+      else if (!wordcmp(name, "final_alignment_iter", " \t\n"))
 	sscanf(value, "%d", &params->final_alignment_iter);
-      else if (!wordcmp(name, "use_cuda", "\t\n"))
+      else if (!wordcmp(name, "use_cuda", " \t\n"))
 	sscanf(value, "%d", &params->use_cuda);
-      else if (!wordcmp(name, "use_true_pose", "\t\n"))
+      else if (!wordcmp(name, "use_true_pose", " \t\n"))
 	sscanf(value, "%d", &params->use_true_pose);
-      else if (!wordcmp(name, "use_fpfh", "\t\n"))
+      else if (!wordcmp(name, "use_fpfh", " \t\n"))
 	sscanf(value, "%d", &params->use_fpfh);
-      else if (!wordcmp(name, "use_shot", "\t\n"))
+      else if (!wordcmp(name, "use_shot", " \t\n"))
 	sscanf(value, "%d", &params->use_shot);
-      else if (!wordcmp(name, "use_sift", "\t\n"))
+      else if (!wordcmp(name, "use_sift", " \t\n"))
 	sscanf(value, "%d", &params->use_sift);
 
-      else if (!wordcmp(name, "dispersion_weight", "\t\n"))
+      else if (!wordcmp(name, "dispersion_weight", " \t\n"))
 	sscanf(value, "%d", &params->dispersion_weight);
       else if (!wordcmp(name, "sift_dthresh", " \t\n"))
 	sscanf(value, "%lf", &params->sift_dthresh);
@@ -715,9 +715,9 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->round1_range_thresh);
       else if (!wordcmp(name, "round1_score_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->round1_score_thresh);
-      else if (!wordcmp(name, "xyz_score_window", "\t\n"))
+      else if (!wordcmp(name, "xyz_score_window", " \t\n"))
 	sscanf(value, "%d", &params->xyz_score_window);
-      else if (!wordcmp(name, "xyz_score_use_plane", "\t\n"))
+      else if (!wordcmp(name, "xyz_score_use_plane", " \t\n"))
 	sscanf(value, "%d", &params->xyz_score_use_plane);
 
       else if (!wordcmp(name, "xyz_sigma", " \t\n"))
@@ -798,7 +798,7 @@ void load_scope_params(scope_params_t *params, char *param_file)
 
       else if (!wordcmp(name, "range_image_resolution", " \t\n"))
 	sscanf(value, "%lf", &params->range_image_resolution);
-      else if (!wordcmp(name, "use_fg_edge_image", "\t\n"))
+      else if (!wordcmp(name, "use_fg_edge_image", " \t\n"))
 	sscanf(value, "%d", &params->use_fg_edge_image);
       else if (!wordcmp(name, "range_edge_weight", " \t\n"))
 	sscanf(value, "%lf", &params->range_edge_weight);
