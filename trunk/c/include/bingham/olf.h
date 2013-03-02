@@ -193,19 +193,24 @@ extern "C" {
     int branching_factor;
     int num_validation_points;
     int knn;
-    int do_icp;
-    int final_icp_iter;
+    int round2_alignment_iter;
+    int final_alignment_iter;
     int use_cuda;
 
     // WEIGHT / DISTANCE PARAMS
     int dispersion_weight;
     double sift_dthresh;
     double vis_thresh;
+    double round1_range_thresh;
+    double round1_score_thresh;
+    int xyz_score_window;
+    int xyz_score_use_plane;
 
     // NOISE MODEL PARAMS
     double xyz_sigma;
     double range_sigma;
     double normal_sigma;
+    double normalvar_thresh;
     double lab_sigma;
     double f_sigma;
     double shot_sigma;
@@ -246,6 +251,7 @@ extern "C" {
     double q_cluster_thresh;
 
     // IMAGE PARAMS
+    double range_image_resolution;
     int use_fg_edge_image;
     double range_edge_weight;
     double curv_edge_weight;
@@ -253,6 +259,7 @@ extern "C" {
     int edge_blur;
     int color_blur;
     double min_edge_prob;
+    int segment_resolution;
 
     //double surfdist_weight;
     //double surfwidth_weight;

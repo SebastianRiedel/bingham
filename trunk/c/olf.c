@@ -690,10 +690,10 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->knn);
       else if (!wordcmp(name, "num_validation_points", " \t\n"))
 	sscanf(value, "%d", &params->num_validation_points);
-      else if (!wordcmp(name, "do_icp", "\t\n"))
-	sscanf(value, "%d", &params->do_icp);
-      else if (!wordcmp(name, "final_icp_iter", "\t\n"))
-	sscanf(value, "%d", &params->final_icp_iter);
+      else if (!wordcmp(name, "round2_alignment_iter", "\t\n"))
+	sscanf(value, "%d", &params->round2_alignment_iter);
+      else if (!wordcmp(name, "final_alignment_iter", "\t\n"))
+	sscanf(value, "%d", &params->final_alignment_iter);
       else if (!wordcmp(name, "use_cuda", "\t\n"))
 	sscanf(value, "%d", &params->use_cuda);
       else if (!wordcmp(name, "use_true_pose", "\t\n"))
@@ -711,6 +711,14 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->sift_dthresh);
       else if (!wordcmp(name, "vis_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->vis_thresh);
+      else if (!wordcmp(name, "round1_range_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->round1_range_thresh);
+      else if (!wordcmp(name, "round1_score_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->round1_score_thresh);
+      else if (!wordcmp(name, "xyz_score_window", "\t\n"))
+	sscanf(value, "%d", &params->xyz_score_window);
+      else if (!wordcmp(name, "xyz_score_use_plane", "\t\n"))
+	sscanf(value, "%d", &params->xyz_score_use_plane);
 
       else if (!wordcmp(name, "xyz_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->xyz_sigma);
@@ -718,6 +726,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->range_sigma);
       else if (!wordcmp(name, "normal_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->normal_sigma);
+      else if (!wordcmp(name, "normalvar_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->normalvar_thresh);
       else if (!wordcmp(name, "lab_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->lab_sigma);
       else if (!wordcmp(name, "f_sigma", " \t\n"))
@@ -786,6 +796,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "q_cluster_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->q_cluster_thresh);
 
+      else if (!wordcmp(name, "range_image_resolution", " \t\n"))
+	sscanf(value, "%lf", &params->range_image_resolution);
       else if (!wordcmp(name, "use_fg_edge_image", "\t\n"))
 	sscanf(value, "%d", &params->use_fg_edge_image);
       else if (!wordcmp(name, "range_edge_weight", " \t\n"))
@@ -800,6 +812,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->color_blur);
       else if (!wordcmp(name, "min_edge_prob", " \t\n"))
 	sscanf(value, "%lf", &params->min_edge_prob);
+      else if (!wordcmp(name, "segment_resolution", " \t\n"))
+	sscanf(value, "%d", &params->segment_resolution);
 
       else if (!wordcmp(name, "mope_samples_weight", " \t\n"))
 	sscanf(value, "%lf", &params->mope_samples_weight);
@@ -2310,8 +2324,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 {
   double t0 = get_time_ms();  //dbug
 
-  //TODO: make this a param
-  int segment_resolution = 7;  // in units of range image pixels
+  int segment_resolution = params->segment_resolution; //7;  // in units of range image pixels
 
   pcd_t *pcd_obs = obs_data->pcd_obs;
   range_image_t *obs_range_image = obs_data->obs_range_image;
@@ -3099,6 +3112,8 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
 
 void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *params)
 {
+  double range_image_resolution = params->range_image_resolution;  //M_PI/1000.0
+
   memset(data, 0, sizeof(scope_obs_data_t));
 
   // unpack obs arguments
@@ -3112,7 +3127,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
     get_olf(&data->pcd_obs_olfs[i], data->pcd_obs, i, 0);
 
   // compute range images
-  data->obs_range_image = pcd_to_range_image(data->pcd_obs, 0, M_PI/1000.0, 4);  //TODO: make this a parameter?
+  data->obs_range_image = pcd_to_range_image(data->pcd_obs, 0, range_image_resolution, 4);
   data->obs_fg_range_image = pcd_to_range_image_from_template(data->fpfh_obs, data->obs_range_image);  // assumes fpfh features are computed densely
 
   // get edge points
@@ -3719,6 +3734,9 @@ double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t
 double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round,
 			 int *outliers, int *num_outliers)
 {
+  int xyz_score_window = params->xyz_score_window;
+  int xyz_score_use_plane = params->xyz_score_use_plane;
+
   int w = obs_range_image->w;
   int h = obs_range_image->h;
 
@@ -3741,15 +3759,21 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
       double dmax = 2*range_sigma;
       double dmin = dmax;
       int x,y;
-      for (x = xi-1; x <= xi+1; x++) {
-	for (y = yi-1; y <= yi+1; y++) {
+      int r = xyz_score_window;
+      for (x = xi-r; x <= xi+r; x++) {
+	for (y = yi-r; y <= yi+r; y++) {
 	  if (x >= 0 && x < w && y >= 0 && y < h && obs_range_image->cnt[x][y] > 0) {
-	    // get distance from model point to range image cell plane
-	    //double c[4];
-	    //xyzn_to_plane(c, obs_range_image->points[xi][yi], obs_range_image->normals[xi][yi]);
-	    //d = fabs(dot(c, cloud[i], 3) + c[3]);
-	    double obs_range = obs_range_image->image[x][y];
-	    double d = fabs(model_range - obs_range);
+	    double d;
+	    if (xyz_score_use_plane) {
+	      // get distance from model point to range image cell plane
+	      double c[4];
+	      xyzn_to_plane(c, obs_range_image->points[xi][yi], obs_range_image->normals[xi][yi]);
+	      d = fabs(dot(c, cloud[i], 3) + c[3]);
+	    }
+	    else {
+	      double obs_range = obs_range_image->image[x][y];
+	      d = fabs(model_range - obs_range);
+	    }
 	    if (d < dmin)
 	      dmin = d;
 	  }
@@ -3787,8 +3811,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 
 double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
-  //TODO: make this a param
-  double normalvar_thresh = 0.3;
+  double normalvar_thresh = params->normalvar_thresh;  //0.3;
 
   double score = 0.0;
   //double normal_sigma = params->normal_sigma;
@@ -4486,9 +4509,10 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
       int y = occ_edges[i][1];
       occ_score += obs_edge_image[x][y];
     }
-    occ_score /= (double) num_occ_edges;
-    occ_score = num_occ_edges*occ_score / (double)(n + num_occ_edges);
-    score = n*score / (double)(n + num_occ_edges);
+    occ_score /= (double)(n + num_occ_edges);
+    //occ_score /= (double) num_occ_edges;
+    //occ_score = num_occ_edges*occ_score / (double)(n + num_occ_edges);
+    //score = n*score / (double)(n + num_occ_edges);
   }
 
   //dbug
@@ -4650,7 +4674,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double **cloud = get_sub_cloud_at_pose(model_data->pcd_model, idx, num_validation_points, x, q);
 
   if (score_round == 1) {  // after c=1, just use free space to score
-    double dthresh = .05;  //TODO: make this a param
+    double dthresh = params->round1_range_thresh;  //.05;  //TODO: make this a param
     double score = 0;
     int xi, yi;
     for (i = 0; i < num_validation_points; i++)
@@ -4769,14 +4793,14 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     int P_outliers[n];
     int num_P_outliers;
     transform_cloud(P, P, n, x, q);
-    /*if (params->num_validation_points == 0) {
+    if (params->num_validation_points == 0) {
       int num_occ_edges;
       int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
       edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
       if (occ_edges)
 	free_matrix2i(occ_edges);
     }
-    else*/
+    else
       edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
     free_matrix2(P);
 
@@ -5800,8 +5824,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   // sort hypotheses
   sort_pose_samples(S);
   
-  //TODO: make this a param
-  double round1_score_thresh = -.2;
+  double round1_score_thresh = params->round1_score_thresh;  //-.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
   if (S->num_samples == 0)
@@ -5824,8 +5847,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params,
 			cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
 {
-  //TODO: make this a param
-  int num_alignment_iters = 5;
+  int num_alignment_iters = params->round2_alignment_iter;  //5;
 
   double t0;
   int i, iter;
@@ -5914,7 +5936,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 
   // align with gradients
   int iter;
-  for (iter = 0; iter < params->final_icp_iter; iter++)
+  for (iter = 0; iter < params->final_alignment_iter; iter++)
     for (i = 0; i < S->num_samples; i++)
       align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
 
