@@ -193,9 +193,8 @@ extern "C" {
     int branching_factor;
     int num_validation_points;
     int knn;
-    int use_range_image;
     int do_icp;
-    int do_final_icp;
+    int final_icp_iter;
     int use_cuda;
 
     // WEIGHT / DISTANCE PARAMS
@@ -247,11 +246,13 @@ extern "C" {
     double q_cluster_thresh;
 
     // IMAGE PARAMS
+    int use_fg_edge_image;
     double range_edge_weight;
     double curv_edge_weight;
     double img_edge_weight;
     int edge_blur;
     int color_blur;
+    double min_edge_prob;
 
     //double surfdist_weight;
     //double surfwidth_weight;

@@ -351,7 +351,6 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_ved66 = pcd_channel(pcd, "ved66");
   int ch_normalvar = pcd_channel(pcd, "normalvar");
 
-  //TODO: clean up these column names
   int ch_labdist1 = pcd_channel(pcd, "labdist1");
   int ch_labdist20 = pcd_channel(pcd, "labdist20");
 
@@ -691,12 +690,10 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->knn);
       else if (!wordcmp(name, "num_validation_points", " \t\n"))
 	sscanf(value, "%d", &params->num_validation_points);
-      else if (!wordcmp(name, "use_range_image", "\t\n"))
-	sscanf(value, "%d", &params->use_range_image);
       else if (!wordcmp(name, "do_icp", "\t\n"))
 	sscanf(value, "%d", &params->do_icp);
-      else if (!wordcmp(name, "do_final_icp", "\t\n"))
-	sscanf(value, "%d", &params->do_final_icp);
+      else if (!wordcmp(name, "final_icp_iter", "\t\n"))
+	sscanf(value, "%d", &params->final_icp_iter);
       else if (!wordcmp(name, "use_cuda", "\t\n"))
 	sscanf(value, "%d", &params->use_cuda);
       else if (!wordcmp(name, "use_true_pose", "\t\n"))
@@ -782,7 +779,6 @@ void load_scope_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "score3_segment_affinity_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_segment_affinity_weight);
 
-
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
 	sscanf(value, "%d", &params->pose_clustering);
       else if (!wordcmp(name, "x_cluster_thresh", " \t\n"))
@@ -790,6 +786,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "q_cluster_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->q_cluster_thresh);
 
+      else if (!wordcmp(name, "use_fg_edge_image", "\t\n"))
+	sscanf(value, "%d", &params->use_fg_edge_image);
       else if (!wordcmp(name, "range_edge_weight", " \t\n"))
 	sscanf(value, "%lf", &params->range_edge_weight);
       else if (!wordcmp(name, "curv_edge_weight", " \t\n"))
@@ -800,6 +798,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->edge_blur);
       else if (!wordcmp(name, "color_blur", " \t\n"))
 	sscanf(value, "%d", &params->color_blur);
+      else if (!wordcmp(name, "min_edge_prob", " \t\n"))
+	sscanf(value, "%lf", &params->min_edge_prob);
 
       else if (!wordcmp(name, "mope_samples_weight", " \t\n"))
 	sscanf(value, "%lf", &params->mope_samples_weight);
@@ -1459,9 +1459,9 @@ double **get_edge_points_image(double **P, int n, range_image_t *range_image)
   return E;
 }
 
-double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, scope_params_t *params)
+double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, range_image_t *fg_range_image, scope_params_t *params)
 {
-  double min_edge_prob = .05;  // TODO: make this a param
+  double min_edge_prob = params->min_edge_prob;  //.05;
 
   double range_edge_weight = params->range_edge_weight;
   double curv_edge_weight = params->curv_edge_weight;
@@ -1479,12 +1479,14 @@ double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, scope_pa
   for (i = 0; i < pcd->num_points; i++) {
     int inbounds = range_image_xyz2sub(&x, &y, range_image, pcd->points[i]);
     if (inbounds) {
-      if (pcd->range_edge[i] > 0)
-	RE[x][y] = MAX(RE[x][y], pcd->range_edge[i]);
-      if (pcd->curv_edge[i] > 0)
-	CE[x][y] = MAX(CE[x][y], pcd->curv_edge[i]);
-      if (pcd->img_edge[i] > 0)
-	IE[x][y] = MAX(IE[x][y], pcd->img_edge[i]);
+      if (!params->use_fg_edge_image || fg_range_image->cnt[x][y] > 0) {  // only keep edge points in the foreground
+	if (pcd->range_edge[i] > 0)
+	  RE[x][y] = MAX(RE[x][y], pcd->range_edge[i]);
+	if (pcd->curv_edge[i] > 0)
+	  CE[x][y] = MAX(CE[x][y], pcd->curv_edge[i]);
+	if (pcd->img_edge[i] > 0)
+	  IE[x][y] = MAX(IE[x][y], pcd->img_edge[i]);
+      }
     }
   }
 
@@ -3118,7 +3120,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   data->obs_edge_points_image = get_edge_points_image(data->obs_edge_points, data->num_obs_edge_points, data->obs_range_image);
 
   // compute blurred edge feature image
-  data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_range_image, params);
+  data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_range_image, data->obs_fg_range_image, params);
 
   // compute blurred image colors
   data->obs_lab_image = get_lab_image(data->obs_range_image, params);
@@ -5911,10 +5913,10 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   double t0 = get_time_ms();
 
   // align with gradients
-  if (params->do_final_icp) {
+  int iter;
+  for (iter = 0; iter < params->final_icp_iter; iter++)
     for (i = 0; i < S->num_samples; i++)
       align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
-  }
 
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
