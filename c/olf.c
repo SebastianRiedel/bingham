@@ -3837,12 +3837,12 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   }
   score -= log(normpdf(0, 0, params->range_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_xyz);
+
   //dbug
   if (params->verbose)
     xyz_score_ = score;
-
-  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
-    score = logistic(score, b_xyz);
 
   double weight = 0;
   if (score_round == 2)
@@ -3888,12 +3888,12 @@ double compute_normal_score(double **cloud, double **cloud_normals, double *vis_
     score /= wtot;
   score -= log(normpdf(0, 0, params->normal_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_normal);
+
   //dbug
   if (params->verbose)
     normal_score_ = score;
-
-  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
-    score = logistic(score, b_normal);
 
   double w = 0;
   if (score_round == 2)
@@ -3948,12 +3948,12 @@ double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, 
   }
   score -= log(normpdf(0, 0, params->f_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_fpfh);
+
   //dbug
   if (params->verbose)
     fpfh_score_ = score;
-
-  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
-    score = logistic(score, b_fpfh);
 
   double w = 0;
   if (score_round == 2)
@@ -4341,17 +4341,17 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
   }
   //score -= log(normpdf(0, 0, params->lab_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    scores[0] = logistic(scores[0], b_L);
+    scores[1] = logistic(scores[1], b_A);
+    scores[2] = logistic(scores[2], b_B);
+  }
+
   //dbug
   if (params->verbose) {
     lab_scores_[0] = scores[0];
     lab_scores_[1] = scores[1];
     lab_scores_[2] = scores[2];    
-  }
-
-  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
-    scores[0] = logistic(scores[0], b_L);
-    scores[1] = logistic(scores[1], b_A);
-    scores[2] = logistic(scores[2], b_B);
   }
 
   double lab_weights2[3] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight};
@@ -4572,16 +4572,16 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
     //score = n*score / (double)(n + num_occ_edges);
   }
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    score = logistic(score, b_edge);
+    occ_score = logistic(occ_score, b_edge_occ);
+  }
+
   //dbug
   if (params->verbose) {
     edge_score_ = score;
     edge_vis_score_ = vis_score;
     edge_occ_score_ = occ_score;
-  }
-
-  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
-    score = logistic(score, b_edge);
-    occ_score = logistic(occ_score, b_edge_occ);
   }
 
   double w1=0, w2=0, w3=0;
@@ -4693,11 +4693,11 @@ double compute_random_walk_score(double *x, double *q, double **cloud, flann_ind
 
   free_matrix2(R_inv);
 
-  if (params->verbose)
-    random_walk_score_ = score;
-
   if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
     score = logistic(score, b_random_walk);
+
+  if (params->verbose)
+    random_walk_score_ = score;
 
   double weight = 0;
   if (score_round == 2)
