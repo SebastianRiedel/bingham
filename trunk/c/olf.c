@@ -131,7 +131,10 @@ void print_good_poses_verbose(scope_samples_t *S, double w_sigma)
 
 //---------------------------- STATIC HELPER FUNCTIONS ---------------------------//
 
-
+double logistic(double x, double *b)
+{
+  return 1.0 / (1.0 + exp(-x*b[1]-b[0]));
+}
 
 char *get_dirname(char *path)
 {
@@ -535,6 +538,7 @@ static void pcd_free_data_pointers(pcd_t *pcd)
 
 dist_grid_t *load_distance_grid(char *filename, pcd_t *pcd);
 symmetries_t *load_symmetries(char *filename);
+score_comp_models_t *load_score_comp_models(char *filename);
 
 
 void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params)
@@ -556,8 +560,10 @@ void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params
   }
   fclose(f);
 
-  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], shot_pcd[1024], sift_pcd[1024], range_edges_pcd[1024], dist_grid[1024], symmetries[1024];
-  if (sscanf(line, "%s %s %s %s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, shot_pcd, sift_pcd, range_edges_pcd, dist_grid, symmetries) < 8) {
+  char model_name[1024], obj_pcd[1024], fpfh_pcd[1024], shot_pcd[1024], sift_pcd[1024];
+  char range_edges_pcd[1024], dist_grid[1024], symmetries[1024], score_comp_models[1024];
+  if (sscanf(line, "%s %s %s %s %s %s %s %s %s", model_name, obj_pcd, fpfh_pcd, shot_pcd, sift_pcd,
+	     range_edges_pcd, dist_grid, symmetries, score_comp_models) < 9) {
     fprintf(stderr, "Error parsing model file: %s\n", model_file);
     return;
   }
@@ -591,6 +597,9 @@ void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params
 
   sprintf(line, "%s/%s", dirname, symmetries);
   model->symmetries = load_symmetries(line);
+
+  sprintf(line, "%s/%s", dirname, score_comp_models);
+  model->score_comp_models = load_score_comp_models(line);
 
   //cleanup
   free(dirname);
@@ -735,6 +744,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "shot_sigma", " \t\n"))
 	sscanf(value, "%lf", &params->shot_sigma);
 
+      else if (!wordcmp(name, "score2_use_score_comp_models", " \t\n"))
+	sscanf(value, "%d", &params->score2_use_score_comp_models);
       else if (!wordcmp(name, "score2_xyz_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_xyz_weight);
       else if (!wordcmp(name, "score2_normal_weight", " \t\n"))
@@ -762,6 +773,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
       else if (!wordcmp(name, "score2_segment_affinity_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_segment_affinity_weight);
 
+      else if (!wordcmp(name, "score3_use_score_comp_models", " \t\n"))
+	sscanf(value, "%d", &params->score3_use_score_comp_models);
       else if (!wordcmp(name, "score3_xyz_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_xyz_weight);
       else if (!wordcmp(name, "score3_normal_weight", " \t\n"))
@@ -1786,15 +1799,6 @@ int distance_grid_find_nn_xyzn(double *nn_d2, double *xyz, double *normal, doubl
 }
 
 
-
-
-
- //==============================================================================================//
-
- //----------------------------------------  Symmetries  ----------------------------------------//
-
- //==============================================================================================//
-
 symmetries_t *load_symmetries(char *filename)
 {
   FILE *f = fopen(filename, "r");
@@ -1873,6 +1877,42 @@ void free_symmetries(symmetries_t *S)
 {
   //STUB
 }
+
+
+score_comp_models_t *load_score_comp_models(char *fname)
+{
+  int n,m;
+  double **B = load_matrix(fname, &n, &m);
+
+  if (B == NULL || n != 13 || m != 2) {
+    printf("Error in %s!\n", fname);
+    return NULL;
+  }
+
+  score_comp_models_t *C;
+  safe_calloc(C, 1, score_comp_models_t);
+
+  int i;
+  for (i = 0; i < 2; i++) {
+    C->b_xyz[i] =              B[0][i];
+    C->b_normal[i] =           B[1][i];
+    //C->b_vis[i] =              B[2][i];
+    C->b_random_walk[i] =      B[3][i];
+    C->b_edge[i] =             B[4][i];
+    //C->b_edge_vis[i] =         B[5][i];
+    C->b_edge_occ[i] =         B[6][i];
+    C->b_color_L[i] =          B[7][i];
+    C->b_color_A[i] =          B[8][i];
+    C->b_color_B[i] =          B[9][i];
+    C->b_fpfh[i] =             B[10][i];
+    //C->b_labdist[i] =          B[11][i];
+    //C->b_segment_affinity[i] = B[12][i];
+  }
+
+  return C;
+}
+
+
 
 
  //==============================================================================================//
@@ -3027,6 +3067,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
   data->model_dist_grid = model->dist_grid;
   data->model_symmetries = model->symmetries;
+  data->score_comp_models = model->score_comp_models;
 
   // compute model olfs
   int i;
@@ -3731,8 +3772,9 @@ double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t
  /*
   * Computes the xyz score for points in 'cloud'.  Also fills in 'outliers' and 'num_outliers'.
   */
-double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round,
-			 int *outliers, int *num_outliers)
+double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points,
+			 range_image_t *obs_range_image, double *b_xyz, scope_params_t *params,
+			 int score_round, int *outliers, int *num_outliers)
 {
   int xyz_score_window = params->xyz_score_window;
   int xyz_score_use_plane = params->xyz_score_use_plane;
@@ -3799,6 +3841,9 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   if (params->verbose)
     xyz_score_ = score;
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_xyz);
+
   double weight = 0;
   if (score_round == 2)
     weight = params->score2_xyz_weight;
@@ -3809,7 +3854,7 @@ double compute_xyz_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 }
 
 
-double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
+double compute_normal_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, range_image_t *obs_range_image, double *b_normal, scope_params_t *params, int score_round)
 {
   double normalvar_thresh = params->normalvar_thresh;  //0.3;
 
@@ -3847,6 +3892,9 @@ double compute_normal_score(double **cloud, double **cloud_normals, double *vis_
   if (params->verbose)
     normal_score_ = score;
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_normal);
+
   double w = 0;
   if (score_round == 2)
     w = params->score2_normal_weight;
@@ -3875,7 +3923,7 @@ double compute_xyz_score(double **xyz, int *nn_idx, double *vis_prob, int n, pcd
 */
 
 double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, /*scope_noise_model_t *noise_models,*/ int num_validation_points,
-			  range_image_t *obs_fg_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
+			  range_image_t *obs_fg_range_image, pcd_t *pcd_obs, double *b_fpfh, scope_params_t *params, int score_round)
 {
   double score = 0.0;
   int i;
@@ -3903,6 +3951,9 @@ double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, 
   //dbug
   if (params->verbose)
     fpfh_score_ = score;
+
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_fpfh);
 
   double w = 0;
   if (score_round == 2)
@@ -4236,7 +4287,7 @@ double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int
 
 
 
-double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, double ***obs_lab_image, scope_params_t *params, int score_round)
+double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, double ***obs_lab_image, double *b_L, double *b_A, double *b_B, scope_params_t *params, int score_round)
 {
   double scores[3] = {0, 0, 0};
   int i, j;
@@ -4295,6 +4346,12 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
     lab_scores_[0] = scores[0];
     lab_scores_[1] = scores[1];
     lab_scores_[2] = scores[2];    
+  }
+
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    scores[0] = logistic(scores[0], b_L);
+    scores[1] = logistic(scores[1], b_A);
+    scores[2] = logistic(scores[2], b_B);
   }
 
   double lab_weights2[3] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight};
@@ -4447,8 +4504,8 @@ double compute_occ_edge_score(double **cloud, double *vis_prob, int n, range_ima
  /*
   * Computes the edge score for range edge points 'P' and occlusion edges 'occ_edges'.  Also fills in 'P_outliers' and 'num_P_outliers'.
   */
-double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round,
-			  int *P_outliers, int *num_P_outliers)
+double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges, range_image_t *obs_range_image, double **obs_edge_image,
+			  double *b_edge, double *b_edge_occ, scope_params_t *params, int score_round, int *P_outliers, int *num_P_outliers)
 {
   if (n == 0)
     return 0.0;
@@ -4522,6 +4579,11 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
     edge_occ_score_ = occ_score;
   }
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    score = logistic(score, b_edge);
+    occ_score = logistic(occ_score, b_edge_occ);
+  }
+
   double w1=0, w2=0, w3=0;
   if (score_round == 2) {
     w1 = params->score2_edge_weight;
@@ -4540,7 +4602,8 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 
 
 // compute the segment affinity score for a scope sample
-double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
+double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *obs_data,
+				      scope_params_t *params, int score_round)
 {
   int *segments = sample->segments_idx;
   double **A = obs_data->obs_segment_affinities;
@@ -4579,13 +4642,13 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
     weight = params->score3_segment_affinity_weight;
 
   return weight * score;
-  
 }
 
 
 
 double compute_random_walk_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
-				 double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image, scope_params_t *params, int score_round)
+				 double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image,
+				 double *b_random_walk, scope_params_t *params, int score_round)
 {
   double range_sigma = params->range_sigma;
   double dmax = 2*range_sigma;
@@ -4632,6 +4695,9 @@ double compute_random_walk_score(double *x, double *q, double **cloud, flann_ind
 
   if (params->verbose)
     random_walk_score_ = score;
+
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = logistic(score, b_random_walk);
 
   double weight = 0;
   if (score_round == 2)
@@ -4726,7 +4792,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   int xyz_outliers[num_validation_points];
   int num_xyz_outliers;
-  double xyz_score = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round, xyz_outliers, &num_xyz_outliers);
+  double xyz_score = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image,
+				       model_data->score_comp_models->b_xyz, params, score_round, xyz_outliers, &num_xyz_outliers);
 
   // update sample xyz outliers
   if (sample->xyz_outliers_idx)
@@ -4736,8 +4803,11 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     sample->xyz_outliers_idx[i] = idx[ xyz_outliers[i] ];
   sample->num_xyz_outliers = num_xyz_outliers;
 
-  double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, params, score_round);
-  double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image, obs_data->obs_lab_image, params, score_round);
+  double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image,
+					     model_data->score_comp_models->b_normal, params, score_round);
+  double lab_score = compute_lab_score(cloud, cloud_lab, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image,
+				       obs_data->obs_lab_image, model_data->score_comp_models->b_color_L, model_data->score_comp_models->b_color_A,
+				       model_data->score_comp_models->b_color_B, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
 
   double labdist_score = 0;
@@ -4769,7 +4839,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
       fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
     double fpfh_vis_pmf[fpfh_num_validation_points];
     normalize_pmf(fpfh_vis_pmf, fpfh_vis_prob, fpfh_num_validation_points);
-    fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image, obs_data->fpfh_obs, params, score_round);
+    fpfh_score = compute_fpfh_score(fpfh_cloud, fpfh_cloud_f, fpfh_vis_pmf, fpfh_num_validation_points, obs_data->obs_fg_range_image,
+				    obs_data->fpfh_obs, model_data->score_comp_models->b_fpfh, params, score_round);
     free_matrix2(fpfh_cloud);
     free_matrix2(fpfh_cloud_normals);
     free_matrix2(fpfh_cloud_f);
@@ -4796,12 +4867,16 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     if (params->num_validation_points == 0) {
       int num_occ_edges;
       int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
-      edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
+      edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image,
+				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ, params,
+				      score_round, P_outliers, &num_P_outliers);
       if (occ_edges)
 	free_matrix2i(occ_edges);
     }
     else
-      edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round, P_outliers, &num_P_outliers);
+      edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image,
+				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ, params,
+				      score_round, P_outliers, &num_P_outliers);
     free_matrix2(P);
 
     // update sample edge outliers
@@ -4819,7 +4894,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double random_walk_score = 0;
   if (score_round >= 3)
     random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
-						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
+						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
+						  model_data->score_comp_models->b_random_walk, params, score_round);
 
   double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
@@ -5679,13 +5755,17 @@ void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data
       //t1 = get_time_ms();  //dbug
       
       // evaluate the score
-      edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image, params, score_round, NULL, NULL);
+      edge_score = compute_edge_score(P2, num_edge_points, NULL, 0, obs_range_image, obs_edge_image,
+				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ,
+				      params, score_round, NULL, NULL);
       
       //printf("compute_edge_score: %.2f ms\n", get_time_ms() - t1); //dbug
       //t1 = get_time_ms();  //dbug
       
-      double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, score_round, NULL, NULL);
-      double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image, params, score_round);
+      double xyz_score = compute_xyz_score(cloud2, vis_pmf, noise_models, num_surface_points, obs_range_image,
+					   model_data->score_comp_models->b_xyz, params, score_round, NULL, NULL);
+      double normal_score = compute_normal_score(cloud2, normals2, vis_pmf, noise_models, num_surface_points, obs_range_image,
+						 model_data->score_comp_models->b_normal, params, score_round);
       double score = edge_score + xyz_score + normal_score;
       
       //printf("xyz/normal scores: %.2f ms\n", get_time_ms() - t1); //dbug

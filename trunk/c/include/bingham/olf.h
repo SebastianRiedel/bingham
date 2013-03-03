@@ -120,6 +120,24 @@ extern "C" {
   } symmetries_t;
 
 
+  // logistic regression coefficients
+  typedef struct {
+    double b_xyz[2];
+    double b_normal[2];
+    //double b_vis[2];
+    double b_random_walk[2];
+    double b_edge[2];
+    //double b_edge_vis[2];
+    double b_edge_occ[2];
+    double b_color_L[2];
+    double b_color_A[2];
+    double b_color_B[2];
+    double b_fpfh[2];
+    //double b_labdist[2];
+    //double b_segment_affinity[2];
+  } score_comp_models_t;
+
+
   typedef struct {
     int center_point;
     int *surface_points;
@@ -160,6 +178,7 @@ extern "C" {
     pcd_t *range_edges_pcd;
     dist_grid_t *dist_grid;
     symmetries_t *symmetries;
+    score_comp_models_t *score_comp_models;
   } olf_model_t;
 
 
@@ -216,6 +235,7 @@ extern "C" {
     double shot_sigma;
 
     // SCORE2 PARAMS
+    int score2_use_score_comp_models;
     double score2_xyz_weight;
     double score2_normal_weight;
     double score2_vis_weight;
@@ -231,6 +251,7 @@ extern "C" {
     double score2_segment_affinity_weight;
 
     // SCORE3 PARAMS
+    int score3_use_score_comp_models;
     double score3_xyz_weight;
     double score3_normal_weight;
     double score3_vis_weight;
@@ -283,6 +304,7 @@ extern "C" {
     pcd_t *shot_model;
     pcd_t *sift_model;
     symmetries_t *model_symmetries;
+    score_comp_models_t *score_comp_models;
     olf_t *pcd_model_olfs;
     olf_t *fpfh_model_olfs;
     olf_t *shot_model_olfs;
