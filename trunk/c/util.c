@@ -2101,7 +2101,7 @@ void eigen_symm(double z[], double **V, double **X, int n)
   for (i = 0; i < n; i++)
     z[i] = A[i][i];
   sort_indices(z, idx, n);
-  if (z[idx[0]] < 0) {  // negative eigenvalues --> sort in reverse order
+  if (z[idx[0]] < -tolerance) {  // negative eigenvalues --> sort in reverse order
     reversei(idx, idx, n);
     //for (i = 0; i < n/2; i++) {
     //  int tmp = idx[i];

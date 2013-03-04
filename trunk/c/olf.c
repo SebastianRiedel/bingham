@@ -724,6 +724,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->round1_range_thresh);
       else if (!wordcmp(name, "round1_score_thresh", " \t\n"))
 	sscanf(value, "%lf", &params->round1_score_thresh);
+      else if (!wordcmp(name, "round4_score_thresh", " \t\n"))
+	sscanf(value, "%lf", &params->round4_score_thresh);
       else if (!wordcmp(name, "xyz_score_window", " \t\n"))
 	sscanf(value, "%d", &params->xyz_score_window);
       else if (!wordcmp(name, "xyz_score_use_plane", " \t\n"))
@@ -1879,6 +1881,49 @@ void free_symmetries(symmetries_t *S)
 }
 
 
+int is_model_rot_symm(symmetries_t *symmetries)
+{
+  double rot_symm_thresh = .001;
+
+  int i;
+  for (i = 0; i < symmetries->n; i++)
+    if (symmetries->types[i] == LINE_SYMMETRY && symmetries->err[i] < rot_symm_thresh)
+      return 1;
+
+  return 0;
+}
+
+
+/*
+ * return the axis (v,p) of rotational symmetry
+ */
+double *get_symmetry_axis(symmetries_t *symmetries)
+{
+  int i;
+  for (i = 0; i < symmetries->n; i++)
+    if (symmetries->types[i] == LINE_SYMMETRY)
+      return symmetries->params[i];
+
+  return NULL;
+}
+
+
+/*
+ * return the point (p) of spherical symmetry
+ */
+double *get_symmetry_point(symmetries_t *symmetries)
+{
+  int i;
+  for (i = 0; i < symmetries->n; i++)
+    if (symmetries->types[i] == POINT_SYMMETRY)
+      return symmetries->params[i];
+
+  return NULL;
+}
+
+
+
+
 score_comp_models_t *load_score_comp_models(char *fname)
 {
   int n,m;
@@ -2865,23 +2910,31 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	double nn_d2;
 	//flann_find_nearest_neighbors_index_double(model_data->model_xyzn_index, xyzn_query, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyzn_params);
 
-	int search_radius = 1;
-	int nn_idx = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
+	//int search_radius = 1;
+	//int nn_idx = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
+	int nn_idx = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
 
-	if (nn_idx < 0 || nn_d2 > 4.0) //params->xyz_sigma * params->xyz_sigma)
+	//if (nn_idx < 0 || nn_d2 > 4.0) //params->xyz_sigma * params->xyz_sigma)
+	if (nn_idx < 0 || nn_d2 > params->xyz_sigma * params->xyz_sigma)
 	  P[j] = 0.0;
 	else {
+	  double d_xyz = sqrt(nn_d2);
+	  double d_normal = acos(fabs(dot(obs_normal, pcd_model->normals[nn_idx], 3)));
+
 	  matrix_vec_mult(p, R, pcd_model->points[nn_idx], 3, 3);
 	  add(p, p, sample->x, 3);
 	  double model_range = norm(p, 3);
 	  get_point(obs_xyz, pcd_obs, segment->surface_points[j]);
 	  double obs_range = norm(obs_xyz, 3);
 	  double dR = model_range - obs_range;
-	  P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
+	  //P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
+
+	  P[j] = normpdf(d_xyz/params->xyz_sigma, 0, 1) / .3989;  //TODO: use noise models
+	  P[j] *= normpdf(.2*d_normal/params->normal_sigma, 0, 1) / .3989;  //TODO: use noise models
 
 	  // multiply by color likelihood (TODO: use labdist)
-	  double d_lab = .3 * dist(segment->avg_lab_color, pcd_model->lab[nn_idx], 3) / params->lab_sigma;  //dbug
-	  P[j] *= normpdf(d_lab, 0, 1) / .3989;
+	  //double d_lab = .3 * dist(segment->avg_lab_color, pcd_model->lab[nn_idx], 3) / params->lab_sigma;  //dbug
+	  //P[j] *= normpdf(d_lab, 0, 1) / .3989;
 	}
       }
       segment_probs[i] = sum(P, segment->num_surface_points) / (double)segment->num_surface_points;
@@ -3395,6 +3448,7 @@ void scope_sample_copy(scope_sample_t *s2, scope_sample_t *s1)
   memcpy(s2->x, s1->x, 3 * sizeof(double));
   memcpy(s2->q, s1->q, 4 * sizeof(double));
   bingham_copy(&s2->B, &s1->B);
+  memcpy(s2->x0, s1->x0, 3 * sizeof(double));
 
   //int i;
   if (s1->nc > s2->nc) {
@@ -3551,22 +3605,6 @@ void cluster_pose_samples(scope_samples_t *S, scope_params_t *params)
 }
 
 
-/*
- * return the axis (v,p) of rotationally symmetric models
- */
-double *get_symmetry_axis(symmetries_t *symmetries)
-{
-  double rot_symm_thresh = .001;
-
-  int i;
-  for (i = 0; i < symmetries->n; i++)
-    if (symmetries->types[i] == LINE_SYMMETRY && symmetries->err[i] < rot_symm_thresh)
-      return symmetries->params[i];
-
-  return NULL;
-}
-
-
 double compute_q_err(double *q, double *q2, double *symm_axis)
 {
   if (symm_axis) {
@@ -3587,7 +3625,9 @@ double compute_q_err(double *q, double *q2, double *symm_axis)
 
 void remove_redundant_pose_samples(scope_samples_t *S, scope_model_data_t *model_data, scope_params_t *params)
 {
-  double *rot_symm_axis = get_symmetry_axis(model_data->model_symmetries);
+  double *rot_symm_axis = NULL;
+  if (is_model_rot_symm(model_data->model_symmetries))
+      rot_symm_axis = get_symmetry_axis(model_data->model_symmetries);
 
   double dx2_thresh = params->x_cluster_thresh * params->x_cluster_thresh;
   double dq_thresh = params->q_cluster_thresh;
@@ -4600,6 +4640,49 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 }
 
 
+// compute the segment score for a scope sample
+double compute_segment_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
+{
+  int *idx = sample->segments_idx;
+
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  pcd_t *pcd_model = model_data->pcd_model;
+
+  double q_inv[4];
+  quaternion_inverse(q_inv, sample->q);
+  double **R_inv = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R_inv, q_inv);
+
+  double score = 0.0;
+  double wtot = 0.0;
+
+  int i,j;
+  for (i = 0; i < sample->num_segments; i++) {
+    superpixel_t *segment = &obs_data->obs_segments[ idx[i] ];
+
+    for (j = 0; j < segment->num_surface_points; j++) {
+
+	double obs_xyz[3];
+	get_point(obs_xyz, pcd_obs, segment->surface_points[j]);
+	sub(obs_xyz, obs_xyz, sample->x, 3);
+	matrix_vec_mult(obs_xyz, R_inv, obs_xyz, 3, 3);
+
+	double d = distance_grid_get_distance(obs_xyz, model_data->model_dist_grid);
+	d = MIN(d, 2*params->xyz_sigma);
+
+	score += log(normpdf(d, 0, .5*params->xyz_sigma));  //TODO: use noise models
+	wtot += 1.0;
+    }
+  }
+  if (wtot > 0.0)
+    score /= wtot;
+  score -= log(normpdf(0, 0, params->xyz_sigma));
+
+  //cleanup
+  free_matrix2(R_inv);
+
+  return score;
+}
 
 // compute the segment affinity score for a scope sample
 double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *obs_data,
@@ -4643,7 +4726,6 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
 
   return weight * score;
 }
-
 
 
 double compute_random_walk_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
@@ -4899,8 +4981,10 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
+  double segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
+
   //double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
-  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score + labdist_score;
+  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score + labdist_score + segment_score;
   
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
@@ -6065,6 +6149,141 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 }
 
 
+void scope_round4(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params,
+		  cu_model_data_t *cu_model, cu_obs_data_t *cu_obs)
+{
+  //TODO: make these params
+  int num_sphere_samples = 20;
+  int num_axis_samples = 10;
+  double q_thresh_sphere = M_PI/8.0;
+  double theta_thresh_axis = M_PI/4.0;
+  
+  int max_q_samples = MAX(num_sphere_samples, num_axis_samples);
+
+  // remove low-weight samples
+  printf("round 4: %d -> ", S->num_samples); //dbug
+  double score_thresh = S->W[0] - params->round4_score_thresh;
+  S->num_samples = find_first_lt(S->W, score_thresh, S->num_samples);
+  printf("%d num samples ", S->num_samples); //dbug
+
+  // get approximate model symmetry params
+  int is_rot_symm = is_model_rot_symm(model_data->model_symmetries);
+  double *s_axis = (is_rot_symm ? NULL : get_symmetry_axis(model_data->model_symmetries));
+  double *s_point = get_symmetry_point(model_data->model_symmetries);
+
+  if (s_axis == NULL && s_point == NULL)
+    return;
+
+  double **R = new_matrix2(3,3);
+  double **Q = new_matrix2(max_q_samples, 4);
+  double **X = new_matrix2(max_q_samples, 3);
+  double **C = new_matrix2(4,4);
+
+  // use approximate model symmetries to perturb samples and fit distributions
+  int i,j;
+  for (i = 0; i < S->num_samples; i++) {
+    
+    printf("."); fflush(0); //dbug
+
+    double x_orig[3];  memcpy(x_orig, S->samples[i].x, 3*sizeof(double));
+    double q_orig[4];  memcpy(q_orig, S->samples[i].q, 4*sizeof(double));
+
+    // get Q samples and point of rotation
+    int n;
+    double *x0;
+    if (s_point) {
+      //printf("p"); fflush(0); //dbug
+
+      for (j = 0; j < num_sphere_samples; j++) {
+	while (1) {
+	  bingham_sample_uniform(&Q[j], 4, 1);
+	  if (compute_q_err(Q[j], q_orig, NULL) < q_thresh_sphere)
+	    break;
+	}
+      }
+      n = num_sphere_samples;
+      x0 = s_point;
+    }
+    else { // s_axis
+      //printf("a"); fflush(0); //dbug
+
+      double theta_step = 2*theta_thresh_axis / (double) num_axis_samples;
+      double theta = -theta_thresh_axis + theta_step/2.0;
+      for (j = 0; j < num_axis_samples; j++, theta += theta_step) {
+	double c = cos(theta/2.0);
+	double s = sin(theta/2.0);
+	double q[4] = {c, s*s_axis[0], s*s_axis[1], s*s_axis[2]};
+	quaternion_mult(Q[j], q_orig, q);
+      }
+      n = num_axis_samples;
+      x0 = &s_axis[3];
+    }
+    //printf("1"); fflush(0); //dbug
+    
+    // normalize the Q's
+    for (j = 0; j < n; j++)
+      normalize(Q[j], Q[j], 4);
+
+    // compute all the X's for each Q (x + x0 - R*x0)
+    for (j = 0; j < n; j++) {
+      quaternion_to_rotation_matrix(R, Q[j]);
+      matrix_vec_mult(X[j], R, x0, 3, 3);
+      sub(X[j], x0, X[j], 3);
+      add(X[j], X[j], x_orig, 3);
+    }
+    //printf("2"); fflush(0); //dbug
+ 
+    // compute the scores of all the (X,Q) samples (TODO: cuda version)
+    double scores[n];
+    for (j = 0; j < n; j++) {
+      memcpy(S->samples[i].x, X[j], 3*sizeof(double));
+      memcpy(S->samples[i].q, Q[j], 4*sizeof(double));
+      scores[j] = exp(2*model_placement_score(&S->samples[i], model_data, obs_data, params, 3));
+
+      printf("scores[%d] = %f\n", j, scores[j]); //dbug
+
+      //printf("-"); fflush(0); //dbug
+    }
+    normalize_pmf(scores, scores, n);
+
+    //printf("3"); fflush(0); //dbug
+
+    // fit a Bingham distribution to the weighted Q samples, and record rotation point x0
+    wcov(C, Q, scores, NULL, n, 4);
+    bingham_fit_scatter(&S->samples[i].B, C, 4);
+    memcpy(S->samples[i].x0, x0, 3*sizeof(double));
+
+    //printf("Q = [");
+    //for (j = 0; j < n; j++)
+    //  printf("%f,%f,%f,%f; ", Q[j][0], Q[j][1], Q[j][2], Q[j][3]);
+    //printf("]\n");
+
+    //printf("Z = [%f,%f,%f]\n", S->samples[i].B.Z[0], S->samples[i].B.Z[1], S->samples[i].B.Z[2]); //dbug
+
+    //dbug
+    printf("segments = [");
+    for (j = 0; j < S->samples[i].num_segments; j++)
+      printf("%d, ", S->samples[i].segments_idx[j]);
+    printf("]\n");
+
+    // reset sample pose to original
+    memcpy(S->samples[i].x, x_orig, 3*sizeof(double));
+    memcpy(S->samples[i].q, q_orig, 4*sizeof(double));
+  }
+
+  printf("\n"); //dbug
+
+
+
+
+  //cleanup
+  free_matrix2(R);
+  free_matrix2(Q);
+  free_matrix2(X);
+  free_matrix2(C);
+}
+
+
 /*
  * Single Cluttered Object Pose Estimation (SCOPE)
  */
@@ -6108,10 +6327,12 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //for (i = 0; i < 4; i++)
     //  S->samples[0].q[i] = normrand(0,1);
     //normalize(S->samples[0].q, S->samples[0].q, 4);
+    S->num_samples = 1;
   }
-  //S->num_samples = 1;
 
   scope_round3(S, model_data, obs_data, params, cu_model, cu_obs);
+
+  scope_round4(S, model_data, obs_data, params, cu_model, cu_obs);
 
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
