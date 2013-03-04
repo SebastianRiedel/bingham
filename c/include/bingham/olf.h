@@ -222,6 +222,7 @@ extern "C" {
     double vis_thresh;
     double round1_range_thresh;
     double round1_score_thresh;
+    double round4_score_thresh;
     int xyz_score_window;
     int xyz_score_use_plane;
 
@@ -369,6 +370,7 @@ extern "C" {
     double x[3];
     double q[4];
     bingham_t B;
+    double x0[3];  // rotate by B about x0, then shift by x (only valid after round 4)
     int *c_obs;
     int *c_model;
     int *c_type;

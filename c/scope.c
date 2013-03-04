@@ -108,6 +108,8 @@ int main(int argc, char *argv[])
   free_scope_model_data(&model_data);
 
 
+  //**************************************************
+
   int n = S->num_samples;
 
   fprintf(f, "X = [");
@@ -126,6 +128,20 @@ int main(int argc, char *argv[])
     fprintf(f, "%f ", S->W[i]);
   fprintf(f, "];\n");
 
+  fprintf(f, "B = {");
+  for (i = 0; i < n; i++) {
+    fprintf(f, "struct('d',4, 'F',%f, 'Z',[%f,%f,%f], 'V',[%f,%f,%f,%f; %f,%f,%f,%f; %f,%f,%f,%f]'), ",
+	    S->samples[i].B.F, S->samples[i].B.Z[0], S->samples[i].B.Z[1], S->samples[i].B.Z[2],
+	    S->samples[i].B.V[0][0], S->samples[i].B.V[0][1], S->samples[i].B.V[0][2], S->samples[i].B.V[0][3],
+	    S->samples[i].B.V[1][0], S->samples[i].B.V[1][1], S->samples[i].B.V[1][2], S->samples[i].B.V[1][3],
+	    S->samples[i].B.V[2][0], S->samples[i].B.V[2][1], S->samples[i].B.V[2][2], S->samples[i].B.V[2][3]);
+  }
+  fprintf(f, "};\n");
+
+  fprintf(f, "X0 = [");
+  for (i = 0; i < n; i++)
+    fprintf(f, "%f, %f, %f;  ", S->samples[i].x0[0], S->samples[i].x0[1], S->samples[i].x0[2]);
+  fprintf(f, "];\n");
 
   //**************************************************
 
@@ -139,6 +155,15 @@ int main(int argc, char *argv[])
     }
     fprintf(f, "];\n");
   }
+
+  fprintf(f, "segments = {");
+  for (i = 0; i < n; i++) {
+    fprintf(f, "[");
+    for (j = 0; j < S->samples[i].num_segments; j++)
+      fprintf(f, "%d ", S->samples[i].segments_idx[j]);
+    fprintf(f, "], ");
+  }
+  fprintf(f, "};\n");
 
   fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
