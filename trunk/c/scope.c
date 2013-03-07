@@ -46,17 +46,17 @@ int main(int argc, char *argv[])
 {
   short have_true_pose = 0;
   simple_pose_t true_pose;
-  if (argc < 8 || argc > 9) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output>\n", argv[0]);
+  if (argc < 9 || argc > 10) {
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <obs_table> <model> <param_file> <samples_output>\n", argv[0]);
     printf("or\n");
-    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_shot> <pcd_obs_sift> <obs_table> <model> <param_file> <samples_output> <ground_truth_file>\n", argv[0]);
     return 1;
   }
 
   // load params
   scope_params_t params;
   memset(&params, 0, sizeof(scope_params_t));
-  load_scope_params(&params, argv[6]);
+  load_scope_params(&params, argv[7]);
 
   // load obs data
   olf_obs_t obs;
@@ -67,23 +67,38 @@ int main(int argc, char *argv[])
     obs.shot_pcd = load_pcd(argv[3]);
   if (params.use_sift)
     obs.sift_pcd = load_pcd(argv[4]);
+  int xxx,yyy;
+  double **table_plane = load_matrix(argv[5], &xxx, &yyy);
+  obs.table_plane = table_plane[0];
   scope_obs_data_t obs_data;
   get_scope_obs_data(&obs_data, &obs, &params);
 
   // load model data
   olf_model_t model;
-  load_olf_model(&model, argv[5], &params);
+  load_olf_model(&model, argv[6], &params);
   scope_model_data_t model_data;
   get_scope_model_data(&model_data, &model, &params);
 
-  FILE *f = fopen(argv[7], "w");
+  FILE *f = fopen(argv[8], "w");
   if (f == NULL) {
-    printf("Can't open %s for writing\n", argv[7]);
+    printf("Can't open %s for writing\n", argv[8]);
     return 1;
   }
 
-  if (argc > 8)
-    have_true_pose = load_true_pose(argv[8], &true_pose);
+  if (argc > 9)
+    have_true_pose = load_true_pose(argv[9], &true_pose);
+
+
+  //dbug
+  if (params.test_bpa) {
+    if (!have_true_pose) {
+      printf("Error: must have true pose to test BPA!\n");
+      return -1;
+    }
+    test_bpa(&model_data, &obs_data, &params, &true_pose);
+    return 0;
+  }
+
 
   scope_samples_t *S;
 

@@ -16,6 +16,9 @@ typedef unsigned char uchar;
 
 //--------------------------- dbug global data ---------------------------//
 
+double **X_align_history_ = NULL;
+double **Q_align_history_ = NULL;
+int align_history_length_ = 0;
 double **obs_edge_image_;
 int obs_edge_image_width_;
 int obs_edge_image_height_;
@@ -39,6 +42,8 @@ int num_range_edge_points_;
 double edge_score_, edge_vis_score_, edge_occ_score_;
 double random_walk_score_;
 double segment_affinity_score_;
+double segment_score_;
+double table_score_;
 int mps_idx_[100000];
 double mps_vis_prob_[100000];
 double *x_true_, *q_true_;
@@ -713,6 +718,14 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->use_shot);
       else if (!wordcmp(name, "use_sift", " \t\n"))
 	sscanf(value, "%d", &params->use_sift);
+      else if (!wordcmp(name, "use_table", " \t\n"))
+	sscanf(value, "%d", &params->use_table);
+      else if (!wordcmp(name, "align_model_to_segments_iter", " \t\n"))
+	sscanf(value, "%d", &params->align_model_to_segments_iter);
+      else if (!wordcmp(name, "use_bpa", " \t\n"))
+	sscanf(value, "%d", &params->use_bpa);
+      else if (!wordcmp(name, "test_bpa", " \t\n"))
+	sscanf(value, "%d", &params->test_bpa);
 
       else if (!wordcmp(name, "dispersion_weight", " \t\n"))
 	sscanf(value, "%d", &params->dispersion_weight);
@@ -774,6 +787,10 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score2_labdist_weight);
       else if (!wordcmp(name, "score2_segment_affinity_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score2_segment_affinity_weight);
+      else if (!wordcmp(name, "score2_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_segment_weight);
+      else if (!wordcmp(name, "score2_table_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score2_table_weight);
 
       else if (!wordcmp(name, "score3_use_score_comp_models", " \t\n"))
 	sscanf(value, "%d", &params->score3_use_score_comp_models);
@@ -803,6 +820,10 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->score3_labdist_weight);
       else if (!wordcmp(name, "score3_segment_affinity_weight", " \t\n"))
 	sscanf(value, "%lf", &params->score3_segment_affinity_weight);
+      else if (!wordcmp(name, "score3_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_segment_weight);
+      else if (!wordcmp(name, "score3_table_weight", " \t\n"))
+	sscanf(value, "%lf", &params->score3_table_weight);
 
       else if (!wordcmp(name, "pose_clustering", " \t\n"))
 	sscanf(value, "%d", &params->pose_clustering);
@@ -2972,9 +2993,48 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
   //printf("sample_segments_given_model_pose():  %f ms\n", get_time_ms() - t0); //dbug
 }
 
+void get_sample_olfs(olf_t *model_olfs[], olf_t *obs_olfs[], scope_sample_t *sample,
+		     scope_model_data_t *model_data, scope_obs_data_t *obs_data);
+
+double compute_sample_correspondences_error(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data)
+{
+  olf_t *model_olfs[sample->nc];
+  olf_t *obs_olfs[sample->nc];
+  get_sample_olfs(model_olfs, obs_olfs, sample, model_data, obs_data);
+
+  double **R = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R, sample->q);
+
+  double d = 0.0;
+
+  int i;
+  for (i = 0; i < sample->nc; i++) {
+    double model_xyz[3];
+    matrix_vec_mult(model_xyz, R, model_olfs[i]->x, 3, 3);
+    add(model_xyz, model_xyz, sample->x, 3);    
+    d += dist2(model_xyz, obs_olfs[i]->x, 3);
+  }
+
+  //cleanup
+  free_matrix2(R);
+
+  return d;
+}
+
 
 void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
 {
+  int max_iter = params->align_model_to_segments_iter;
+
+  //dbug
+  if (X_align_history_ == NULL) {
+    X_align_history_ = new_matrix2(max_iter+1, 3);
+    Q_align_history_ = new_matrix2(max_iter+1, 4);
+    align_history_length_ = max_iter + 1;
+  }
+  memcpy(X_align_history_[0], sample->x, 3*sizeof(double));
+  memcpy(Q_align_history_[0], sample->q, 4*sizeof(double));
+
   //double t0 = get_time_ms();  //dbug
 
   //pcd_t *pcd_model = model_data->pcd_model;
@@ -2984,19 +3044,21 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
   double normal_weight = 1.0 / params->normal_sigma;
 
   double q_inv[4];
-  quaternion_inverse(q_inv, sample->q);
   double **R_inv = new_matrix2(3, 3);
-  quaternion_to_rotation_matrix(R_inv, q_inv);
 
   // realloc sample fields
   safe_realloc(sample->c_obs, 2*sample->num_segments, int);
   safe_realloc(sample->c_model, 2*sample->num_segments, int);
   safe_realloc(sample->c_type, 2*sample->num_segments, int);
   safe_realloc(sample->c_score, 2*sample->num_segments, double);
-  sample->nc = 0;
 
-  int iter, max_iter = 1;
+  int iter;
   for (iter = 0; iter < max_iter; iter++) {
+
+    sample->nc = 0;
+
+    quaternion_inverse(q_inv, sample->q);
+    quaternion_to_rotation_matrix(R_inv, q_inv);
 
     //double t1 = get_time_ms(); //dbug
 
@@ -3016,8 +3078,9 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
 
       double nn_d2;
       int search_radius = 2;
-      int c_model = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
-      //int nn_idx = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
+      int c_model = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight,
+					       model_data->model_dist_grid, search_radius);
+      //int c_model = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
 
       if (c_model >= 0) {
 	int nc = sample->nc;
@@ -3033,7 +3096,6 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
     int model_edge_idx[model_data->pcd_model->num_points];
     int num_model_edges = 0;
     double **model_edge_points = get_range_edge_points(&num_model_edges, sample->x, sample->q, model_data->range_edges_model, model_edge_idx);
-
     // get correspondences from obs segment edges to model
     for (i = 0; i < sample->num_segments; i++) {
       superpixel_t *segment = &obs_data->obs_segments[ sample->segments_idx[i] ];
@@ -3089,9 +3151,29 @@ void align_model_to_segments(scope_sample_t *sample, scope_model_data_t *model_d
     }
 
     // sample model pose given olf correspondences
-    sample_model_pose_given_correspondences(sample, model_data, obs_data, params);
+    if (sample->nc > 0) {
+      
+      //double x0[3];
+      //double q0[4];
+      //memcpy(x0, sample->x, 3*sizeof(double));
+      //memcpy(q0, sample->q, 4*sizeof(double));
+
+      //double d0 = compute_sample_correspondences_error(sample, model_data, obs_data);
+
+      sample_model_pose_given_correspondences(sample, model_data, obs_data, params);
+
+      //double d = compute_sample_correspondences_error(sample, model_data, obs_data);
+      //if (d > d0) {  // don't accept new pose if it increases alignment error
+      //	memcpy(sample->x, x0, 3*sizeof(double));
+      //	memcpy(sample->q, q0, 4*sizeof(double));
+      //}
+    }
 
     //printf(" - got model pose in %f ms\n", get_time_ms() - t1); //dbug
+
+    //dbug
+    memcpy(X_align_history_[iter+1], sample->x, 3*sizeof(double));
+    memcpy(Q_align_history_[iter+1], sample->q, 4*sizeof(double));
   }
 
   //cleanup
@@ -3213,6 +3295,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   // unpack obs arguments
   data->pcd_obs = obs->bg_pcd;
   data->fpfh_obs = obs->fpfh_pcd;  // need this for obs_fg_range_image
+  data->table_plane = obs->table_plane;
 
   // compute obs olfs
   int i;
@@ -4640,50 +4723,6 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
 }
 
 
-// compute the segment score for a scope sample
-double compute_segment_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
-{
-  int *idx = sample->segments_idx;
-
-  pcd_t *pcd_obs = obs_data->pcd_obs;
-  pcd_t *pcd_model = model_data->pcd_model;
-
-  double q_inv[4];
-  quaternion_inverse(q_inv, sample->q);
-  double **R_inv = new_matrix2(3,3);
-  quaternion_to_rotation_matrix(R_inv, q_inv);
-
-  double score = 0.0;
-  double wtot = 0.0;
-
-  int i,j;
-  for (i = 0; i < sample->num_segments; i++) {
-    superpixel_t *segment = &obs_data->obs_segments[ idx[i] ];
-
-    for (j = 0; j < segment->num_surface_points; j++) {
-
-	double obs_xyz[3];
-	get_point(obs_xyz, pcd_obs, segment->surface_points[j]);
-	sub(obs_xyz, obs_xyz, sample->x, 3);
-	matrix_vec_mult(obs_xyz, R_inv, obs_xyz, 3, 3);
-
-	double d = distance_grid_get_distance(obs_xyz, model_data->model_dist_grid);
-	d = MIN(d, 2*params->xyz_sigma);
-
-	score += log(normpdf(d, 0, .5*params->xyz_sigma));  //TODO: use noise models
-	wtot += 1.0;
-    }
-  }
-  if (wtot > 0.0)
-    score /= wtot;
-  score -= log(normpdf(0, 0, params->xyz_sigma));
-
-  //cleanup
-  free_matrix2(R_inv);
-
-  return score;
-}
-
 // compute the segment affinity score for a scope sample
 double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *obs_data,
 				      scope_params_t *params, int score_round)
@@ -4791,6 +4830,86 @@ double compute_random_walk_score(double *x, double *q, double **cloud, flann_ind
 }
 
 
+// compute the segment score for a scope sample
+double compute_segment_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
+{
+  int *idx = sample->segments_idx;
+
+  pcd_t *pcd_obs = obs_data->pcd_obs;
+  pcd_t *pcd_model = model_data->pcd_model;
+
+  double q_inv[4];
+  quaternion_inverse(q_inv, sample->q);
+  double **R_inv = new_matrix2(3,3);
+  quaternion_to_rotation_matrix(R_inv, q_inv);
+
+  double score = 0.0;
+  double wtot = 0.0;
+
+  int i,j;
+  for (i = 0; i < sample->num_segments; i++) {
+    superpixel_t *segment = &obs_data->obs_segments[ idx[i] ];
+
+    for (j = 0; j < segment->num_surface_points; j++) {
+
+	double obs_xyz[3];
+	get_point(obs_xyz, pcd_obs, segment->surface_points[j]);
+	sub(obs_xyz, obs_xyz, sample->x, 3);
+	matrix_vec_mult(obs_xyz, R_inv, obs_xyz, 3, 3);
+
+	double d = distance_grid_get_distance(obs_xyz, model_data->model_dist_grid);
+	d = MIN(d, 2*params->xyz_sigma);
+
+	score += log(normpdf(d, 0, .5*params->xyz_sigma));  //TODO: use noise models
+	wtot += 1.0;
+    }
+  }
+  if (wtot > 0.0)
+    score /= wtot;
+  score -= log(normpdf(0, 0, params->xyz_sigma));
+
+  if (params->verbose)
+    segment_score_ = score;
+
+  double weight = 0;
+  if (score_round == 2)
+    weight = params->score2_segment_weight;
+  else
+    weight = params->score3_segment_weight;
+
+  //cleanup
+  free_matrix2(R_inv);
+
+  return score;
+}
+
+
+double compute_table_score(double **cloud, int n, double *table_plane, scope_params_t *params, int score_round)
+{
+  double vis_thresh = params->vis_thresh;
+
+  double score = 0;
+
+  int i;
+  for (i = 0; i < n; i++) {
+    double d = dot(cloud[i], table_plane, 3) + table_plane[3];  // signed distance to table plane
+    if (d < 0)
+      score += log(normpdf(d/vis_thresh, 0, 1) / .3989);
+  }
+  score /= (double)n;
+
+  if (params->verbose)
+    table_score_ = score;
+
+  double weight = 1.0;
+  if (score_round == 2)
+    weight = params->score2_table_weight;
+  else
+    weight = params->score3_table_weight;
+
+  return weight * score;
+}
+
 
 double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, int score_round)
 {
@@ -4821,14 +4940,19 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   // extract transformed model validation features
   double **cloud = get_sub_cloud_at_pose(model_data->pcd_model, idx, num_validation_points, x, q);
 
-  if (score_round == 1) {  // after c=1, just use free space to score
+  if (score_round == 1) {  // after c=1, just use free space (and table) to score
     double dthresh = params->round1_range_thresh;  //.05;  //TODO: make this a param
     double score = 0;
     int xi, yi;
     for (i = 0; i < num_validation_points; i++)
-      if (range_image_xyz2sub(&xi, &yi, obs_data->obs_range_image, cloud[i]) && obs_data->obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
+      if (range_image_xyz2sub(&xi, &yi, obs_data->obs_range_image, cloud[i]) &&
+	  obs_data->obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
 	score -= 1.0;
     score /= (double)num_validation_points;
+
+    if (params->use_table)
+      score += compute_table_score(cloud, num_validation_points, obs_data->table_plane, params, score_round);
+
     free_matrix2(cloud);
     return score;
   }
@@ -4983,8 +5107,13 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   double segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
 
-  //double score = xyz_score + normal_score + edge_score + lab_score + vis_score + random_walk_score + fpfh_score + labdist_score + segment_affinity_score;
-  double score = xyz_score + normal_score + lab_score + vis_score + edge_score + segment_affinity_score + labdist_score + segment_score;
+  double table_score = 0;
+  if (params->use_table)
+    table_score = compute_table_score(cloud, num_validation_points, obs_data->table_plane, params, score_round);
+
+
+  double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
+    fpfh_score + labdist_score + segment_affinity_score + segment_score + table_score;
   
   //dbug
   //if (sample->c_type[0] == C_TYPE_SIFT)
@@ -4999,10 +5128,11 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   
   if (params->verbose) {
-    double scores[13] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
-			 lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, labdist_score_, segment_affinity_score_};
+    double scores[15] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
+			 lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, labdist_score_, segment_affinity_score_,
+			 segment_score_, table_score_};
     if (sample->scores == NULL) {
-      sample->num_scores = 13;
+      sample->num_scores = 15;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));
@@ -5348,7 +5478,10 @@ void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model
   olf_t *obs_olfs[sample->nc];
   get_sample_olfs(model_olfs, obs_olfs, sample, model_data, obs_data);
 
-  get_model_pose_distribution_from_olf_correspondences(x0, B, model_olfs, obs_olfs, sample->nc, params->xyz_sigma);
+  if (params->use_bpa || sample->nc == 1)
+    get_model_pose_distribution_from_olf_correspondences(x0, B, model_olfs, obs_olfs, sample->nc, params->xyz_sigma);
+  else
+    get_model_pose_distribution_from_olf_correspondences_LS(x0, B, model_olfs, obs_olfs, sample->nc, params->xyz_sigma);
 
   // sample a model orientation
   double *q = sample->q;
@@ -6327,12 +6460,12 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //for (i = 0; i < 4; i++)
     //  S->samples[0].q[i] = normrand(0,1);
     //normalize(S->samples[0].q, S->samples[0].q, 4);
-    S->num_samples = 1;
+    //S->num_samples = 1;
   }
 
   scope_round3(S, model_data, obs_data, params, cu_model, cu_obs);
 
-  scope_round4(S, model_data, obs_data, params, cu_model, cu_obs);
+  //scope_round4(S, model_data, obs_data, params, cu_model, cu_obs);
 
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
@@ -6595,6 +6728,112 @@ mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_
 
   return M;
 }
+
+
+
+
+//==============================================================================================//
+
+//--------------------------------------  BPA Testing  -----------------------------------------//
+
+//==============================================================================================//
+
+void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
+	      scope_params_t *params, simple_pose_t *true_pose)
+{
+  int num_samples = params->num_samples_round3;
+
+  // get the true pose sample segments
+  scope_sample_t true_sample;
+  scope_sample_alloc(&true_sample, params->num_correspondences);
+  memcpy(true_sample.x, true_pose->X, 3*sizeof(double));
+  memcpy(true_sample.q, true_pose->Q, 4*sizeof(double));
+  sample_segments_given_model_pose(&true_sample, model_data, obs_data, params, 1);
+
+  // initialize samples at true_pose + noise
+  scope_samples_t *S = create_scope_samples(num_samples, params->num_correspondences);
+  S->num_samples = num_samples;
+  int i,j;
+  for (i = 0; i < num_samples; i++) {
+
+    while (1) {
+      scope_sample_copy(&S->samples[i], &true_sample);
+
+      for (j = 0; j < 3; j++)
+	S->samples[i].x[j] += normrand(0, .02);
+      for (j = 0; j < 4; j++)
+	S->samples[i].q[j] += normrand(0, .2);
+      normalize(S->samples[i].q, S->samples[i].q, 4);
+
+      sample_segments_given_model_pose(&S->samples[i], model_data, obs_data, params, 1);
+
+      if (S->samples[i].num_segments > 0)
+	break;
+    }
+  }
+
+  int hlen = 1 + params->align_model_to_segments_iter;
+  double ***X = new_matrix3(num_samples, hlen, 3);
+  double ***Q = new_matrix3(num_samples, hlen, 4);
+  for (i = 0; i < num_samples; i++) {
+    align_model_to_segments(&S->samples[i], model_data, obs_data, params);
+    memcpy(X[i][0], X_align_history_[0], hlen*3*sizeof(double));
+    memcpy(Q[i][0], Q_align_history_[0], hlen*4*sizeof(double));
+  }
+  save_matrix("X_align_history.txt", X[0], num_samples*hlen, 3);
+  save_matrix("Q_align_history.txt", Q[0], num_samples*hlen, 4);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
