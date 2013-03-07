@@ -187,6 +187,7 @@ extern "C" {
     pcd_t *fpfh_pcd;
     pcd_t *shot_pcd;
     pcd_t *sift_pcd;
+    double *table_plane;
   } olf_obs_t;
 
 
@@ -205,6 +206,7 @@ extern "C" {
     int use_fpfh;
     int use_shot;
     int use_sift;
+    int use_table;
     int num_samples_round1;
     int num_samples_round2;
     int num_samples_round3;
@@ -215,6 +217,9 @@ extern "C" {
     int round2_alignment_iter;
     int final_alignment_iter;
     int use_cuda;
+    int align_model_to_segments_iter;
+    int use_bpa;
+    int test_bpa;
 
     // WEIGHT / DISTANCE PARAMS
     int dispersion_weight;
@@ -250,6 +255,8 @@ extern "C" {
     double score2_fpfh_weight;
     double score2_labdist_weight;
     double score2_segment_affinity_weight;
+    double score2_segment_weight;
+    double score2_table_weight;
 
     // SCORE3 PARAMS
     int score3_use_score_comp_models;
@@ -266,6 +273,8 @@ extern "C" {
     double score3_fpfh_weight;
     double score3_labdist_weight;
     double score3_segment_affinity_weight;
+    double score3_segment_weight;
+    double score3_table_weight;
 
     // POSE CLUSTERING PARAMS
     int pose_clustering;
@@ -338,6 +347,7 @@ extern "C" {
     pcd_t *fpfh_obs;
     pcd_t *shot_obs;
     pcd_t *sift_obs;
+    double *table_plane;
     olf_t *pcd_obs_olfs;
     olf_t *fpfh_obs_olfs;
     olf_t *shot_obs_olfs;
@@ -500,6 +510,8 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
 
 struct cu_model_data_struct;
 struct cu_obs_data_struct;
+
+void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose);
 
 scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 
