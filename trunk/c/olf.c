@@ -29,9 +29,10 @@ double mps_normal_dists_[100000];
 double normal_score_;
 double fpfh_score_;
 double lab_scores_[3];
+double specularity_score_;
 double mps_labdist_p_ratio_;
 double mps_labdist_p_ratios_[100000];
-double labdist_score_;
+//double labdist_score_;
 double vis_score_;
 int **occ_edge_pixels_ = NULL;
 int num_occ_edge_points_;
@@ -2741,6 +2742,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       //	continue;
       //else
 
+      //dbug: save edge image
       S[xi][yi][0] = S[xi][yi][1] = S[xi][yi][2] = (uchar)255*exp(obs_edge_image[xi][yi]);
 
       /*
@@ -4151,7 +4153,10 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
 */
 
 
-double compute_simple_labdist_score(double **cloud, int *idx, int n, pcd_color_model_t *color_model, scope_params_t *params)
+
+double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *noise_models, int *model_idx,
+			 pcd_color_model_t *color_model, int n, range_image_t *obs_range_image, double ***obs_lab_image,
+			 double *b_L, double *b_A, double *b_B, scope_params_t *params, int score_round)
 {
   // get obs colors
   double **obs_lab = new_matrix2(n,3);
@@ -4165,352 +4170,38 @@ double compute_simple_labdist_score(double **cloud, int *idx, int n, pcd_color_m
     }
   }
 
-  // get model colors (with specularities removed)
+  // get model colors
   double **model_lab = new_matrix2(n,3);
-  reorder_rows(model_lab, color_model->lab, idx, n, 3);
+  reorder_rows(model_lab, color_model->lab, model_idx, n, 3);
 
   // classify obs specularities
-  double specularity_mask[n];
-  for (i = 0; i < n; i++)
-    specularity_mask[i] = (obs_lab[i][0] > 90 && obs_lab[i][0] > model_lab[i][0] + 10);
-
-  //double specularity_score = 
-
-  //cleanup
-  free_matrix2(obs_lab);
-  free_matrix2(model_lab);
-}
-
-
-//double labdist_likelihood(double *labdist, double *lab, double pmin)
-double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, double pmin, scope_params_t *params)
-{
-  /*
-  double m1[3] = {labdist[0], labdist[1], labdist[2]};
-  double m2[3] = {labdist[3], labdist[4], labdist[5]};
-  double C1_data[9] = {labdist[6], labdist[7], labdist[8], labdist[7], labdist[9], labdist[10], labdist[8], labdist[10], labdist[11]};
-  double C2_data[9] = {labdist[12], labdist[13], labdist[14], labdist[13], labdist[15], labdist[16], labdist[14], labdist[16], labdist[17]};
-  double **C1 = new_matrix2_data(3, 3, C1_data);
-  double **C2 = new_matrix2_data(3, 3, C2_data);
-  double cnt1 = (labdist[18] < 4 ? 0 : labdist[18]);
-  double cnt2 = (labdist[19] < 4 ? 0 : labdist[19]);
-  */
-  int cnt1 = color_model->cnts[0][idx];
-  int cnt2 = color_model->cnts[1][idx];
-  if (cnt1 < 4)
-    cnt1 = 0;
-  if (cnt2 < 4)
-    cnt2 = 0;
-
-  if (cnt1 == 0 && cnt2 == 0) {
-    double z[3] = {0,0,0};
-    return log(pmin * mvnpdf(z, z, color_model->avg_cov, 3));
-  }
-
-  double w1 = cnt1 / (double)(cnt1+cnt2);
-  double w2 = cnt2 / (double)(cnt1+cnt2);
-
-  double *m1 = color_model->means[0][idx];
-  double *m2 = color_model->means[1][idx];
-  double **C1 = color_model->covs[0][idx];
-  double **C2 = color_model->covs[1][idx];
-
-  double *maxm = (w1 > w2 ? m1 : m2);
-  double maxp = (w1 > 0 ? w1*mvnpdf(maxm, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(maxm, m2, C2, 3) : 0);
-
-  double p = (w1 > 0 ? w1*mvnpdf(lab, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(lab, m2, C2, 3) : 0);
-  p = MAX(p, maxp*pmin);
-
-  //dbug
-  if (params->verbose)
-    mps_labdist_p_ratio_ = p / maxp;
-
-  /*dbug
-  if (params->verbose) {
-    double p1 = (cnt1 > 0 ? mvnpdf(lab, m1, C1, 3) : 0);
-    double p2 = (cnt2 > 0 ? mvnpdf(lab, m2, C2, 3) : 0);
-    double *m = (p1 > p2 ? m1 : m2);
-    printf("%f,%f,%f; ...\n", m[0], m[1], m[2]);
-  }
-  */
-
-  if (!isfinite(p)) {
-    printf("p = %f, cnt1 = %d, cnt2 = %d, idx = %d\n", p, cnt1, cnt2, idx); //dbug
-    printf("det(C1) = %f, det(C2) = %f\n", det(C1,3), det(C2,3));
-
-    printf("C1 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C1[0][0], C1[0][1], C1[0][2], C1[0][3], C1[0][4], C1[0][5], C1[0][6], C1[0][7], C1[0][8]);
-    printf("C2 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C2[0][0], C2[0][1], C2[0][2], C2[0][3], C2[0][4], C2[0][5], C2[0][6], C2[0][7], C2[0][8]);
-  }
-
-  return log(p);
-}
-
-
-void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx, int n, double **obs_lab, double *obs_weights, double pmin, scope_params_t *params)
-{
-  //TODO: make these params
-  double lambda = 1.0;
-  double shift_threshold = 0.1;
-
-  double **C_inv = new_matrix2(3,3);
-  double **B = new_matrix2(3,3);
-  inv(B, color_model->avg_cov, 3);
-  double **A = new_matrix2(3,3);
-  double z[3];  // m-bar
-  double w;
-
-  memset(shift, 0, 3*sizeof(double));
-
-  int i, j, iter, max_iter = 10;
-  
-  for (iter = 0; iter < max_iter; iter++) {
-
-    // reset shift statistics
-    memset(A[0], 0, 9*sizeof(double));
-    memset(z, 0, 3*sizeof(double));
-    w = 0;
-    
-    for (i = 0; i < n; i++) {
-
-      if (obs_weights[i] == 0.0)
-	continue;
-
-      int cnt1 = color_model->cnts[0][idx[i]];
-      int cnt2 = color_model->cnts[1][idx[i]];
-      if (cnt1 < 4)
-	cnt1 = 0;
-      if (cnt2 < 4)
-	cnt2 = 0;
-      if (cnt1 == 0 && cnt2 == 0)
-	continue;
-
-      double *m1 = color_model->means[0][idx[i]];
-      double *m2 = color_model->means[1][idx[i]];
-      double **C1 = color_model->covs[0][idx[i]];
-      double **C2 = color_model->covs[1][idx[i]];
-
-      // assign observed color to a cluster
-      double y[3];  // current obs_lab[i]
-      add(y, obs_lab[i], shift, 3);
-      double p1 = (cnt1 > 0 ? mvnpdf(y, m1, C1, 3) : 0);
-      double p2 = (cnt2 > 0 ? mvnpdf(y, m2, C2, 3) : 0);
-      
-      // check if assigned cluster could be a specularity cluster (i.e., has higher L-value)
-      if ((p1 > p2 && p2 > 0 && m1[0] > m2[0]) || (p2 > p1 && p1 > 0 && m2[0] > m1[0]))
-	continue;
-
-      double *m = (p1 > p2 ? m1 : m2);
-      double **C = (p1 > p2 ? C1 : C2);
-
-      double maxp = mvnpdf(m, m, C, 3);
-      double p = mvnpdf(y, m, C, 3);
-
-      // check if point is an outlier of the cluster
-      if (p < pmin*maxp)
-	continue;
-
-      // add observed color and color model covariance matrix to the shift statistics
-      for (j = 0; j < 3; j++)
-	z[j] = z[j] + obs_weights[i]*(m[j] - obs_lab[i][j]);
-      inv(C_inv, C, 3);
-      for (j = 0; j < 9; j++)
-	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
-      w += obs_weights[i];
+  int specularity_mask[n];
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      specularity_mask[i] = (obs_lab[i][0] > 90 && obs_lab[i][0] > model_lab[i][0] + 10);
+      if (specularity_mask[i] == 0)
+	vis_pmf[i] = 0;
     }
-    if (w == 0.0)
-      break;
-
-    mult(z, z, 1/w, 3);  // avg. z
-    mult(A[0], A[0], lambda/w, 9);  // avg. A and multiply by lambda
-
-    // solve for best shift = inv(lambda*A+B)*lambda*A*z
-    double new_shift[3];
-    matrix_vec_mult(z, A, z, 3, 3);
-    add(A[0], A[0], B[0], 9);
-    inv(C_inv, A, 3);
-    matrix_vec_mult(new_shift, C_inv, z, 3, 3);
-    double d2 = dist2(shift, new_shift, 3);
-    memcpy(shift, new_shift, 3*sizeof(double));
-
-    //printf("shift = [%f, %f, %f]\n", shift[0], shift[1], shift[2]);  //dbug
-
-    if (d2 < shift_threshold*shift_threshold)
-      break;
   }
+  double specularity_score = 1.0 - isum(specularity_mask, n) / (double)n;
 
-  // apply shift to obs_lab
-  for (i = 0; i < n; i++)
-    if (obs_weights[i] > 0.0)
-      add(obs_lab[i], obs_lab[i], shift, 3);
-
-  free_matrix2(A);
-  free_matrix2(B);
-  free_matrix2(C_inv);
-}
-
-
-//double compute_labdist_score(double **cloud, double **labdist, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
-double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
-			     range_image_t *obs_range_image, double ***obs_lab_image, scope_params_t *params, int score_round)
-{
-  double tmp = sum(vis_pmf, n);
-  if (tmp < 0.001)
-    printf("tiny pmf\n");
-  //TODO: make this a param
-  double pmin = .1;
-
-  // get obs colors
-  double **obs_lab = new_matrix2(n,3);
   double obs_weights[n];
-  memset(obs_weights, 0, n*sizeof(double));
-  int i, j;
-  for (i = 0; i < n; i++) {
-    if (vis_pmf[i] > .01/(double)n) {
-      int xi,yi;
-      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
-      for (j = 0; j < 3; j++)
-	obs_lab[i][j] = obs_lab_image[j][xi][yi];
-      obs_weights[i] = vis_pmf[i];
-    }
-  }
+  for (i = 0; i < n; i++)
+    obs_weights[i] = (specularity_mask[i] || vis_pmf[i] < .01/(double)n ? 0.0 : vis_pmf[i]);
+  normalize_pmf(obs_weights, obs_weights, n);
 
-  // get color shift (and apply it to obs_lab)
-  double color_shift[3];
-  labdist_color_shift(color_shift, color_model, idx, n, obs_lab, obs_weights, pmin, params);
-
-  /*dbug
-  if (params->verbose) {
-    printf("color_shift = [%f, %f, %f]\n", color_shift[0], color_shift[1], color_shift[2]);
-    printf("idx = [");
-    for (i = 0; i < n; i++)
-      printf("%d ", idx[i]+1);
-    printf("];\n");
-    printf("obs_weights = [");
-    for (i = 0; i < n; i++)
-      printf("%f ", obs_weights[i]);
-    printf("];\n");
-    printf("obs_lab = [");
-    for (i = 0; i < n; i++)
-      printf("%f,%f,%f; ...\n", obs_lab[i][0], obs_lab[i][1], obs_lab[i][2]);
-    printf("];\n");
-  }
-  */
-  /*  
-  if (params->verbose) {
-    
-    printf("avg_cov = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", color_model->avg_cov[0][0], color_model->avg_cov[0][1], color_model->avg_cov[0][2],
-	   color_model->avg_cov[0][3], color_model->avg_cov[0][4], color_model->avg_cov[0][5], color_model->avg_cov[0][6], color_model->avg_cov[0][7], color_model->avg_cov[0][8]);
-
-    printf("\n obs_weights = [");
-    for (i = 0; i < n; i++)
-      printf("%f ", obs_weights[i]);
-    printf("];\n");
-    printf("\n obs_lab = [");
-    for (i = 0; i < n; i++)
-      printf("%f,%f,%f; ...\n", obs_lab[i][0], obs_lab[i][1], obs_lab[i][2]);
-    printf("];\n");
-    printf("\n model_lab = [");
-  }
-  */
-
-  if (params->verbose) {
-    memset(mps_labdist_p_ratios_, 0, n*sizeof(double));
-  }
-
-
-  double logp_list[n];  memset(logp_list, 0, n*sizeof(double));  //dbug
-  double zero[3] = {0,0,0};
-  double score = 0.0;
-  for (i = 0; i < n; i++) {
-    if (vis_pmf[i] > .01/(double)n) {
-      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin, params);
-      score += vis_pmf[i] * logp;
-      logp_list[i] = logp; //dbug
-
-      if (params->verbose)
-	mps_labdist_p_ratios_[i] = mps_labdist_p_ratio_;
-    }
-    //else  //dbug
-    //  printf("0,0,0; ...\n");
-  }
-
-  /*
-  if (params->verbose) {
-    printf("];\n");
-    printf("\n logp_list = [");
-    for (i = 0; i < n; i++)
-      printf("%f,", logp_list[i]);
-    printf("];\n");
-  }
-  */
-
-  //dbug
-  if (params->verbose)
-    labdist_score_ = score;
-
-  double w = 0;
-  if (score_round == 2)
-    w = params->score2_labdist_weight;
-  else
-    w = params->score3_labdist_weight;
-
-  free_matrix2(obs_lab);
-
-  return w * score;
-}
-
-
-
-double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, double ***obs_lab_image, double *b_L, double *b_A, double *b_B, scope_params_t *params, int score_round)
-{
   double scores[3] = {0, 0, 0};
-  int i, j;
-  //double L_weight = params->L_weight;
-  //double lab_sigma = params->lab_sigma;
-  //double dmax = 2*lab_sigma; // * sqrt(2.0 + L_weight*L_weight);  // TODO: make this a param
   for (i = 0; i < n; i++) {
-    if (vis_pmf[i] > .01/(double)n) {
-      int xi,yi;
-      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
-      //double d = dmax;
+    if (obs_weights[i] > 0.0) {
       double dlab[3], dmax[3], lab_sigma[3];
       for (j = 0; j < 3; j++) {
 	lab_sigma[j] = params->lab_sigma * noise_models[i].lab_sigma[j];
 	dmax[j] = 2*lab_sigma[j];
 	dlab[j] = dmax[j];
-      }
-
-      for (j = 0; j < 3; j++) {
-	double d = fabs(lab[i][j] - obs_lab_image[j][xi][yi]);
+	double d = fabs(model_lab[i][j] - obs_lab[i][j]);
 	dlab[j] = MIN(d, dmax[j]);
+	scores[j] += obs_weights[i] * log(normpdf(dlab[j], 0, lab_sigma[j]));
       }
-
-      //int obs_idx = obs_range_image->idx[xi][yi];
-      //if (obs_idx >= 0) {
-      //double *obs_lab = pcd_obs->lab[obs_idx];
-      //sub(dlab, lab[i], obs_lab, 3);
-	//dlab[0] = L_weight * (lab[i][0] - obs_lab[0]) / noise_models[i].lab_sigma[0];
-	//dlab[1] = (lab[i][1] - obs_lab[1]) / noise_models[i].lab_sigma[1];
-	//dlab[2] = (lab[i][2] - obs_lab[2]) / noise_models[i].lab_sigma[2];
-	//dlab[2] = 0;
-	//d = norm(dlab, 3);
-	//d = MIN(d, dmax);
-	//for (j = 0; j < 3; j++)	  
-	//  dlab[j] = MIN(dlab[j], dmax[j]);
-
-	//dbug
-	//if (params->verbose && (i%100==0)) {
-	//  printf("model lab[%d] = [%.2f, %.2f, %.2f], obs_lab = [%.2f, %.2f, %.2f]\n", i, lab[i][0], lab[i][1], lab[i][2], obs_lab[0], obs_lab[1], obs_lab[2]);
-	//}
-      //}
-      //score += vis_pmf[i] * log(normpdf(d, 0, lab_sigma));
-      for (j = 0; j < 3; j++)
-	scores[j] += vis_pmf[i] * log(normpdf(dlab[j], 0, lab_sigma[j]));
-
-      //dbug
-      //if (params->verbose && (i%100==0)) {
-      //  printf("dlab[%d] = [%.2f, %.2f, %.2f], lab_sigma = [%.2f, %.2f, %.2f]\n", i, dlab[0], dlab[1], dlab[2], lab_sigma[0], lab_sigma[1], lab_sigma[2]);
-      //}
     }
   }
   //score -= log(normpdf(0, 0, params->lab_sigma));
@@ -4525,7 +4216,8 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
   if (params->verbose) {
     lab_scores_[0] = scores[0];
     lab_scores_[1] = scores[1];
-    lab_scores_[2] = scores[2];    
+    lab_scores_[2] = scores[2];
+    specularity_score_ = specularity_score;
   }
 
   double lab_weights2[3] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight};
@@ -4536,6 +4228,10 @@ double compute_lab_score(double **cloud, double **lab, double *vis_pmf, scope_no
     w = lab_weights2;
   else
     w = lab_weights3;
+
+  //cleanup
+  free_matrix2(obs_lab);
+  free_matrix2(model_lab);
 
   return dot(scores, w, 3);
 }
@@ -5001,8 +4697,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 	score -= 1.0;
     score /= (double)num_validation_points;
 
-    if (params->use_table)
-      score += compute_table_score(cloud, num_validation_points, obs_data->table_plane, params, score_round);
+    //if (params->use_table)
+    //  score += compute_table_score(cloud, num_validation_points, obs_data->table_plane, params, score_round);
 
     free_matrix2(cloud);
     return score;
@@ -6215,6 +5911,12 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   S->num_samples = MIN(S->num_samples, params->num_samples_round2);
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
+  //dbug: add true pose
+  if (have_true_pose_) {
+    memcpy(S->samples[0].x, x_true_, 3*sizeof(double));
+    memcpy(S->samples[0].q, q_true_, 4*sizeof(double));
+  }
+
   t0 = get_time_ms();  //dbug
   for (iter = 0; iter < num_alignment_iters; iter++) {
     
@@ -6241,9 +5943,12 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
       int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
       cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points, obs_data->num_obs_segments);
     }
-    else
+    else {
+      //params->verbose = 1; //dbug
       for (i = 0; i < S->num_samples; ++i)
 	new_scores[i] = model_placement_score(&samples[i], model_data, obs_data, params, 2);
+      //params->verbose = 0; //dbug
+    }
     
     for (i = 0; i < S->num_samples; ++i) {
       if (new_scores[i] > S->W[i]) {
@@ -6896,6 +6601,225 @@ void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
 
 
 //*************  Old version of BPA, before superpixels  ******************//
+
+
+
+/*
+double labdist_likelihood(pcd_color_model_t *color_model, int idx, double *lab, double pmin, scope_params_t *params)
+{
+  int cnt1 = color_model->cnts[0][idx];
+  int cnt2 = color_model->cnts[1][idx];
+  if (cnt1 < 4)
+    cnt1 = 0;
+  if (cnt2 < 4)
+    cnt2 = 0;
+
+  if (cnt1 == 0 && cnt2 == 0) {
+    double z[3] = {0,0,0};
+    return log(pmin * mvnpdf(z, z, color_model->avg_cov, 3));
+  }
+
+  double w1 = cnt1 / (double)(cnt1+cnt2);
+  double w2 = cnt2 / (double)(cnt1+cnt2);
+
+  double *m1 = color_model->means[0][idx];
+  double *m2 = color_model->means[1][idx];
+  double **C1 = color_model->covs[0][idx];
+  double **C2 = color_model->covs[1][idx];
+
+  double *maxm = (w1 > w2 ? m1 : m2);
+  double maxp = (w1 > 0 ? w1*mvnpdf(maxm, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(maxm, m2, C2, 3) : 0);
+
+  double p = (w1 > 0 ? w1*mvnpdf(lab, m1, C1, 3) : 0) + (w2 > 0 ? w2*mvnpdf(lab, m2, C2, 3) : 0);
+  p = MAX(p, maxp*pmin);
+
+  //dbug
+  if (params->verbose)
+    mps_labdist_p_ratio_ = p / maxp;
+
+  if (!isfinite(p)) {
+    printf("p = %f, cnt1 = %d, cnt2 = %d, idx = %d\n", p, cnt1, cnt2, idx); //dbug
+    printf("det(C1) = %f, det(C2) = %f\n", det(C1,3), det(C2,3));
+
+    printf("C1 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C1[0][0], C1[0][1], C1[0][2], C1[0][3], C1[0][4], C1[0][5], C1[0][6], C1[0][7], C1[0][8]);
+    printf("C2 = [%f,%f,%f; %f,%f,%f; %f,%f,%f]\n", C2[0][0], C2[0][1], C2[0][2], C2[0][3], C2[0][4], C2[0][5], C2[0][6], C2[0][7], C2[0][8]);
+  }
+
+  return log(p);
+}
+
+
+void labdist_color_shift(double *shift, pcd_color_model_t *color_model, int *idx, int n, double **obs_lab, double *obs_weights, double pmin, scope_params_t *params)
+{
+  //TODO: make these params
+  double lambda = 1.0;
+  double shift_threshold = 0.1;
+
+  double **C_inv = new_matrix2(3,3);
+  double **B = new_matrix2(3,3);
+  inv(B, color_model->avg_cov, 3);
+  double **A = new_matrix2(3,3);
+  double z[3];  // m-bar
+  double w;
+
+  memset(shift, 0, 3*sizeof(double));
+
+  int i, j, iter, max_iter = 10;
+  
+  for (iter = 0; iter < max_iter; iter++) {
+
+    // reset shift statistics
+    memset(A[0], 0, 9*sizeof(double));
+    memset(z, 0, 3*sizeof(double));
+    w = 0;
+    
+    for (i = 0; i < n; i++) {
+
+      if (obs_weights[i] == 0.0)
+	continue;
+
+      int cnt1 = color_model->cnts[0][idx[i]];
+      int cnt2 = color_model->cnts[1][idx[i]];
+      if (cnt1 < 4)
+	cnt1 = 0;
+      if (cnt2 < 4)
+	cnt2 = 0;
+      if (cnt1 == 0 && cnt2 == 0)
+	continue;
+
+      double *m1 = color_model->means[0][idx[i]];
+      double *m2 = color_model->means[1][idx[i]];
+      double **C1 = color_model->covs[0][idx[i]];
+      double **C2 = color_model->covs[1][idx[i]];
+
+      // assign observed color to a cluster
+      double y[3];  // current obs_lab[i]
+      add(y, obs_lab[i], shift, 3);
+      double p1 = (cnt1 > 0 ? mvnpdf(y, m1, C1, 3) : 0);
+      double p2 = (cnt2 > 0 ? mvnpdf(y, m2, C2, 3) : 0);
+      
+      // check if assigned cluster could be a specularity cluster (i.e., has higher L-value)
+      if ((p1 > p2 && p2 > 0 && m1[0] > m2[0]) || (p2 > p1 && p1 > 0 && m2[0] > m1[0]))
+	continue;
+
+      double *m = (p1 > p2 ? m1 : m2);
+      double **C = (p1 > p2 ? C1 : C2);
+
+      double maxp = mvnpdf(m, m, C, 3);
+      double p = mvnpdf(y, m, C, 3);
+
+      // check if point is an outlier of the cluster
+      if (p < pmin*maxp)
+	continue;
+
+      // add observed color and color model covariance matrix to the shift statistics
+      for (j = 0; j < 3; j++)
+	z[j] = z[j] + obs_weights[i]*(m[j] - obs_lab[i][j]);
+      inv(C_inv, C, 3);
+      for (j = 0; j < 9; j++)
+	A[0][j] = A[0][j] + obs_weights[i]*C_inv[0][j];
+      w += obs_weights[i];
+    }
+    if (w == 0.0)
+      break;
+
+    mult(z, z, 1/w, 3);  // avg. z
+    mult(A[0], A[0], lambda/w, 9);  // avg. A and multiply by lambda
+
+    // solve for best shift = inv(lambda*A+B)*lambda*A*z
+    double new_shift[3];
+    matrix_vec_mult(z, A, z, 3, 3);
+    add(A[0], A[0], B[0], 9);
+    inv(C_inv, A, 3);
+    matrix_vec_mult(new_shift, C_inv, z, 3, 3);
+    double d2 = dist2(shift, new_shift, 3);
+    memcpy(shift, new_shift, 3*sizeof(double));
+
+    //printf("shift = [%f, %f, %f]\n", shift[0], shift[1], shift[2]);  //dbug
+
+    if (d2 < shift_threshold*shift_threshold)
+      break;
+  }
+
+  // apply shift to obs_lab
+  for (i = 0; i < n; i++)
+    if (obs_weights[i] > 0.0)
+      add(obs_lab[i], obs_lab[i], shift, 3);
+
+  free_matrix2(A);
+  free_matrix2(B);
+  free_matrix2(C_inv);
+}
+
+
+//double compute_labdist_score(double **cloud, double **labdist, double *vis_pmf, scope_noise_model_t *noise_models, int n, range_image_t *obs_range_image, pcd_t *pcd_obs, scope_params_t *params, int score_round)
+double compute_labdist_score(double **cloud, pcd_color_model_t *color_model, int *idx, double *vis_pmf, scope_noise_model_t *noise_models, int n,
+			     range_image_t *obs_range_image, double ***obs_lab_image, scope_params_t *params, int score_round)
+{
+  double tmp = sum(vis_pmf, n);
+  if (tmp < 0.001)
+    printf("tiny pmf\n");
+  //TODO: make this a param
+  double pmin = .1;
+
+  // get obs colors
+  double **obs_lab = new_matrix2(n,3);
+  double obs_weights[n];
+  memset(obs_weights, 0, n*sizeof(double));
+  int i, j;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      int xi,yi;
+      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
+      for (j = 0; j < 3; j++)
+	obs_lab[i][j] = obs_lab_image[j][xi][yi];
+      obs_weights[i] = vis_pmf[i];
+    }
+  }
+
+  // get color shift (and apply it to obs_lab)
+  double color_shift[3];
+  labdist_color_shift(color_shift, color_model, idx, n, obs_lab, obs_weights, pmin, params);
+
+  if (params->verbose) {
+    memset(mps_labdist_p_ratios_, 0, n*sizeof(double));
+  }
+
+
+  double logp_list[n];  memset(logp_list, 0, n*sizeof(double));  //dbug
+  double zero[3] = {0,0,0};
+  double score = 0.0;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      double logp = labdist_likelihood(color_model, idx[i], (obs_weights[i] > 0 ? obs_lab[i] : zero), pmin, params);
+      score += vis_pmf[i] * logp;
+      logp_list[i] = logp; //dbug
+
+      if (params->verbose)
+	mps_labdist_p_ratios_[i] = mps_labdist_p_ratio_;
+    }
+    //else  //dbug
+    //  printf("0,0,0; ...\n");
+  }
+
+  //dbug
+  if (params->verbose)
+    labdist_score_ = score;
+
+  double w = 0;
+  if (score_round == 2)
+    w = params->score2_labdist_weight;
+  else
+    w = params->score3_labdist_weight;
+
+  free_matrix2(obs_lab);
+
+  return w * score;
+}
+*/
+
+
+
 
 
 
