@@ -1148,6 +1148,7 @@ pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
   pcd_color_model_t *C;
   safe_calloc(C, 1, pcd_color_model_t);
 
+  C->lab = new_matrix2(pcd->num_points, 3);
   C->means[0] = new_matrix2(pcd->num_points, 3);
   C->means[1] = new_matrix2(pcd->num_points, 3);
   C->covs[0] = new_matrix3(pcd->num_points, 3, 3);
@@ -1174,6 +1175,17 @@ pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
     add(C->avg_cov[0], C->avg_cov[0], C1_data, 9);
   }
   mult(C->avg_cov[0], C->avg_cov[0], 1/(double)pcd->num_points, 9);
+
+  // get model colors with specularities removed
+  for (i = 0; i < pcd->num_points; i++) {
+    double *m1 = C->means[0][i];
+    double *m2 = C->means[1][i];
+    int cnt2 = C->cnts[1][i];
+    if (cnt2 < 5 || m1[0] < m2[0])
+      memcpy(C->lab[i], m1, 3*sizeof(double));
+    else
+      memcpy(C->lab[i], m2, 3*sizeof(double));
+  }
 
   // add in avg_cov prior
   for (i = 0; i < pcd->num_points; i++) {
@@ -1211,6 +1223,7 @@ pcd_color_model_t *get_pcd_color_model(pcd_t *pcd)
 
 void free_pcd_color_model(pcd_color_model_t *C)
 {
+  free_matrix2(C->lab);
   free_matrix2(C->means[0]);
   free_matrix2(C->means[1]);
   free_matrix3(C->covs[0]);
@@ -2727,6 +2740,10 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       //if ((xi > 0 && i != I[xi-1][yi]) || (yi > 0 && i != I[xi][yi-1]) || i < 0)  // segment boundary
       //	continue;
       //else
+
+      S[xi][yi][0] = S[xi][yi][1] = S[xi][yi][2] = (uchar)255*exp(obs_edge_image[xi][yi]);
+
+      /*
       if (i >= 0) {
 	double rgb[3];
 	lab2rgb(rgb, cluster_colors[i]);
@@ -2735,8 +2752,10 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	S[xi][yi][1] = (uchar)rgb[1];
 	S[xi][yi][2] = (uchar)rgb[2];
       }
+      */
     }
   }
+  /*
   for (i = 0; i < obs_data->num_obs_edge_points; i++) {  // add obs_edge_points
     if (range_image_xyz2sub(&xi, &yi, obs_range_image, obs_data->obs_edge_points[i])) {
       S[xi][yi][0] = 0;
@@ -2765,6 +2784,7 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       S[xi][yi][2] = 0;
     }    
   }
+  */
   FILE *f = fopen("super.ppm", "w");
   fprintf(f, "P6 %d %d 255\n", w, h);
   for (yi = h-1; yi >= 0; yi--)
@@ -4129,6 +4149,37 @@ double compute_sdw_score(double **sdw, int *nn_idx, double *vis_prob, int n, pcd
   return score;
 }
 */
+
+
+double compute_simple_labdist_score(double **cloud, int *idx, int n, pcd_color_model_t *color_model, scope_params_t *params)
+{
+  // get obs colors
+  double **obs_lab = new_matrix2(n,3);
+  int i, j;
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n) {
+      int xi,yi;
+      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
+      for (j = 0; j < 3; j++)
+	obs_lab[i][j] = obs_lab_image[j][xi][yi];
+    }
+  }
+
+  // get model colors (with specularities removed)
+  double **model_lab = new_matrix2(n,3);
+  reorder_rows(model_lab, color_model->lab, idx, n, 3);
+
+  // classify obs specularities
+  double specularity_mask[n];
+  for (i = 0; i < n; i++)
+    specularity_mask[i] = (obs_lab[i][0] > 90 && obs_lab[i][0] > model_lab[i][0] + 10);
+
+  //double specularity_score = 
+
+  //cleanup
+  free_matrix2(obs_lab);
+  free_matrix2(model_lab);
+}
 
 
 //double labdist_likelihood(double *labdist, double *lab, double pmin)
