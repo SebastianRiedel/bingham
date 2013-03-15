@@ -60,6 +60,7 @@ extern "C" {
 
 
   typedef struct {
+    double **lab;
     double **means[2];
     double ***covs[2];
     int *cnts[2];
