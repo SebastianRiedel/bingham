@@ -133,6 +133,7 @@ extern "C" {
     double b_color_L[2];
     double b_color_A[2];
     double b_color_B[2];
+    //double b_specularity[2];
     double b_fpfh[2];
     //double b_labdist[2];
     //double b_segment_affinity[2];
