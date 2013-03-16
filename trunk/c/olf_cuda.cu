@@ -547,19 +547,10 @@ __device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_p
   return cu_dot(scores, w, 3);
 }
 
+/*
 __device__ double labdist_likelihood(cu_double_matrix_t *avg_cov, cu_double_matrix_t *means1, cu_double_matrix_t *means2, cu_double_matrix3d_t *cov1, cu_double_matrix3d_t *cov2, 
 			  cu_int_arr_t *cnts1, cu_int_arr_t *cnts2, int idx, double *lab, double pmin, scope_params_t *params)
 {
-  /*
-  double m1[3] = {labdist[0], labdist[1], labdist[2]};
-  double m2[3] = {labdist[3], labdist[4], labdist[5]};
-  double C1_data[9] = {labdist[6], labdist[7], labdist[8], labdist[7], labdist[9], labdist[10], labdist[8], labdist[10], labdist[11]};
-  double C2_data[9] = {labdist[12], labdist[13], labdist[14], labdist[13], labdist[15], labdist[16], labdist[14], labdist[16], labdist[17]};
-  double **C1 = new_matrix2_data(3, 3, C1_data);
-  double **C2 = new_matrix2_data(3, 3, C2_data);
-  double cnt1 = (labdist[18] < 4 ? 0 : labdist[18]);
-  double cnt2 = (labdist[19] < 4 ? 0 : labdist[19]);
-  */
   int cnt1 = cnts1->ptr[idx];
   int cnt2 = cnts2->ptr[idx];
   if (cnt1 < 4)
@@ -778,7 +769,7 @@ __device__ double compute_labdist_score(int *xi, int *yi, cu_double_matrix_t *co
 
   return ww * score;
 }
-
+*/
 
 
 __device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round)

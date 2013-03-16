@@ -254,7 +254,7 @@ extern "C" {
     double score2_A_weight;
     double score2_B_weight;
     double score2_fpfh_weight;
-    double score2_labdist_weight;
+    double score2_specularity_weight;
     double score2_segment_affinity_weight;
     double score2_segment_weight;
     double score2_table_weight;
@@ -272,7 +272,7 @@ extern "C" {
     double score3_A_weight;
     double score3_B_weight;
     double score3_fpfh_weight;
-    double score3_labdist_weight;
+    double score3_specularity_weight;
     double score3_segment_affinity_weight;
     double score3_segment_weight;
     double score3_table_weight;
@@ -405,7 +405,6 @@ extern "C" {
     double *scores;
     int num_scores;
     double *vis_probs;
-    double *labdist_p_ratios;
     int num_validation_points;
   } scope_sample_t;
 
