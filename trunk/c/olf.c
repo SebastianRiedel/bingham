@@ -4179,10 +4179,14 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 
   // classify obs specularities
   int specularity_mask[n];
-  for (i = 0; i < n; i++)
-    if (vis_pmf[i] > .01/(double)n)
-      specularity_mask[i] = (obs_lab[i][0] > 90 && obs_lab[i][0] > model_lab[i][0] + 10);
-  double specularity_score = 1.0 - isum(specularity_mask, n) / (double)n;
+  double specularity_score = 1.0;
+  memset(specularity_mask, 0, n*sizeof(int));
+  for (i = 0; i < n; i++) {
+    if (vis_pmf[i] > .01/(double)n && obs_lab[i][0] > 90 && obs_lab[i][0] > model_lab[i][0] + 10) {
+      specularity_mask[i] = 1;
+      specularity_score -= vis_pmf[i];
+    }
+  }
 
   double obs_weights[n];
   for (i = 0; i < n; i++)
@@ -4217,6 +4221,8 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
     lab_scores_[1] = scores[1];
     lab_scores_[2] = scores[2];
     specularity_score_ = specularity_score;
+
+    printf("specularity_score = %.2f\n", specularity_score); //dbug
   }
 
   double lab_weights2[4] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight, params->score2_specularity_weight};
