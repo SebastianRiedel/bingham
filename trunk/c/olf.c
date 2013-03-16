@@ -4152,7 +4152,8 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 			 scope_obs_data_t *obs_data, scope_model_data_t *model_data, scope_params_t *params, int score_round)
 {
   // unpack args
-  pcd_color_model_t *color_model = model_data->color_model;
+  //pcd_color_model_t *color_model = model_data->color_model;
+  pcd_t *pcd_model = model_data->pcd_model;
   double *b_L = model_data->score_comp_models->b_color_L;
   double *b_A = model_data->score_comp_models->b_color_A;
   double *b_B = model_data->score_comp_models->b_color_B;
@@ -4173,7 +4174,8 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
 
   // get model colors
   double **model_lab = new_matrix2(n,3);
-  reorder_rows(model_lab, color_model->lab, model_idx, n, 3);
+  //reorder_rows(model_lab, color_model->lab, model_idx, n, 3);
+  reorder_rows(model_lab, pcd_model->lab, model_idx, n, 3);
 
   // classify obs specularities
   int specularity_mask[n];
@@ -5846,10 +5848,10 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   printf("Scored round 2 initial poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   //dbug: add true pose
-  if (have_true_pose_) {
-    memcpy(S->samples[0].x, x_true_, 3*sizeof(double));
-    memcpy(S->samples[0].q, q_true_, 4*sizeof(double));
-  }
+  //if (have_true_pose_) {
+  //  memcpy(S->samples[0].x, x_true_, 3*sizeof(double));
+  //  memcpy(S->samples[0].q, q_true_, 4*sizeof(double));
+  //}
 
   t0 = get_time_ms();  //dbug
   for (iter = 0; iter < num_alignment_iters; iter++) {
