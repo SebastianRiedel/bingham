@@ -710,6 +710,10 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->use_cuda);
       else if (!wordcmp(name, "use_true_pose", " \t\n"))
 	sscanf(value, "%d", &params->use_true_pose);
+      else if (!wordcmp(name, "add_true_pose_x_noise", " \t\n"))
+	sscanf(value, "%d", &params->add_true_pose_x_noise);
+      else if (!wordcmp(name, "add_true_pose_q_noise", " \t\n"))
+	sscanf(value, "%d", &params->add_true_pose_q_noise);
       else if (!wordcmp(name, "use_fpfh", " \t\n"))
 	sscanf(value, "%d", &params->use_fpfh);
       else if (!wordcmp(name, "use_shot", " \t\n"))
@@ -4222,7 +4226,10 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
     lab_scores_[2] = scores[2];
     specularity_score_ = specularity_score;
 
-    printf("specularity_score = %.2f\n", specularity_score); //dbug
+    //printf("specularity_score = %.2f\n", specularity_score); //dbug
+
+    save_matrix("obs_lab.txt", obs_lab, n, 3);
+    save_matrix("model_lab.txt", model_lab, n, 3);
   }
 
   double lab_weights2[4] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight, params->score2_specularity_weight};
@@ -6150,13 +6157,19 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   if (have_true_pose_ && params->use_true_pose) {
     memcpy(S->samples[0].x, true_pose->X, 3*sizeof(double));
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
+
     //dbug: add x noise
-    //for (i = 0; i < 3; i++)
-    //  S->samples[0].x[i] += .1*(frand()-.5);
+    if (params->add_true_pose_x_noise)
+      for (i = 0; i < 3; i++)
+	S->samples[0].x[i] += .1*(frand()-.5);
+
     //dbug: add q noise
-    //for (i = 0; i < 4; i++)
-    //  S->samples[0].q[i] = normrand(0,1);
-    //normalize(S->samples[0].q, S->samples[0].q, 4);
+    if (params->add_true_pose_q_noise) {
+      for (i = 0; i < 4; i++)
+	S->samples[0].q[i] = normrand(0,1);
+      normalize(S->samples[0].q, S->samples[0].q, 4);
+    }
+
     //S->num_samples = 1;
   }
 

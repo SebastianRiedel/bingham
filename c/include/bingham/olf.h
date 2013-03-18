@@ -205,6 +205,8 @@ extern "C" {
     // GENERAL PARAMS
     int verbose;
     int use_true_pose;
+    int add_true_pose_x_noise;
+    int add_true_pose_q_noise;
     int use_fpfh;
     int use_shot;
     int use_sift;
