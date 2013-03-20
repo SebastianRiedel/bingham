@@ -6162,6 +6162,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     memcpy(S->samples[0].q, true_pose->Q, 4*sizeof(double));
 
     //dbug: add x noise
+    int i;
     if (params->add_true_pose_x_noise)
       for (i = 0; i < 3; i++)
 	S->samples[0].x[i] += .1*(frand()-.5);
