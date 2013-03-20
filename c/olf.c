@@ -356,6 +356,7 @@ static void pcd_add_data_pointers(pcd_t *pcd)
   int ch_ved1 = pcd_channel(pcd, "ved1");
   int ch_ved66 = pcd_channel(pcd, "ved66");
   int ch_normalvar = pcd_channel(pcd, "normalvar");
+  int ch_canny = pcd_channel(pcd, "canny");
 
   int ch_labdist1 = pcd_channel(pcd, "labdist1");
   int ch_labdist20 = pcd_channel(pcd, "labdist20");
@@ -467,6 +468,8 @@ static void pcd_add_data_pointers(pcd_t *pcd)
     pcd->img_edge = pcd->data[ch_img_edge];
   if (ch_normalvar>=0)
     pcd->normalvar = pcd->data[ch_normalvar];
+  if (ch_canny>=0)
+    pcd->canny = pcd->data[ch_canny];
 
   // add quaternion orientation features
   if (ch_nx>=0 && ch_ny>=0 && ch_nz>=0 && ch_pcx>=0 && ch_pcy>=0 && ch_pcz>=0) {
