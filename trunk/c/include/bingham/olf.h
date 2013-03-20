@@ -26,6 +26,7 @@ extern "C" {
     double *curv_edge;
     double *img_edge;
     double *normalvar;
+    double *canny;
 
     // transposed data
     double **points;
@@ -365,6 +366,7 @@ extern "C" {
     double **obs_edge_points_image;
     double **obs_edge_image;
     double ***obs_lab_image;
+    double **obs_canny_image;
     superpixel_t *obs_segments;
     int **obs_segment_image;
     double **obs_segment_affinities;
