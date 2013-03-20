@@ -68,8 +68,13 @@ int main(int argc, char *argv[])
   if (params.use_sift)
     obs.sift_pcd = load_pcd(argv[4]);
   int xxx,yyy;
-  double **table_plane = load_matrix(argv[5], &xxx, &yyy);
-  obs.table_plane = table_plane[0];
+
+  double **table_plane;
+  if (params.use_table) {
+    table_plane = load_matrix(argv[5], &xxx, &yyy);
+    obs.table_plane = table_plane[0];
+  }
+
   scope_obs_data_t obs_data;
   get_scope_obs_data(&obs_data, &obs, &params);
 
