@@ -1968,7 +1968,7 @@ score_comp_models_t *load_score_comp_models(char *fname)
   int n,m;
   double **B = load_matrix(fname, &n, &m);
 
-  if (B == NULL || n != 13 || m != 2) {
+  if (B == NULL || n != 15 || m != 2) {
     printf("Error in %s!\n", fname);
     return NULL;
   }
@@ -3897,19 +3897,33 @@ scope_noise_model_t *get_noise_models(double *x, double *q, int *idx, int n, pcd
 
 
 /*
-double compute_xyzn_score(double *nn_d2, double *vis_prob, int n, scope_params_t *params)
+double compute_italian_xyzn_score(double **cloud, double *cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models,
+				  int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
+  double xyz_sigma = params->xyz_sigma;
+
   int i;
   double score = 0.0;
-  double range_sigma = params->range_sigma;
-  double xyz_weight = params->xyz_weight;
-  for (i = 0; i < n; i++) {
-    double d = sqrt(nn_d2[i]) / xyz_weight;  // TODO: make this a param
-    d = MIN(d, 3*range_sigma);               // TODO: make this a param
-    score += vis_prob[i] * log(normpdf(d, 0, range_sigma));
+  double w_tot = 0.0;
+  for (i = 0; i < num_validation_points; i++) {
+    if (vis_pmf[i] > .01/(double)num_validation_points) {
+      int xi,yi;
+      range_image_xyz2sub(&xi, &yi, obs_range_image, cloud[i]);
+      if (obs_range_image->cnt[xi][yi] > 0) {
+	// get distance from model normal to range image cell normal
+	double p_normal = dot(cloud_normals[i], obs_range_image->normals[xi][yi], 3);
+	double model_range = norm(cloud[i], 3);
+	double obs_range = obs_range_image->image[x][y];
+	double p_range = 1.0 - fabs(model_range - obs_range) / xyz_sigma;
+	p_range = MAX(p_range, 0.0);
+	p_normal = MAX(p_normal, 0.0);
+	score += vis_pmf[i] * p_range * p_normal;
+	w_tot += vis_pmf[i];
+      }
+    }
   }
+  score /= w_tot;
 
-  score -= log(normpdf(0,0,range_sigma));
   return score;
 }
 */
