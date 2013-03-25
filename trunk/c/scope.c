@@ -116,12 +116,12 @@ int main(int argc, char *argv[])
     cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs);
     printf("Data copied\n");
 
-    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs);
+    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs, NULL);
 
     cu_free_all_the_things(&cu_model, &cu_obs);
   }
   else
-    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), NULL, NULL);
+    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), NULL, NULL, NULL);
 
   // cleanup
   free_scope_obs_data(&obs_data);
@@ -166,16 +166,14 @@ int main(int argc, char *argv[])
   //**************************************************
 
   //dbug
-  if (!params.use_cuda) {
-    fprintf(f, "scores = [");
-    for (i = 0; i < n; i++) {
-      for (j = 0; j < S->samples[i].num_scores; j++)
-	fprintf(f, "%f ", S->samples[i].scores[j]);
-      fprintf(f, "; ");
-    }
-    fprintf(f, "];\n");
+  fprintf(f, "scores = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].num_scores; j++)
+      fprintf(f, "%f ", S->samples[i].scores[j]);
+    fprintf(f, "; ");
   }
-
+  fprintf(f, "];\n");
+  
   fprintf(f, "segments = {");
   for (i = 0; i < n; i++) {
     fprintf(f, "[");
@@ -216,7 +214,64 @@ int main(int argc, char *argv[])
   for (i = 0; i < n; i++)
     fprintf(f, "%d ", S->samples[i].nc);
   fprintf(f, "];\n");
+
+  /*  fprintf(f, "obs_edge_image = [");
+  for (i = 0; i < obs_edge_image_width_; ++i) {
+    for (j = 0; j < obs_edge_image_height_; ++j) {
+      fprintf(f, "%f ", obs_edge_image_orig_[i][j]);
+    }
+    fprintf(f, "; ");
+  }
+  fprintf(f, "]; \n");
+
+  fprintf(f, "xyz_dists = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].dists.n; j++)
+      fprintf(f, "%f ", S->samples[i].dists.xyz_dists[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
+  fprintf(f, "fpfh_dists = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].dists.n; j++)
+      fprintf(f, "%f ", S->samples[i].dists.fpfh_dists[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
+  fprintf(f, "normal_dists = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].dists.n; j++)
+      fprintf(f, "%f ", S->samples[i].dists.normal_dists[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
+
+  fprintf(f, "vis_probs = [");
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < S->samples[i].dists.n; j++)
+      fprintf(f, "%f ", S->samples[i].dists.vis_probs[j]);
+    fprintf(f, "; ");
+  }
+  fprintf(f, "];\n");
   
+  fprintf(f, "range_edge_pixels = {};\n");
+  for (i = 0; i < n; ++i) {
+    fprintf(f, "range_edge_pixels{%d} = [", i+1);
+    for (j = 0; j < S->samples[i].dists.num_range_edge_points; j++)
+      fprintf(f, "%d, %d; ", S->samples[i].dists.range_edge_pixels[j][0], S->samples[i].dists.range_edge_pixels[j][1]);
+    fprintf(f, "];\n");    
+  }
+
+  fprintf(f, "range_edge_points = {};\n");
+  for (i = 0; i < n; ++i) {
+    fprintf(f, "range_edge_points{%d} = [", i+1);
+    for (j = 0; j < S->samples[i].dists.num_range_edge_points; j++)
+      fprintf(f, "%f, %f, %f; ", S->samples[i].dists.range_edge_points[j][0], S->samples[i].dists.range_edge_points[j][1], S->samples[i].dists.range_edge_points[j][2]);
+    fprintf(f, "];\n");    
+    }*/
+
   /*
   fprintf(f, "vis_probs = [");
   for (i = 0; i < n; i++) {

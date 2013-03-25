@@ -123,7 +123,7 @@ extern "C" {
 
 
   // logistic regression coefficients
-  typedef struct {
+  typedef struct score_comp_models_struct {
     double b_xyz[2];
     double b_normal[2];
     //double b_vis[2];
@@ -152,6 +152,7 @@ extern "C" {
     double avg_point[3];
     double avg_normal[3];
     double avg_lab_color[3];
+    int num_pixels;
   } superpixel_t;
 
 
@@ -306,9 +307,22 @@ extern "C" {
     //double fsurf_sigma;
 
     // MOPE PARAMS
-    double mope_samples_weight;
-    double mope_explained_weight;
-    double mope_overlap_weight;    
+    double mope_r1_scope_score_weight;
+    double mope_r1_unexplained_weight;
+    double mope_r1_overlap_weight;    
+    double mope_r1_overlap_per_object_weight;
+    double mope_r1_num_taken_weight;
+
+    double mope_r2_scope_score_weight;
+    double mope_r2_unexplained_weight;
+    double mope_r2_overlap_weight;    
+    double mope_r2_overlap_per_object_weight;
+    double mope_r2_num_taken_weight;
+    
+    int mope_score_comp_models;
+    int mope_num_rounds;
+
+    int mope_plot_true; //dbug
 
   } scope_params_t;
 
@@ -382,6 +396,20 @@ extern "C" {
   enum {C_TYPE_FPFH, C_TYPE_SHOT, C_TYPE_SIFT, C_TYPE_EDGE, C_TYPE_SURFACE};
 
 
+  typedef struct {
+    // A star needs to be added back to each of these except n
+    int n;
+
+    //dbug
+    double *vis_probs;
+    double *xyz_dists;
+    double *fpfh_dists;
+    double *normal_dists;
+    int num_range_edge_points;
+    int **range_edge_pixels;
+    double **range_edge_points;
+  } olf_pose_sample_t;
+
   typedef struct scope_sample_struct {
     double x[3];
     double q[4];
@@ -411,6 +439,7 @@ extern "C" {
     int num_scores;
     double *vis_probs;
     int num_validation_points;
+    olf_pose_sample_t dists;
   } scope_sample_t;
 
 
@@ -426,6 +455,8 @@ extern "C" {
     int *model_ids;
     scope_sample_t *objects;
     int num_objects;
+    double *scores; //dbg
+    int num_scores;
   } mope_sample_t;
 
   typedef struct {
@@ -518,10 +549,14 @@ struct cu_obs_data_struct;
 
 void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose);
 
-scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
+scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs,
+		       int *segment_blacklist);
 
 mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
-mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
+//mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
+mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, 
+				     struct cu_obs_data_struct *cu_obs, FILE *f, int round, int *segment_blacklist);
+mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, scope_params_t *params, FILE *f, int round);
 
 /*#ifdef __cplusplus
 extern "C" {
@@ -533,29 +568,30 @@ extern "C" {
   // DEPRECATED
   //
 
-  /*
-  typedef struct {
-    double **X;
-    double **Q;
-    double *W;
+ 
+  /*typedef struct {
+    //double **X;
+    //double **Q;
+    //double *W;
     int n;
 
     //dbug
-    int **C_obs;
-    int **C_model;
+    //int **C_obs;
+    //int **C_model;
     double **vis_probs;
     double **xyz_dists;
+    double **fpfh_dists;
     double **normal_dists;
     int **range_edge_pixels;
-    double **range_edge_vis_prob;
+    int **range_edge_points;
+    //double **range_edge_vis_prob;
     int *num_range_edge_points;
     int **occ_edge_pixels;
     int *num_occ_edge_points;
     double **scores;
-    int num_scores;
+    int *num_scores;
 
-  } olf_pose_samples_t;
-  */
+    } olf_pose_samples_t;  */
 
   /* heirarchical segmentation and balls model
   typedef struct {
