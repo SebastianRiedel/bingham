@@ -1710,6 +1710,14 @@ dist_grid_t *load_distance_grid(char *filename, pcd_t *pcd)
 
   fclose(f);
 
+
+  //dbug
+  for (i = 0; i < n; i++) {
+    if (grid->nn_dist[i] == 0.0 && grid->pcd_idx[i][0] < 0)
+      printf("Warning: grid->pcd_idx[i][0] = %d, i = %d\n", grid->pcd_idx[i][0], i);
+  }
+
+
   return grid;
 }
 
@@ -1753,6 +1761,9 @@ int distance_grid_find_nn(double *nn_d2, double *xyz, dist_grid_t *grid)
 
   int i1 = grid->pcd_idx[c][0];
   int i2 = grid->pcd_idx[c][1];
+
+  if (i1 < 0)
+    return -1;
 
   double d1 = dist2(xyz, grid->pcd->points[i1], 3);
 
@@ -1968,7 +1979,7 @@ score_comp_models_t *load_score_comp_models(char *fname)
   int n,m;
   double **B = load_matrix(fname, &n, &m);
 
-  if (B == NULL || n != 15 || m != 2) {
+  if (B == NULL || n < 11 || m != 2) {
     printf("Error in %s!\n", fname);
     return NULL;
   }
@@ -3224,7 +3235,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
 
   // unpack model arguments
   data->pcd_model = model->obj_pcd;
-  data->color_model = get_pcd_color_model(model->obj_pcd);
+  //data->color_model = get_pcd_color_model(model->obj_pcd);
   data->range_edges_model = get_multiview_pcd(model->range_edges_pcd);
   data->model_dist_grid = model->dist_grid;
   data->model_symmetries = model->symmetries;
@@ -3407,7 +3418,7 @@ void free_scope_model_data(scope_model_data_t *data)
     free_olf(&data->range_edges_model_olfs[i]);
   free(data->range_edges_model_olfs);
 
-  free_pcd_color_model(data->color_model);
+  //free_pcd_color_model(data->color_model);
   free_multiview_pcd(data->range_edges_model);
   flann_free_index(data->model_xyz_index, &data->model_xyz_params);
   flann_free_index(data->model_xyzn_index, &data->model_xyzn_params);
@@ -3872,7 +3883,8 @@ scope_noise_model_t *get_noise_models(double *x, double *q, int *idx, int n, pcd
     noise_models[i].lab_sigma[1] = .5*sigmoid(surface_angles[i], b_SA) + .5*sigmoid(edge_dists[i], b_EA);
     noise_models[i].lab_sigma[2] = .5*sigmoid(surface_angles[i], b_SB) + .5*sigmoid(edge_dists[i], b_EB);
 
-    noise_models[i].normal_sigma = MAX(noise_models[i].normal_sigma, pcd_model->normalvar[idx[i]]);
+    if (pcd_model->normalvar)
+      noise_models[i].normal_sigma = MAX(noise_models[i].normal_sigma, pcd_model->normalvar[idx[i]]);
 
     //dbug
     //if (i%100==0) {
@@ -3896,8 +3908,7 @@ scope_noise_model_t *get_noise_models(double *x, double *q, int *idx, int n, pcd
 //==============================================================================================//
 
 
-/*
-double compute_italian_xyzn_score(double **cloud, double *cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models,
+double compute_italian_xyzn_score(double **cloud, double **cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models,
 				  int num_validation_points, range_image_t *obs_range_image, scope_params_t *params, int score_round)
 {
   double xyz_sigma = params->xyz_sigma;
@@ -3913,7 +3924,7 @@ double compute_italian_xyzn_score(double **cloud, double *cloud_normals, double 
 	// get distance from model normal to range image cell normal
 	double p_normal = dot(cloud_normals[i], obs_range_image->normals[xi][yi], 3);
 	double model_range = norm(cloud[i], 3);
-	double obs_range = obs_range_image->image[x][y];
+	double obs_range = obs_range_image->image[xi][yi];
 	double p_range = 1.0 - fabs(model_range - obs_range) / xyz_sigma;
 	p_range = MAX(p_range, 0.0);
 	p_normal = MAX(p_normal, 0.0);
@@ -3926,7 +3937,7 @@ double compute_italian_xyzn_score(double **cloud, double *cloud_normals, double 
 
   return score;
 }
-*/
+
 
 
  /*
@@ -4180,6 +4191,9 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   double *b_B = model_data->score_comp_models->b_color_B;
   range_image_t *obs_range_image = obs_data->obs_range_image;
   double ***obs_lab_image = obs_data->obs_lab_image;
+
+  if (pcd_model->lab == NULL)
+    return 0.0;
 
   // get obs colors
   double **obs_lab = new_matrix2(n,3);
@@ -4840,16 +4854,39 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   if (params->use_table)
     table_score = compute_table_score(cloud, num_validation_points, obs_data->table_plane, params, score_round);
 
+  //NEW
+  double italian_xyzn_score = 0;
+  double xyz_score2 = 0;
+  double outliers_score = 0;
+  if (score_round == 3) {
+    italian_xyzn_score = compute_italian_xyzn_score(cloud, cloud_normals, vis_pmf, noise_models,
+						    num_validation_points, obs_data->obs_range_image, params, score_round);
+
+    int xyz_score_window_orig = params->xyz_score_window;
+    params->xyz_score_window = 3;
+    xyz_score2 = compute_xyz_score(cloud, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image,
+				   model_data->score_comp_models->b_xyz, params, score_round, xyz_outliers, &num_xyz_outliers);
+    params->xyz_score_window = xyz_score_window_orig;
+
+    double dthresh = params->xyz_sigma;
+    int xi, yi;
+    for (i = 0; i < num_validation_points; i++)
+      if (range_image_xyz2sub(&xi, &yi, obs_data->obs_range_image, cloud[i]) &&
+	  obs_data->obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
+	outliers_score -= 1.0;
+    outliers_score /= (double)num_validation_points;
+  }
+
 
   double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
-    fpfh_score + segment_affinity_score + segment_score + table_score;
+    fpfh_score + segment_affinity_score + segment_score + table_score + italian_xyzn_score + xyz_score2 + outliers_score;
   
   if (params->verbose) {
-    double scores[15] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
+    double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
 			 lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, specularity_score_, segment_affinity_score_,
-			 segment_score_, table_score_};
+			 segment_score_, table_score_,      italian_xyzn_score, xyz_score2, outliers_score};  //dbug
     if (sample->scores == NULL) {
-      sample->num_scores = 15;
+      sample->num_scores = 18;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));
