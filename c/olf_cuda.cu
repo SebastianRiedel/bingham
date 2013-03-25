@@ -27,17 +27,64 @@ __device__ __constant__ double b_EN[3] = {0.1246,     1.4406,   -185.8350};
 __device__ __constant__ double b_EL[3] = {0.2461,     0.2624,   -140.0192};
 __device__ __constant__ double b_EA[3] = {0.1494,     0.2114,   -139.4324};
 __device__ __constant__ double b_EB[3] = {0.2165,     0.2600,   -135.5203};
+const int num_components = 7; //9;
+__device__ __constant__ int cu_num_components = num_components;
 
-
-// util.h stuff **********************************
-/*__device__ static void init_rand() {
-  if (first) {
-    first = 0;
-    srand (time(NULL));
-  }
-  } */
+__device__ __constant__ int xyz_idx = 0, normal_idx = 1, vis_idx = 2, occ_idx = 3, edge_vis_idx = 4, edge_idx = 5, segment_idx = 6; //lab1_idx = 5, lab2_idx = 6, lab3_idx = 7, segment_idx = 8;
 
 curandGenerator_t gen;
+
+void copy_double_matrix_to_gpu(cu_double_matrix_t *dev_dest, double **host_src, int n, int m) {
+  dev_dest->n = n;
+  dev_dest->m = m;
+  if (cudaMalloc(&(dev_dest->ptr), m*n*sizeof(double)) != cudaSuccess) {
+    printf("double 2d malloc\n");
+  }      
+  if (cudaMemcpy(dev_dest->ptr, host_src[0], n * m * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("double 2d copy\n");
+  }      
+} 
+
+void copy_int_matrix_to_gpu(cu_int_matrix_t *dev_dest, int **host_src, int n, int m) {
+  dev_dest->n = n;
+  dev_dest->m = m;
+  if (cudaMalloc(&(dev_dest->ptr), m*n*sizeof(int)) != cudaSuccess) {
+    printf("int 2d malloc \n");
+  }      
+  if (cudaMemcpy(dev_dest->ptr, host_src[0], n * m * sizeof(int), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("int 2d copy\n");
+  }      
+}
+
+void copy_double_matrix3d_to_gpu(cu_double_matrix3d_t *dev_dest, double ***host_src, int n, int m, int p) {
+  dev_dest->n = n; dev_dest->m = m; dev_dest->p = p;
+  if (cudaMalloc(&(dev_dest->ptr), n * m * p * sizeof(double)) != cudaSuccess) {
+    printf("3d malloc\n");
+  }      
+  if (cudaMemcpy(dev_dest->ptr, host_src[0][0], n * m * p * sizeof(double), cudaMemcpyHostToDevice)) {
+    printf("3d copy\n");
+  }
+}
+
+void copy_double_arr_to_gpu(cu_double_arr_t *dev_dest, double *host_src, int n) {
+  dev_dest->n = n;
+  if (cudaMalloc(&(dev_dest->ptr), n * sizeof(double)) != cudaSuccess) {
+    printf("double arr malloc\n");
+  }
+  if (cudaMemcpy(dev_dest->ptr, host_src, n * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("double arr copy\n");
+  }
+}
+
+void copy_int_arr_to_gpu(cu_int_arr_t *dev_dest, int *host_src, int n) {
+  dev_dest->n = n;
+  if (cudaMalloc(&(dev_dest->ptr), n * sizeof(int)) != cudaSuccess) {
+    printf("int arr malloc\n");
+  }
+  if (cudaMemcpy(dev_dest->ptr, host_src, n * sizeof(int), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("int arr copy\n");
+  }
+}
 
 __device__ void cu_randperm(int *x, int n, int d, uint r1, uint r2) {
   int i;
@@ -58,6 +105,16 @@ __device__ void cu_randperm(int *x, int n, int d, uint r1, uint r2) {
     x[i] = idx;
     idx = (idx + step) % n;
   }
+}
+
+__device__ inline double cu_sigmoid(double x, const double *b)
+{
+  return b[0] + (1 - b[0]) / (1 + exp(-b[1]-b[2]*x));
+}
+
+__device__ inline double cu_logistic(double x, double *b)
+{
+  return 1.0 / (1.0 + exp(-x*b[1]-b[0]));
 }
 
 // computes the max of x
@@ -424,9 +481,12 @@ __device__ void range_image_xyz2sub(int *i, int *j, cu_range_image_data_t *range
   }
 }
 
-__device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, 
-				    cu_double_matrix_t *range_image, cu_range_image_data_t *range_image_data, cu_int_matrix_t *range_image_cnt, scope_params_t *params, int score_round)
+__device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, cu_double_matrix_t *range_image, 
+				    cu_range_image_data_t *range_image_data, cu_int_matrix_t *range_image_cnt, double *b_xyz, scope_params_t *params, int score_round, double *score_c)
 {
+  int xyz_score_window = params->xyz_score_window;
+  int xyz_score_use_plane = params->xyz_score_use_plane;
+  
   double score = 0.0;
   //double range_sigma = params->range_sigma;
   //double dmax = 2*range_sigma;
@@ -438,8 +498,9 @@ __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis
       double dmax = 2*range_sigma;
       double dmin = dmax;
       int x, y;
-      for (x = xi[i] - 1; x<=xi[i] + 1; ++x) {
-	for (y = yi[i] - 1; y <= yi[i] + 1; ++y) {
+      int r = xyz_score_window;
+      for (x = xi[i] - r; x<=xi[i] + r; ++x) {
+	for (y = yi[i] - r; y <= yi[i] + r; ++y) {
 	  if (x >= 0 && x < (range_image_data->w) && y>=0 && y<(range_image_data->h) && range_image_cnt->ptr[x * range_image_cnt->m + y] > 0) {
 	    double obs_range = range_image->ptr[x * range_image->m + y];
 	    double d = fabs(model_range - obs_range);
@@ -455,6 +516,11 @@ __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis
   }
   score -= log(cu_normpdf(0, 0, params->range_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = cu_logistic(score, b_xyz);
+
+  *score_c = score;
+
   double w = 0;
   if (score_round == 2)
     w = params->score2_xyz_weight;
@@ -465,7 +531,7 @@ __device__ double compute_xyz_score(double *cloud, int *xi, int *yi, double *vis
 }
 
 __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, scope_noise_model_t *noise_models, int num_validation_points, int *xi, int *yi,
-				       cu_int_matrix_t *range_image_cnt, cu_double_matrix3d_t *range_image_normals, scope_params_t *params, int score_round)
+				       cu_int_matrix_t *range_image_cnt, cu_double_matrix3d_t *range_image_normals, double *b_normal, scope_params_t *params, int score_round, double *score_c)
 {
   //TODO: make this a param
   double normalvar_thresh = .3;
@@ -494,6 +560,11 @@ __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, s
     score /= wtot;
   score -= log(cu_normpdf(0, 0, params->normal_sigma));
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = cu_logistic(score, b_normal);
+
+  *score_c = score;
+
   double w = 0;
   if (score_round == 2)
     w = params->score2_normal_weight;
@@ -504,7 +575,7 @@ __device__ double compute_normal_score(double *cloud_normals, double *vis_pmf, s
 }
 
 __device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_pmf, scope_noise_model_t *noise_models, int n, cu_int_matrix_t *range_image_idx, cu_double_matrix3d_t *obs_lab_image, 
-				    scope_params_t *params, int score_round, double lab_scores[]) 
+				    double *b_L, double *b_A, double *b_B, scope_params_t *params, int score_round, double *lab_scores) 
 {
   double scores[3] = {0, 0, 0};
   int i, j;
@@ -533,16 +604,22 @@ __device__ double compute_lab_score(int *xi, int *yi, double *lab, double *vis_p
   }
   //score -= log(normpdf(0, 0, params->lab_sigma));
 
+  
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    scores[0] = cu_logistic(scores[0], b_L);
+    scores[1] = cu_logistic(scores[1], b_A);
+    scores[2] = cu_logistic(scores[2], b_B);
+  }
+
+  memcpy(lab_scores, scores, 3 * sizeof(double));
+
   double lab_weights2[3] = {params->score2_L_weight, params->score2_A_weight, params->score2_B_weight};
   double lab_weights3[3] = {params->score3_L_weight, params->score3_A_weight, params->score3_B_weight};
-
   double *w = NULL;
   if (score_round == 2)
     w = lab_weights2;
   else
     w = lab_weights3;
-  
-  memcpy(lab_scores, scores, 3 * sizeof(double));
 
   return cu_dot(scores, w, 3);
 }
@@ -772,9 +849,11 @@ __device__ double compute_labdist_score(int *xi, int *yi, cu_double_matrix_t *co
 */
 
 
-__device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round)
+__device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round, double *score_c)
 {
   double score = log(cu_sum(vis_prob, n) / (double) n);
+  
+  *score_c = score;
 
   double w = 0;
   if (score_round == 2)
@@ -813,11 +892,6 @@ __device__ double compute_visibility_prob(double *point, double *normal, int xi,
 
   double dR = model_range - obs_range;
   return (dR < 0 ? 1.0 : cu_normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
-}
-
-__device__ inline double cu_sigmoid(double x, const double *b)
-{
-  return b[0] + (1 - b[0]) / (1 + exp(-b[1]-b[2]*x));
 }
 
 __device__ void get_noise_models(scope_noise_model_t *noise_models, double *cloud, double *cloud_normals, double x[], double q[], int *idx, int n, 
@@ -1029,8 +1103,9 @@ __device__ void compute_occ_edges(int *occ_edges, double *V, double *V2, int *nu
   }
 }
 
-__device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pmf, int n, int *occ_edges, int num_occ_edges, cu_range_image_data_t *range_image_data,
-				     cu_double_matrix_t *range_image, cu_double_matrix_t *edge_image, scope_params_t *params, int score_round)
+__device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pmf, int n, int *occ_edges, int num_occ_edges, cu_range_image_data_t *range_image_data, cu_double_matrix_t *range_image, 
+				     cu_double_matrix_t *edge_image, double *b_edge, double *b_edge_occ, scope_params_t *params, 
+				     int score_round, double *score_occ, double *score_edge_vis, double *score_edge)
 {
   if (n == 0)
     return 0.0;
@@ -1075,6 +1150,15 @@ __device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pm
     score = n*score / (double)(n + num_occ_edges);
   }
 
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    score = cu_logistic(score, b_edge);
+    occ_score = cu_logistic(occ_score, b_edge_occ);
+  }
+
+  *score_edge = score;
+  *score_occ = occ_score;
+  *score_edge_vis = vis_score;
+
   double w1=0, w2=0, w3=0;
   if (score_round == 2) {
     w1 = params->score2_edge_weight;
@@ -1091,7 +1175,7 @@ __device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pm
 }
 
 // compute the segment affinity score for a scope sample
-__device__ double compute_segment_affinity_score(int *segments, int num_segments, cu_double_matrix_t *segment_affinities, int num_obs_segments, int *mask, scope_params_t *params, int score_round)
+__device__ double compute_segment_affinity_score(int *segments, int num_segments, cu_double_matrix_t *segment_affinities, int num_obs_segments, int *mask, scope_params_t *params, int score_round, double *score_c)
 {
   int n = num_obs_segments;
 
@@ -1100,22 +1184,22 @@ __device__ double compute_segment_affinity_score(int *segments, int num_segments
   for (i = 0; i < num_segments; i++)
     mask[segments[i]] = 1;
 
-  int j, cnt = 0;  // normalize by the number of model boundary edges
+  int j;  // normalize by the number of model boundary edges
   double score = 0;
   for (i = 0; i < num_segments; i++) {
     int s = segments[i];
     for (j = 0; j < n; j++) {
       if (mask[j] == 0) {
-	cnt++;
 	double a = MIN(segment_affinities->ptr[s * segment_affinities->m + j], .9);
 	if (a > 0.5)
 	  score += log((1-a)/a);
       }
     }
   }
-  if (cnt > 0)
-    score = 5*score/(double)cnt;
+  score *= .05;
 
+  *score_c = score;
+  
   double weight = 0;
   if (score_round == 2)
     weight = params->score2_segment_affinity_weight;
@@ -1126,7 +1210,7 @@ __device__ double compute_segment_affinity_score(int *segments, int num_segments
   
 }
 
-__device__ double cu_model_placement_score(double x[], double q[], cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
+__device__ double cu_model_placement_score(double x[], double q[], double *scores, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 					   int *xi, int *yi, int *idx, double *cloud, double *cloud_normals, double *cloud_lab, int num_validation_points, double *vis_prob, double *vis_pmf, uint *r,
 					   scope_noise_model_t *noise_models, int *segments_idx, int num_segments, int *segment_mask,
 					   int *idx_edge, double *P, double *V_edge, double *V2_edge, int *occ_edges, double *vis_prob_edge, double *vis_pmf_edge, double *obs_lab, double *obs_weights) {
@@ -1167,12 +1251,15 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
   // compute noise models
   get_noise_models(noise_models, cloud, cloud_normals, x, q, idx, num_validation_points, &(cu_model->ved), &(cu_model->range_edges_model_views), &(cu_model->normalvar));
 
-  double normal_score = compute_normal_score(cloud_normals, vis_pmf, noise_models, num_validation_points, xi, yi, &(cu_obs->range_image_cnt), &(cu_obs->range_image_normals), cu_params, score_round);
   double xyz_score = compute_xyz_score(cloud, xi, yi, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image), &(cu_obs->range_image_data), &(cu_obs->range_image_cnt), 
-				       cu_params, score_round);
-  double lab_scores[3];
-  double lab_score = compute_lab_score(xi, yi, cloud_lab, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_idx), &(cu_obs->obs_lab_image), cu_params, score_round, lab_scores);
-  double vis_score = compute_vis_score(vis_prob, num_validation_points, cu_params, score_round);
+				       cu_model->score_comp_models.ptr->b_xyz, cu_params, score_round, &scores[xyz_idx]);
+  double normal_score = compute_normal_score(cloud_normals, vis_pmf, noise_models, num_validation_points, xi, yi, &(cu_obs->range_image_cnt), &(cu_obs->range_image_normals), 
+					     cu_model->score_comp_models.ptr->b_normal, cu_params, score_round, &scores[normal_idx]);
+  double vis_score = compute_vis_score(vis_prob, num_validation_points, cu_params, score_round, &scores[vis_idx]);
+  //double lab_score = compute_lab_score(xi, yi, cloud_lab, vis_pmf, noise_models, num_validation_points, &(cu_obs->range_image_idx), &(cu_obs->obs_lab_image), 
+  //				       cu_model->score_comp_models.ptr->b_color_L, cu_model->score_comp_models.ptr->b_color_A, cu_model->score_comp_models.ptr->b_color_B, cu_params, score_round, 
+  //                                   &scores[lab1_idx]);
+  double lab_score = 0;
   /*double labdist_score = compute_labdist_score(xi, yi, &(cu_model->color_avg_cov), &(cu_model->color_means1), &(cu_model->color_means2), &(cu_model->color_cov1), &(cu_model->color_cov2), 
 					       &(cu_model->color_cnts1), &(cu_model->color_cnts2), idx, vis_pmf, noise_models, num_validation_points, 
 					       &(cu_obs->range_image), cu_obs->range_image_data.w, cu_obs->range_image_data.h, &(cu_obs->obs_lab_image), obs_lab, obs_weights, cu_params, score_round);*/
@@ -1191,7 +1278,8 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
       edge_score = compute_edge_score(P, vis_prob_edge, vis_pmf_edge, n, occ_edges, num_occ_edges, &(cu_obs->range_image_data), &(cu_obs->range_image), &(cu_obs->edge_image), cu_params, score_round);
     }
     else*/
-    edge_score = compute_edge_score(P, vis_prob_edge, vis_pmf_edge, n, NULL, 0, &(cu_obs->range_image_data), &(cu_obs->range_image), &(cu_obs->edge_image), cu_params, score_round);
+    edge_score = compute_edge_score(P, vis_prob_edge, vis_pmf_edge, n, NULL, 0, &(cu_obs->range_image_data), &(cu_obs->range_image), &(cu_obs->edge_image), cu_model->score_comp_models.ptr->b_edge, 
+				    cu_model->score_comp_models.ptr->b_edge_occ, cu_params, score_round, &scores[occ_idx], &scores[edge_vis_idx], &scores[edge_idx]);
   }
 
   /*double segment_score = 0;
@@ -1200,16 +1288,15 @@ __device__ double cu_model_placement_score(double x[], double q[], cu_model_data
 					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
   */
   
-  double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round);
+  double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round, &scores[segment_idx]);
 
-  double score = xyz_score + normal_score + vis_score + edge_score + lab_score + segment_affinity_score + labdist_score;
+  //double score = xyz_score + normal_score + vis_score + edge_score + lab_score + segment_affinity_score + labdist_score;
+  double score = xyz_score + normal_score + vis_score + edge_score + segment_affinity_score + labdist_score;
 
-  double scores[8] = {xyz_score, normal_score, vis_score, edge_score, lab_scores[0], lab_scores[1], lab_scores[2], segment_affinity_score};
-    
   return score;
 }
 
-__global__ void device_score_samples(double *cu_scores, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples,
+__global__ void device_score_samples(double *cu_scores, double *cu_score_components, cu_double_matrix_t cu_samples_x, cu_double_matrix_t cu_samples_q, int num_samples,
 			      cu_int_arr_t cu_segments_idx, cu_int_arr_t cu_num_segments, int *cu_segment_mask, 
 			      cu_model_data_t cu_model, cu_obs_data_t cu_obs, scope_params_t cu_params, 
 			      int score_round, int *cu_xi, int *cu_yi, int *cu_idx, double *cu_cloud, double *cu_cloud_normals, double *cu_cloud_lab, double *cu_vis_prob, double *cu_vis_pmf, uint *cu_rands, 
@@ -1263,83 +1350,16 @@ __global__ void device_score_samples(double *cu_scores, cu_double_matrix_t cu_sa
     vis_prob_edge = &cu_vis_prob_edge[i*n_edge];
     vis_pmf_edge = &cu_vis_pmf_edge[i*n_edge];
 
-    cu_scores[i] = cu_model_placement_score(x, q, &cu_model, &cu_obs, &cu_params, score_round, xi, yi, idx, cloud, cloud_normals, cloud_lab, num_validation_points, 
+    double *scores;
+    scores = &cu_score_components[i * cu_num_components];
+
+    cu_scores[i] = cu_model_placement_score(x, q, scores, &cu_model, &cu_obs, &cu_params, score_round, xi, yi, idx, cloud, cloud_normals, cloud_lab, num_validation_points, 
 					    vis_prob, vis_pmf, &cu_rands[4*i], noise_models, segments_idx, cu_num_segments.ptr[i], segment_mask,
 					    idx_edge, P, V_edge, V2_edge, occ_edge, vis_prob_edge, vis_pmf_edge, obs_lab, obs_weights);
 
     //printf("%lf\n", cu_scores[i]);
   }
 }
-
-void copy_double_matrix_to_gpu(cu_double_matrix_t *dev_dest, double **host_src, int n, int m) {
-  dev_dest->n = n;
-  dev_dest->m = m;
-  //cudaMallocPitch(&(dev_dest->ptr), &(dev_dest->pitch), m * sizeof(double), n);
-  //cudaMemcpy2D(dev_dest->ptr, dev_dest->pitch, host_src[0], m * sizeof(double), m * sizeof(double), n, cudaMemcpyHostToDevice); 
-  if (cudaMalloc(&(dev_dest->ptr), m*n*sizeof(double)) != cudaSuccess) {
-    printf("double 2d malloc\n");
-  }      
-  if (cudaMemcpy(dev_dest->ptr, host_src[0], n * m * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess) {
-    printf("double 2d copy\n");
-  }      
-} 
-
-void copy_int_matrix_to_gpu(cu_int_matrix_t *dev_dest, int **host_src, int n, int m) {
-  dev_dest->n = n;
-  dev_dest->m = m;
-  //cudaMallocPitch(&(dev_dest->ptr), &(dev_dest->pitch), m * sizeof(int), n);
-  //cudaMemcpy2D(dev_dest->ptr, dev_dest->pitch, host_src[0], m * sizeof(int), m * sizeof(int), n, cudaMemcpyHostToDevice); 
-  if (cudaMalloc(&(dev_dest->ptr), m*n*sizeof(int)) != cudaSuccess) {
-    printf("int 2d malloc \n");
-  }      
-  if (cudaMemcpy(dev_dest->ptr, host_src[0], n * m * sizeof(int), cudaMemcpyHostToDevice) != cudaSuccess) {
-    printf("int 2d copy\n");
-  }      
-}
-
-void copy_double_matrix3d_to_gpu(cu_double_matrix3d_t *dev_dest, double ***host_src, int n, int m, int p) {
-  dev_dest->n = n; dev_dest->m = m; dev_dest->p = p;
-  /*  dest->extent = make_cudaExtent(m * sizeof(double), n, p);
-  cudaMalloc3D(&(dest->ptr), dest->extent);
-  cudaPitchedPtr src_ptr;
-  src_ptr.ptr = host_src[0][0];
-  src_ptr.pitch = m * sizeof(double);
-  src_ptr.xsize = m;
-  src_ptr.ysize = n;
-  cudaMemcpy3DParms copy_params = {0};
-  copy_params.srcPtr = src_ptr;
-  copy_params.dstPtr = dest->ptr;
-  copy_params.extent = dest->extent;
-  copy_params.kind = cudaMemcpyHostToDevice;
-  cudaMemcpy3D(&copy_params);*/
-  if (cudaMalloc(&(dev_dest->ptr), n * m * p * sizeof(double)) != cudaSuccess) {
-    printf("3d malloc\n");
-  }      
-  if (cudaMemcpy(dev_dest->ptr, host_src[0][0], n * m * p * sizeof(double), cudaMemcpyHostToDevice)) {
-    printf("3d copy\n");
-  }
-}
-
-void copy_double_arr_to_gpu(cu_double_arr_t *dev_dest, double *host_src, int n) {
-  dev_dest->n = n;
-  if (cudaMalloc(&(dev_dest->ptr), n * sizeof(double)) != cudaSuccess) {
-    printf("double arr malloc\n");
-  }
-  if (cudaMemcpy(dev_dest->ptr, host_src, n * sizeof(double), cudaMemcpyHostToDevice) != cudaSuccess) {
-    printf("double arr copy\n");
-  }
-}
-
-void copy_int_arr_to_gpu(cu_int_arr_t *dev_dest, int *host_src, int n) {
-  dev_dest->n = n;
-  if (cudaMalloc(&(dev_dest->ptr), n * sizeof(int)) != cudaSuccess) {
-    printf("int arr malloc\n");
-  }
-  if (cudaMemcpy(dev_dest->ptr, host_src, n * sizeof(int), cudaMemcpyHostToDevice) != cudaSuccess) {
-    printf("int arr copy\n");
-  }
-}
-
 void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 		      int num_validation_points, int num_obs_segments) {
   double t0 = get_time_ms();  
@@ -1438,17 +1458,12 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
     memcpy(samples_q[i], samples[i].q, 4 * sizeof(double));
   }  
 
-  cu_double_matrix_t cu_samples_x;
-  copy_double_matrix_to_gpu(&cu_samples_x, samples_x, num_samples, 3);
-  cu_double_matrix_t cu_samples_q;
-  copy_double_matrix_to_gpu(&cu_samples_q, samples_q, num_samples, 4);
-
   // segment stuff
   cu_int_arr_t cu_segments_idx;
   int *tmp_segments_idx;
   safe_malloc(tmp_segments_idx, num_samples * num_obs_segments, int);
   memset(tmp_segments_idx, -1, num_samples * num_obs_segments * sizeof(int));
-  for (int i = 0; i < num_samples; ++i) {
+  for (i = 0; i < num_samples; ++i) {
     memcpy(&(tmp_segments_idx[i * num_obs_segments]), samples[i].segments_idx, samples[i].num_segments * sizeof(int));
   }
   copy_int_arr_to_gpu(&cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments);
@@ -1456,7 +1471,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   cu_int_arr_t cu_num_segments;
   int *num_segments;
   safe_calloc(num_segments, num_samples, int);
-  for (int i = 0; i < num_samples; ++i) {
+  for (i = 0; i < num_samples; ++i) {
     num_segments[i] = samples[i].num_segments;
   }  
   copy_int_arr_to_gpu(&cu_num_segments, num_segments, num_samples);
@@ -1465,22 +1480,40 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   if (cudaMalloc(&cu_segment_mask, num_samples * num_obs_segments * sizeof(int)) != cudaSuccess) {
     printf("segment_mask\n");
   }
+
+  cu_double_matrix_t cu_samples_x;
+  copy_double_matrix_to_gpu(&cu_samples_x, samples_x, num_samples, 3);
+  cu_double_matrix_t cu_samples_q;
+  copy_double_matrix_to_gpu(&cu_samples_q, samples_q, num_samples, 4);
+
+  double *cu_score_components;
+  if (cudaMalloc(&cu_score_components, num_samples * num_components * sizeof(double)) != cudaSuccess) {
+    printf("score components\n");
+  }
   
   //cudaProfilerStart();
   int threads_per_block = 8;
   int blocks_per_grid = ceil(num_samples/(1.0*threads_per_block));
 
-  device_score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_samples_x, cu_samples_q, num_samples, cu_segments_idx, cu_num_segments, cu_segment_mask, *cu_model, *cu_obs, *cu_params, score_round, 
-							cu_xi, cu_yi, cu_idx, cu_cloud, cu_normals, cu_lab, cu_vis_prob, cu_vis_pmf, cu_rands, cu_noise_models,
-							cu_idx_edge, cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge, cu_obs_lab, cu_obs_weights, num_validation_points);
+  device_score_samples<<<blocks_per_grid, threads_per_block>>>(cu_scores, cu_score_components, cu_samples_x, cu_samples_q, num_samples, cu_segments_idx, cu_num_segments, cu_segment_mask, *cu_model, *cu_obs, 
+							       *cu_params, score_round, cu_xi, cu_yi, cu_idx, cu_cloud, cu_normals, cu_lab, cu_vis_prob, cu_vis_pmf, cu_rands, cu_noise_models, cu_idx_edge, 
+							       cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge, cu_obs_lab, cu_obs_weights, num_validation_points);
   cudaDeviceSynchronize();
   //cudaProfilerStop();
-  printf("scoring: %.2f ms\n", get_time_ms() - t0);
-  cudaError err;
-  err = cudaMemcpy(scores, cu_scores, num_samples * sizeof(double), cudaMemcpyDeviceToHost);
-  if (err != cudaSuccess) {
-    printf("scores error: %s\n", cudaGetErrorString(err));
+  if (cudaMemcpy(scores, cu_scores, num_samples * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess) {
+    printf("scores error\n");
   }      
+  double sample_scores[num_samples * num_components];
+  if (cudaMemcpy(sample_scores, cu_score_components, num_samples * num_components * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess) {
+    printf("sample_scores\n");
+  }
+  for (i = 0; i < num_samples; ++i) {
+    samples[i].num_scores = num_components;
+    safe_malloc(samples[i].scores, num_components, double);
+    memcpy(samples[i].scores, &sample_scores[i * num_components], num_components * sizeof(double));
+  }
+
+  printf("scoring: %.2f ms\n", get_time_ms() - t0);
   
   free_matrix2(samples_x);
   free_matrix2(samples_q);  
@@ -1560,7 +1593,15 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   copy_int_arr_to_gpu(&(cu_model->range_edges_view_idx), model_data->range_edges_model->view_idx, model_data->range_edges_model->num_views);
   copy_int_arr_to_gpu(&(cu_model->range_edges_view_cnt), model_data->range_edges_model->view_cnt, model_data->range_edges_model->num_views);
   copy_double_matrix_to_gpu(&(cu_model->range_edges_points), model_data->range_edges_model->pcd->points, model_data->range_edges_model->pcd->num_points, 3);
+
   
+  if (cudaMalloc(&(cu_model->score_comp_models.ptr), sizeof(score_comp_models_t)) != cudaSuccess) {
+    printf("score_comp_models malloc\n");
+  }      
+  if (cudaMemcpy(cu_model->score_comp_models.ptr, model_data->score_comp_models, sizeof(score_comp_models_t), cudaMemcpyHostToDevice) != cudaSuccess) {
+    printf("score_comp_models copy\n");
+  }      
+    
   cu_model->num_points = model_data->pcd_model->num_points;
   cu_model->num_views = model_data->range_edges_model->num_views;
   int n_edge = arr_max_i(model_data->range_edges_model->view_cnt, model_data->range_edges_model->num_views);
@@ -1613,7 +1654,14 @@ void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs
     copy_int_arr_to_gpu(&(cu_model[i].range_edges_view_idx), model_data[i].range_edges_model->view_idx, model_data[i].range_edges_model->num_views);
     copy_int_arr_to_gpu(&(cu_model[i].range_edges_view_cnt), model_data[i].range_edges_model->view_cnt, model_data[i].range_edges_model->num_views);
     copy_double_matrix_to_gpu(&(cu_model[i].range_edges_points), model_data[i].range_edges_model->pcd->points, model_data[i].range_edges_model->pcd->num_points, 3);
-  
+    
+    if (cudaMalloc(&(cu_model[i].score_comp_models.ptr), sizeof(score_comp_models_t)) != cudaSuccess) {
+      printf("score_comp_models malloc\n");
+    }      
+    if (cudaMemcpy(cu_model[i].score_comp_models.ptr, model_data[i].score_comp_models, sizeof(score_comp_models_t), cudaMemcpyHostToDevice) != cudaSuccess) {
+      printf("score_comp_models copy\n");
+    }      
+
     cu_model[i].num_points = model_data[i].pcd_model->num_points;
     cu_model[i].num_views = model_data[i].range_edges_model->num_views;
     int n_edge = arr_max_i(model_data[i].range_edges_model->view_cnt, model_data[i].range_edges_model->num_views);
@@ -1665,7 +1713,8 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
   cudaFree(cu_model->color_cnts2.ptr);
   cudaFree(cu_model->range_edges_view_idx.ptr);
   cudaFree(cu_model->range_edges_view_cnt.ptr);
-  
+  cudaFree(cu_model->score_comp_models.ptr);
+
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);
   cudaFree(cu_obs->range_image_pcd_obs_lab.ptr);
@@ -1701,6 +1750,7 @@ void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_o
     cudaFree(cu_model[i].color_cnts2.ptr);
     cudaFree(cu_model[i].range_edges_view_idx.ptr);
     cudaFree(cu_model[i].range_edges_view_cnt.ptr);
+    cudaFree(cu_model[i].score_comp_models.ptr);
   }
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);

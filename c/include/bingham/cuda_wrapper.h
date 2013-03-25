@@ -11,6 +11,7 @@ struct scope_model_data_struct;
 struct scope_obs_data_struct;
 struct scope_sample_struct;
 struct scope_params_struct;
+struct score_comp_models_struct;
 
 typedef struct {
   int *ptr;
@@ -40,6 +41,10 @@ typedef struct {
   double *ptr;
   size_t n, m, p;
 } cu_double_matrix3d_t;
+
+typedef struct {
+  struct score_comp_models_struct *ptr;
+} cu_score_comp_models_t;
   
 typedef struct cu_model_data_struct {
   cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
@@ -49,6 +54,8 @@ typedef struct cu_model_data_struct {
   cu_int_arr_t color_cnts1, color_cnts2, range_edges_view_idx, range_edges_view_cnt;
 
   int num_points, num_views, max_num_edges;
+  cu_score_comp_models_t score_comp_models;
+  
 } cu_model_data_t;
 
 typedef struct {
