@@ -732,6 +732,8 @@ void load_scope_params(scope_params_t *params, char *param_file)
 	sscanf(value, "%d", &params->use_bpa);
       else if (!wordcmp(name, "test_bpa", " \t\n"))
 	sscanf(value, "%d", &params->test_bpa);
+      else if (!wordcmp(name, "use_colors", " \t\n"))
+	sscanf(value, "%d", &params->use_colors);
 
       else if (!wordcmp(name, "dispersion_weight", " \t\n"))
 	sscanf(value, "%d", &params->dispersion_weight);
@@ -1285,6 +1287,7 @@ range_image_t *pcd_to_range_image_from_template(pcd_t *pcd, range_image_t *R0)
   double **P = new_matrix2(n,3);  // points
   double **N = new_matrix2(n,3);  // normals
   double **L = pcd->lab;          // lab colors
+
   for (i = 0; i < n; i++) {
     // get point and normal (w.r.t. viewpoint)
     double *p = P[i];
@@ -1306,7 +1309,8 @@ range_image_t *pcd_to_range_image_from_template(pcd_t *pcd, range_image_t *R0)
   R->idx = new_matrix2i(w,h);
   R->points = new_matrix3(w,h,3);
   R->normals = new_matrix3(w,h,3);
-  R->lab_colors = new_matrix3(3,w,h);  // note the order of indices
+  if (pcd->lab)
+    R->lab_colors = new_matrix3(3,w,h);  // note the order of indices
   R->cnt = new_matrix2i(w,h);
 
   for (i = 0; i < w; i++) {
@@ -1334,7 +1338,8 @@ range_image_t *pcd_to_range_image_from_template(pcd_t *pcd, range_image_t *R0)
     for (j = 0; j < 3; j++) {
       avg_point[j] = (cnt*avg_point[j] + P[i][j]) / (double)(cnt+1);
       avg_normal[j] = (cnt*avg_normal[j] + N[i][j]) / (double)(cnt+1);
-      R->lab_colors[j][cx][cy] = (cnt*R->lab_colors[j][cx][cy] + L[i][j]) / (double)(cnt+1);
+      if (pcd->lab)
+	R->lab_colors[j][cx][cy] = (cnt*R->lab_colors[j][cx][cy] + L[i][j]) / (double)(cnt+1);
     }
     normalize(avg_normal, avg_normal, 3);
     R->cnt[cx][cy]++;
@@ -1427,7 +1432,8 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int paddin
   int h = R->h;
   R->points = new_matrix3(w,h,3);
   R->normals = new_matrix3(w,h,3);
-  R->lab_colors = new_matrix3(3,w,h);  // note the order of indices
+  if (pcd->lab)
+    R->lab_colors = new_matrix3(3,w,h);  // note the order of indices
   R->cnt = new_matrix2i(w,h);
   for (i = 0; i < n; i++) {
     int cx = (int)floor( (X[i] - R->min[0]) / R->res);
@@ -1440,7 +1446,8 @@ range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int paddin
     for (j = 0; j < 3; j++) {
       avg_point[j] = (cnt*avg_point[j] + P[i][j]) / (double)(cnt+1);
       avg_normal[j] = (cnt*avg_normal[j] + N[i][j]) / (double)(cnt+1);
-      R->lab_colors[j][cx][cy] = (cnt*R->lab_colors[j][cx][cy] + L[i][j]) / (double)(cnt+1);
+      if (pcd->lab)
+	R->lab_colors[j][cx][cy] = (cnt*R->lab_colors[j][cx][cy] + L[i][j]) / (double)(cnt+1);
     }
     normalize(avg_normal, avg_normal, 3);
     R->cnt[cx][cy]++;
@@ -1462,7 +1469,8 @@ void free_range_image(range_image_t *range_image)
   free_matrix2i(range_image->idx);
   free_matrix3(range_image->points);
   free_matrix3(range_image->normals);
-  free_matrix3(range_image->lab_colors);
+  if (range_image->lab_colors)
+    free_matrix3(range_image->lab_colors);
   free_matrix2i(range_image->cnt);
   free(range_image);
 }
@@ -1613,6 +1621,9 @@ double **get_edge_feature_image(pcd_t *pcd, range_image_t *range_image, range_im
 
 double ***get_lab_image(range_image_t *range_image, scope_params_t *params)
 {
+  if (range_image->lab_colors == NULL)
+    return NULL;
+
   int color_blur = params->color_blur;
 
   int w = range_image->w;
@@ -2541,8 +2552,9 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	  if (xi >= 0) {
 	    memcpy(cluster_points[num_clusters], obs_range_image->points[xi][yi], 3*sizeof(double));
 	    memcpy(cluster_normals[num_clusters], obs_range_image->normals[xi][yi], 3*sizeof(double));
-	    for (i = 0; i < 3; i++)
-	      cluster_colors[num_clusters][i] = obs_lab_image[i][xi][yi];
+	    if (obs_lab_image)
+	      for (i = 0; i < 3; i++)
+		cluster_colors[num_clusters][i] = obs_lab_image[i][xi][yi];
 	    num_clusters++;
 	  }
 	}
@@ -2569,8 +2581,9 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	      printf("obs_range_image->normals[%d][%d] = (%f, %f, %f)\n", xi, yi,
 		     obs_range_image->normals[xi][yi][0], obs_range_image->normals[xi][yi][1], obs_range_image->normals[xi][yi][2]);
 
-	    for (j = 0; j < 3; j++)
-	      cluster_colors[i][j] += obs_lab_image[j][xi][yi];
+	    if (obs_lab_image)
+	      for (j = 0; j < 3; j++)
+		cluster_colors[i][j] += obs_lab_image[j][xi][yi];
 	    cluster_cnts[i]++;
 	  }
 	}
@@ -2614,8 +2627,11 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
 	  if (obs_fg_range_image->cnt[xi][yi] > 0 && obs_range_image->cnt[xi][yi] > 0) {  // only include foreground points in clusters
 	    double d2_point = dist2(obs_range_image->points[xi][yi], cluster_points[i], 3);
 	    double d2_normal = dist2(obs_range_image->normals[xi][yi], cluster_normals[i], 3);
-	    double obs_lab[3] = {obs_lab_image[0][xi][yi], obs_lab_image[1][xi][yi], obs_lab_image[2][xi][yi]};
-	    double d2_color = dist2(obs_lab, cluster_colors[i], 3);
+	    double d2_color = 0.0;
+	    if (obs_lab_image) {
+	      double obs_lab[3] = {obs_lab_image[0][xi][yi], obs_lab_image[1][xi][yi], obs_lab_image[2][xi][yi]};
+	      d2_color = dist2(obs_lab, cluster_colors[i], 3);
+	    }
 
 	    double d2 = d2_point/xyz_sigma2 + d2_normal/normal_sigma2 + d2_color/lab_sigma2;
 
@@ -2794,18 +2810,20 @@ void get_superpixel_segmentation(scope_obs_data_t *obs_data, scope_params_t *par
       //else
 
       //dbug: save edge image
-      S[xi][yi][0] = S[xi][yi][1] = S[xi][yi][2] = (uchar)255*exp(obs_edge_image[xi][yi]);
+      //S[xi][yi][0] = S[xi][yi][1] = S[xi][yi][2] = (uchar)255*exp(obs_edge_image[xi][yi]);
 
-      /*
       if (i >= 0) {
-	double rgb[3];
-	lab2rgb(rgb, cluster_colors[i]);
+	//double rgb[3];
+	//lab2rgb(rgb, cluster_colors[i]);
 
-	S[xi][yi][0] = (uchar)rgb[0];
-	S[xi][yi][1] = (uchar)rgb[1];
-	S[xi][yi][2] = (uchar)rgb[2];
+	//S[xi][yi][0] = (uchar)rgb[0];
+	//S[xi][yi][1] = (uchar)rgb[1];
+	//S[xi][yi][2] = (uchar)rgb[2];
+
+	S[xi][yi][0] = (i*7*13*19 + 23*29) % 256;
+	S[xi][yi][1] = (i*5*13*19 + 23*29) % 256;
+	S[xi][yi][2] = (i*3*13*19 + 23*29) % 256;
       }
-      */
     }
   }
   /*
@@ -2862,7 +2880,7 @@ void get_superpixel_affinity_graph(scope_obs_data_t *obs_data, scope_params_t *p
   double edge_weight = .1; //.5;
   double dist_weight = 2; //10;
   double normal_weight = .3; //1;
-  double color_weight = .001; //.005
+  double color_weight = (params->use_colors ? .001 : 0.0); //.005
 
   pcd_t *pcd_obs = obs_data->pcd_obs;
   range_image_t *obs_range_image = obs_data->obs_range_image;
@@ -2968,15 +2986,21 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
     double p[3];
     sub(p, pcd_obs->points[ segment->center_point ], sample->x, 3);
     matrix_vec_mult(p, R_inv, p, 3, 3);
+
     //int nn_idx;
-    //double nn_d2;
+    double nn_d2;
     //flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
+
     double d = distance_grid_get_distance(p, model_data->model_dist_grid);
+
+    //if (d > segment->max_radius && sqrt(nn_d2) < segment->max_radius)
+    //  printf("dist_grid dist = %f, flann dist = %f, max_radius = %f\n", d, sqrt(nn_d2), segment->max_radius); //dbug
 
     //if (nn_d2 > segment->max_radius * segment->max_radius)
     if (d > segment->max_radius)
       segment_probs[i] = 0.0;
     else {
+      //segment_probs[i] = 1.0; //dbug
 
       num_possible++; //dbug
 
@@ -2989,6 +3013,8 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	//sub(p, p_obs, sample->x, 3);
 	//matrix_vec_mult(p, R_inv, p, 3, 3);
 	//flann_find_nearest_neighbors_index_double(model_data->model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyz_params);
+	//int flann_nn_idx = nn_idx;
+	//double flann_nn_d2 = nn_d2;
 
 	double obs_xyz[3];
 	get_point(obs_xyz, pcd_obs, segment->surface_points[j]);
@@ -3004,12 +3030,15 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	//mult(&xyzn_query[3], obs_normal, normal_weight, 3);
 
 	//int nn_idx;
-	double nn_d2;
+	//double nn_d2;
 	//flann_find_nearest_neighbors_index_double(model_data->model_xyzn_index, xyzn_query, 1, &nn_idx, &nn_d2, 1, &model_data->model_xyzn_params);
 
 	//int search_radius = 1;
 	//int nn_idx = distance_grid_find_nn_xyzn(&nn_d2, obs_xyz, obs_normal, xyz_weight, normal_weight, model_data->model_dist_grid, search_radius);
 	int nn_idx = distance_grid_find_nn(&nn_d2, obs_xyz, model_data->model_dist_grid);
+
+	//if (nn_idx < 0)
+	//  printf("Warning: nn_idx < 0!\n");
 
 	//if (nn_idx < 0 || nn_d2 > 4.0) //params->xyz_sigma * params->xyz_sigma)
 	if (nn_idx < 0 || nn_d2 > params->xyz_sigma * params->xyz_sigma)
@@ -3026,6 +3055,7 @@ void sample_segments_given_model_pose(scope_sample_t *sample, scope_model_data_t
 	  //double dR = model_range - obs_range;
 	  //P[j] = (dR < 0 ? 1.0 : normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
 
+	  P[j] = 1.0;
 	  P[j] = normpdf(d_xyz/params->xyz_sigma, 0, 1) / .3989;  //TODO: use noise models
 	  P[j] *= normpdf(.2*d_normal/params->normal_sigma, 0, 1) / .3989;  //TODO: use noise models
 
@@ -3393,7 +3423,8 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
   data->obs_edge_image = get_edge_feature_image(data->pcd_obs, data->obs_range_image, data->obs_fg_range_image, params);
 
   // compute blurred image colors
-  data->obs_lab_image = get_lab_image(data->obs_range_image, params);
+  if (params->use_colors)
+    data->obs_lab_image = get_lab_image(data->obs_range_image, params);
 
   //dbug
   obs_edge_image_width_ = data->obs_range_image->w;
@@ -3507,7 +3538,8 @@ void free_scope_obs_data(scope_obs_data_t *data)
   free_matrix2(data->obs_edge_points);
   free_matrix2(data->obs_edge_points_image);
   free_matrix2(data->obs_edge_image);
-  free_matrix3(data->obs_lab_image);
+  if (data->obs_lab_image)
+    free_matrix3(data->obs_lab_image);
 
   if (data->fpfh_obs_olfs) {
     for (i = 0; i < data->fpfh_obs->num_points; i++)
@@ -4239,7 +4271,7 @@ double compute_lab_score(double **cloud, double *vis_pmf, scope_noise_model_t *n
   range_image_t *obs_range_image = obs_data->obs_range_image;
   double ***obs_lab_image = obs_data->obs_lab_image;
 
-  if (pcd_model->lab == NULL)
+  if (pcd_model->lab == NULL || params->use_colors == 0)
     return 0.0;
 
   // get obs colors

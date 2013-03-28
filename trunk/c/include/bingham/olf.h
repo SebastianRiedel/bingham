@@ -213,6 +213,7 @@ extern "C" {
     int use_shot;
     int use_sift;
     int use_table;
+    int use_colors;
     int num_samples_round1;
     int num_samples_round2;
     int num_samples_round3;
