@@ -10,21 +10,20 @@
 
 int main(int argc, char *argv[])
 {
-  // NEXT: Fix reading from file
-  if (argc < 8) {
-    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_sift> <pcd_obs_shot> <model> <param_file> <output_file> <r/s/w flag> <if flag is r or w, sample_file>\n", argv[0]);
+  if (argc < 9) {
+    printf("usage: %s <pcd_obs> <pcd_obs_fpfh> <pcd_obs_sift> <pcd_obs_shot> <model> <scope_param_file> <mope_param_file> <output_file> <r/s/w flag> <if flag is r or w, sample_file>\n", argv[0]);
     return 1;
   }
-  if (argc == 9 && (argv[8][0] == 'r' || argv[8][0] == 'w')) {
+  if (argc == 10 && (argv[9][0] == 'r' || argv[9][0] == 'w')) {
     printf("Missing samples file\n");
   }
 
   char flag;
   char *fl = NULL;
-  if (argc == 8) {
+  if (argc == 10) {
     flag = 's';
   } else {  
-    fl = argv[8];
+    fl = argv[9];
     flag = fl[0];
     if (flag != 'r' && flag != 'w' && flag != 's') {
       printf("Invalid read/write flag\n");
@@ -32,16 +31,16 @@ int main(int argc, char *argv[])
     }
   }
 
-  FILE *f = fopen(argv[7], "w");
+  FILE *f = fopen(argv[8], "w");
   if (f == NULL) {
-    printf("Can't open %s for writing\n", argv[7]);
+    printf("Can't open %s for writing\n", argv[8]);
     return 1;
   }
   FILE *sample = NULL;
   if (flag != 's') {
-    sample = fopen(argv[9], fl);
+    sample = fopen(argv[10], fl);
     if (sample == NULL) {
-      printf("Can't open %s", argv[9]);
+      printf("Can't open %s", argv[10]);
       return 1;
     }
   }
@@ -51,9 +50,13 @@ int main(int argc, char *argv[])
   int num_models;
 
   // load params
-  scope_params_t params;
-  memset(&params, 0, sizeof(scope_params_t));
-  load_scope_params(&params, argv[6]);
+  scope_params_t scope_params;
+  memset(&scope_params, 0, sizeof(scope_params_t));
+  load_scope_params(&scope_params, argv[6]);
+
+  mope_params_t mope_params;
+  memset(&mope_params, 0, sizeof(mope_params_t));
+  load_mope_params(&mope_params, argv[7]);
 
   int num_obs_segments;
   int *segment_cnts = NULL;
@@ -63,35 +66,35 @@ int main(int argc, char *argv[])
     // load obs data
     olf_obs_t obs;
     obs.bg_pcd = load_pcd(argv[1]);
-    if (params.use_fpfh)
+    if (scope_params.use_fpfh)
       obs.fpfh_pcd = load_pcd(argv[2]);
-    if (params.use_shot)
+    if (scope_params.use_shot)
       obs.shot_pcd = load_pcd(argv[3]);
-    if (params.use_sift)
+    if (scope_params.use_sift)
       obs.sift_pcd = load_pcd(argv[4]);
     scope_obs_data_t obs_data;
-    get_scope_obs_data(&obs_data, &obs, &params);
+    get_scope_obs_data(&obs_data, &obs, &scope_params);
 
     num_obs_segments = obs_data.num_obs_segments;
     safe_calloc(segment_cnts, num_obs_segments, int);
   
     // load model data
-    olf_model_t *models = load_olf_models(&num_models, argv[5], &params);
+    olf_model_t *models = load_olf_models(&num_models, argv[5], &scope_params);
     scope_model_data_t model_data[num_models];
     for (i = 0; i < num_models; i++)
-      get_scope_model_data(&model_data[i], &models[i], &params);
+      get_scope_model_data(&model_data[i], &models[i], &scope_params);
 
-    //mope_sample_t *M = mope_greedy(model_data, num_models, &obs_data, &params, cu_model, &cu_obs);
-    if (params.use_cuda) {
+    //mope_sample_t *M = mope_greedy(model_data, num_models, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs);
+    if (scope_params.use_cuda) {
       cu_init();
       cu_model_data_t cu_model[num_models];
       cu_obs_data_t cu_obs;
       cu_init_scoring_mope(model_data, &obs_data, num_models, cu_model, &cu_obs);
        
-      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &params, cu_model, &cu_obs, sample, 1, NULL);
+      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs, sample, 1, NULL);
       cu_free_all_the_things_mope(cu_model, &cu_obs, num_models);
     } else {
-      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &params, NULL, NULL, sample, 1, NULL);
+      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, NULL, NULL, sample, 1, NULL);
     }
 
     /*//dbug
@@ -120,26 +123,26 @@ int main(int argc, char *argv[])
 
     scope_model_data_t model_data[num_models];
     scope_obs_data_t obs_data;
-    if (params.mope_num_rounds == 2) {
+    if (mope_params.num_rounds == 2) {
       // load model data
-      olf_model_t *models = load_olf_models(&num_models, argv[5], &params);
+      olf_model_t *models = load_olf_models(&num_models, argv[5], &scope_params);
       for (i = 0; i < num_models; i++)
-	get_scope_model_data(&model_data[i], &models[i], &params);
+	get_scope_model_data(&model_data[i], &models[i], &scope_params);
 
       // load obs data
       olf_obs_t obs;
       obs.bg_pcd = load_pcd(argv[1]);
-      if (params.use_fpfh)
+      if (scope_params.use_fpfh)
 	obs.fpfh_pcd = load_pcd(argv[2]);
-      if (params.use_shot)
+      if (scope_params.use_shot)
 	obs.shot_pcd = load_pcd(argv[3]);
-      if (params.use_sift)
+      if (scope_params.use_sift)
 	obs.sift_pcd = load_pcd(argv[4]);
-      get_scope_obs_data(&obs_data, &obs, &params);
+      get_scope_obs_data(&obs_data, &obs, &scope_params);
     }
 
     //num_models = 35;
-    M = annealing_existing_samples(model_data, num_models, segment_cnts, &obs_data, num_obs_segments, &params, sample, 1);
+    M = annealing_existing_samples(model_data, num_models, segment_cnts, &obs_data, num_obs_segments, &scope_params, &mope_params, sample, 1);
     
     /*//dbug
     for (i = 0; i < M->num_objects; i++)
@@ -185,9 +188,9 @@ int main(int argc, char *argv[])
     }
     fprintf(f, "];\n");
     
-    double weights[18] = {params.score3_xyz_weight, params.score3_normal_weight, params.score3_vis_weight, params.score3_random_walk_weight, params.score3_edge_weight, 
-			  params.score3_edge_vis_weight, params.score3_edge_occ_weight, params.score3_L_weight, params.score3_A_weight, params.score3_B_weight, params.score3_fpfh_weight,
-			  params.score3_specularity_weight, params.score3_segment_affinity_weight, params.score3_segment_weight, params.score3_table_weight,
+    double weights[18] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_random_walk_weight, mope_params.scope_edge_weight, 
+			  mope_params.scope_edge_vis_weight, mope_params.scope_edge_occ_weight, mope_params.scope_L_weight, mope_params.scope_A_weight, mope_params.scope_B_weight, mope_params.scope_fpfh_weight,
+			  mope_params.scope_specularity_weight, mope_params.scope_segment_affinity_weight, mope_params.scope_segment_weight, mope_params.scope_table_weight,
 			  0, 0, 0};
     
     fprintf(f, "scope_W = [");
