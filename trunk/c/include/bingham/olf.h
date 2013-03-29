@@ -308,7 +308,7 @@ extern "C" {
     //double fsurf_sigma;
 
     // MOPE PARAMS
-    double mope_r1_scope_score_weight;
+    /*double mope_r1_scope_score_weight;
     double mope_r1_unexplained_weight;
     double mope_r1_overlap_weight;    
     double mope_r1_overlap_per_object_weight;
@@ -320,13 +320,51 @@ extern "C" {
     double mope_r2_overlap_per_object_weight;
     double mope_r2_num_taken_weight;
     
-    int mope_score_comp_models;
-    int mope_num_rounds;
+    int score_comp_models;
+    int num_rounds;
 
-    int mope_plot_true; //dbug
+    int plot_true; //dbug*/
 
   } scope_params_t;
 
+  typedef struct mope_params_struct {  // mope_params_t
+
+    // SCOPE PARAMS
+    double scope_xyz_weight;
+    double scope_normal_weight;
+    double scope_vis_weight;
+    double scope_random_walk_weight;
+    double scope_edge_weight;
+    double scope_edge_vis_weight;
+    double scope_edge_occ_weight;
+    double scope_L_weight;
+    double scope_A_weight;
+    double scope_B_weight;
+    double scope_fpfh_weight;
+    double scope_specularity_weight;
+    double scope_segment_affinity_weight;
+    double scope_segment_weight;
+    double scope_table_weight;
+
+    // MOPE PARAMS
+    double round1_scope_score_weight;
+    double round1_unexplained_weight;
+    double round1_overlap_weight;    
+    double round1_overlap_per_object_weight;
+    double round1_num_taken_weight;
+
+    double round2_scope_score_weight;
+    double round2_unexplained_weight;
+    double round2_overlap_weight;    
+    double round2_overlap_per_object_weight;
+    double round2_num_taken_weight;
+    
+    int score_comp_models;
+    int num_rounds;
+
+    int plot_true; //dbug
+
+  } mope_params_t;
 
   typedef struct scope_model_data_struct {
     pcd_t *pcd_model;
@@ -467,67 +505,6 @@ extern "C" {
     int num_samples_allocated;
   } mope_samples_t;
   
-// *************** CUDA ********************
-/*
-typedef struct {
-  int *ptr;
-  size_t n;
-} cu_int_arr_t;
-
-typedef struct {
-  double *ptr;
-  //size_t pitch;
-  size_t n, m;
-} cu_double_matrix_t;
-
-typedef struct {
-  int *ptr;
-  //size_t pitch;
-  size_t n, m;
-} cu_int_matrix_t;
-
-typedef struct {
-  //cudaPitchedPtr ptr;
-  //cudaExtent extent;
-  double *ptr;
-  size_t n, m, p;
-} cu_double_matrix3d_t;
-  
-typedef struct {
-  cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
-  cu_double_matrix3d_t color_cov1, color_cov2;
-  
-  cu_int_arr_t color_cnts1, color_cnts2, range_edges_view_idx, range_edges_view_cnt;
-
-  int num_points, num_views, max_num_edges;
-} cu_model_data_t;
-
-typedef struct {
-  double res, min0, min1;
-  int w, h;
-} cu_range_image_data_t;
-
-typedef struct {
-  cu_double_matrix_t range_image, range_image_pcd_obs_bg_lab, pcd_obs_fpfh, edge_image;
-  cu_double_matrix3d_t range_image_points, range_image_normals;
-
-  cu_range_image_data_t range_image_data;
-
-  cu_int_matrix_t range_image_cnt, range_image_idx;
-} cu_obs_data_t;
-
-
-void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
-		     cu_model_data_t *cu_model, cu_obs_data_t *cu_obs);
-void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs_data, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models);
-void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs);
-void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models);
-
-//void cu_noise_models_sigmas(double *range_sigma, double *normal_sigma, double *l_sigma, double *a_sigma, double *b_sigma, const double *surface_angles, const double *edge_dists, int n);
-void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *params, int score_round, int num_validation_points);
-*/
-// ************* END CUDA **************
-
   pcd_t *load_pcd(char *f_pcd);                        // loads a pcd
   void pcd_free(pcd_t *pcd);                           // frees the contents of a pcd_t, but not the pointer itself
   int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
@@ -539,6 +516,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   olf_model_t *load_olf_models(int *n, char *models_file, scope_params_t *params);
 
   void load_scope_params(scope_params_t *params, char *param_file);
+  void load_mope_params(mope_params_t *params, char *param_file);
   void get_scope_model_data(scope_model_data_t *model_data, olf_model_t *model, scope_params_t *params);
   void get_scope_obs_data(scope_obs_data_t *obs_data, olf_obs_t *obs, scope_params_t *params);
 
@@ -553,11 +531,13 @@ void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_
 scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs,
 		       int *segment_blacklist);
 
-mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
+mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *scope_params, mope_params_t *mope_params, 
+			   struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 //mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
-mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, 
-				     struct cu_obs_data_struct *cu_obs, FILE *f, int round, int *segment_blacklist);
-mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, scope_params_t *params, FILE *f, int round);
+mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs, scope_params_t *scope_params, mope_params_t *mope_params,
+				     struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs, FILE *f, int round, int *segment_blacklist);
+mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, 
+					   scope_params_t *scope_params, mope_params_t *mope_params, FILE *f, int round);
 
 /*#ifdef __cplusplus
 extern "C" {
