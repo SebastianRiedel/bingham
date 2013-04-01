@@ -6628,12 +6628,6 @@ int sample_triangle(int n) {
   return r1;
 }
 
-typedef struct {
-  double key;
-  int idx;
-  int other_heap;
-} mope_heap_node_t;
-
 const int mope_num_components = 5;
 
 typedef struct {
@@ -6642,111 +6636,6 @@ typedef struct {
   int taken[20][2];
   int num_taken;
 } mope_sample_data_t;
-
-void heap_swap(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int i, int j) {
-  mope_heap_node_t tmp;
-  int oi = heap[i].other_heap;
-  int oj = heap[j].other_heap;
-  memcpy(&tmp, &heap[i], sizeof(mope_heap_node_t));
-  memcpy(&heap[i], &heap[j], sizeof(mope_heap_node_t));
-  memcpy(&heap[j], &tmp, sizeof(mope_heap_node_t));
-
-  int idx_tmp;
-  idx_tmp = other_heap[oi].other_heap;
-  other_heap[oi].other_heap = other_heap[oj].other_heap;
-  other_heap[oj].other_heap = idx_tmp;
-}
-
-void max_heapify_down(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int i, int n) {
-  int next;
-  while (2 * i + 1 < n) {
-    next = 2 * i + 1;
-    if (2 * i + 2 < n && heap[next].key < heap[2*i+2].key) {
-      ++next;
-    }
-    if (heap[next].key > heap[i].key) {
-      heap_swap(heap, other_heap, i, next);
-      i = next;
-    } else {
-      break;
-    }
-  }
-}
-
-void min_heapify_down(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int i, int n) {
-  int next;
-  while (2 * i + 1 < n) {
-    next = 2 * i + 1;
-    if (2 * i + 2 < n && heap[next].key > heap[2*i+2].key) {
-      ++next;
-    }
-    if (heap[next].key < heap[i].key) {
-      heap_swap(heap, other_heap, i, next);
-      i = next;
-    } else {
-      break;
-    }
-  }
-}
-
-void min_heap_pop(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int i, int n) {
-  heap_swap(heap, other_heap, i, n);
-  min_heapify_down(heap, other_heap, i, n);
-}
-
-void max_heap_pop(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int i, int *n) {
-  *n = *n - 1;
-  heap_swap(heap, other_heap, i, *n);
-  max_heapify_down(heap, other_heap, i, *n);
-  min_heap_pop(other_heap, heap, heap[*n].other_heap, *n);
-}
-
-mope_heap_node_t *max_heap_extract_max(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int *n) {
-  mope_heap_node_t *root;
-  safe_malloc(root, 1, mope_heap_node_t);
-  memcpy(root, &heap[0], sizeof(mope_heap_node_t));
-  max_heap_pop(heap, other_heap, 0, n);
-  return root;
-}
-
-int max_heap_insert(mope_heap_node_t heap[], mope_heap_node_t other_heap[], int n, double val, int idx) {
-  int i = n-1;
-  heap[i].key = val;
-  heap[i].idx = idx;
-  heap[i].other_heap = i;
-  other_heap[i].key = val;
-  other_heap[i].other_heap = i;
-  int ret = i;
-  while (heap[i/2].key < heap[i].key) {
-    heap_swap(heap, other_heap, i, i/2);
-    ret = i / 2;
-    i = i / 2;
-    if (i == 0) break;
-  }
-  while (other_heap[i/2].key > other_heap[i].key) {
-    heap_swap(other_heap, heap, i, i/2);
-    i = i / 2;
-    if (i == 0) break;
-  }
-  return ret;
-}
-
-int two_heap_insert(mope_heap_node_t max_heap[], mope_heap_node_t min_heap[], int *heap_size, int heap_cap, double new_val) {
-  int ret = -1;
-  if (*heap_size == heap_cap) {
-    if (min_heap[0].key > new_val)
-      return -1;
-    ret = max_heap[min_heap[0].other_heap].idx;
-    max_heap_pop(max_heap, min_heap, min_heap[0].other_heap, heap_size);
-  } else if (*heap_size < heap_cap) {
-    ret = *heap_size;
-  }
-  *heap_size = *heap_size + 1;
-  int i;
-  max_heap_insert(max_heap, min_heap, *heap_size, new_val, ret);
-  //max_heap[idx].other_heap = min_heap_insert(min_heap, max_heap, *heap_size, new_val, idx);
-  return ret;
-}
 
 void move_data(mope_sample_data_t data[], int i, int j) {
   data[j].key = data[i].key;
@@ -6789,7 +6678,7 @@ int find_spot_data(mope_sample_data_t data[], int *data_size, int data_cap, doub
   return i;
 }
 
-mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_samples_t *S[], int num_objects, int *segment_cnts, int num_segments, mope_params_t *params, int num_correspondences) {
+mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *segment_cnts, int num_segments, mope_params_t *params, int num_correspondences) {
   int i, j, r;
   int num_samples = 0;
   for (i = 0; i < num_objects; ++i) {
@@ -6804,20 +6693,14 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
   double prob_accept_worse;
   int new_taken[num_samples][2];
   int new_num_taken = 0;
-  //int best_taken[num_samples][2];
-  //int best_num_taken = 0;
 
   const double min_score = -10000.0;
   double old_score = min_score;
   double new_score;
-  // double best_score = -10000.0;
   
-  int num_runs = 15;
+  int num_runs = 30;
 
   double mope_components[mope_num_components];
-  int heap_cap = 1000;
-  mope_heap_node_t max_heap[heap_cap], min_heap[heap_cap];
-  int heap_size = 0;
   int data_cap = (params->num_rounds == 2 ? 1 : 100);
   int data_size = 0;
   mope_sample_data_t data[data_cap + 1];
@@ -6827,16 +6710,11 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
     data[i].key = min_score;
   }
 
-  int last_update = 0;
-  int last_run = 0;
   for (r = 0; r < num_runs; ++r) {
-    //printf("*************** r = %d\n", r);
-    //printf("----------- RUN RESTART ----------\n");
-    //printf("Run %d\n", r);
     num_taken = 0;
     old_score = min_score;
     for (i = 0; i < num_steps; ++i) {
-      prob_switch = (num_taken == 0 ? 0 : 1.0/3.0); // It's more likely to do a switch as the time goes by // NOTE(sanja): I'm not sure this is the best way to do it...
+      prob_switch = (num_taken == 0 ? 0 : 1.0/3.0);
       prob_accept_worse = MAX(0, 0.5 * (1 - i / (double) num_steps)); //gets smaller as the time goes by, i.e. the system cools down
       for (j = 0; j < num_taken; ++j) {
 	new_taken[j][0] = taken[j][0];
@@ -6874,18 +6752,6 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
 	}
       }    
       new_score = evaluate_assignment(mope_components, new_taken, new_num_taken, S, num_objects, segment_cnts, num_segments, 0, params);
-      /*int idx = two_heap_insert(max_heap, min_heap, &heap_size, heap_cap, new_score);
-      if (idx != -1) {
-	memcpy(&data[idx].components, mope_components, mope_num_components * sizeof(double));
-	if (data[idx].num_taken > 0)
-	  free_matrix2i(data[idx].taken);
-	data[idx].num_taken = new_num_taken;
-	data[idx].taken = new_matrix2i(new_num_taken, 2);
-	for (j = 0; j < new_num_taken; ++j) {
-	  data[idx].taken[j][0] = new_taken[j][0];
-	  data[idx].taken[j][1] = new_taken[j][1];
-	}
-	}*/
 
       // Sort new_taken
       int q, k;
@@ -6906,21 +6772,14 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
       }
 
       int idx = find_spot_data(data, &data_size, data_cap, new_score, new_num_taken, new_taken);
-      if (idx != data_cap) {
-	//printf("r = %d, i = %d, last run update = %d Last update = %d\n", r, i, last_run, last_update);
-	last_update = 0;
-	last_run = r;
-	data[idx].key = new_score;
-	memcpy(&data[idx].components, mope_components, mope_num_components * sizeof(double));
-	data[idx].num_taken = new_num_taken;
-	for (j = 0; j < new_num_taken; ++j) {
-	  data[idx].taken[j][0] = new_taken[j][0];
-	  data[idx].taken[j][1] = new_taken[j][1];
-	}
-      } else {
-	++last_update;
+      data[idx].key = new_score;
+      memcpy(&data[idx].components, mope_components, mope_num_components * sizeof(double));
+      data[idx].num_taken = new_num_taken;
+      for (j = 0; j < new_num_taken; ++j) {
+	data[idx].taken[j][0] = new_taken[j][0];
+	data[idx].taken[j][1] = new_taken[j][1];
       }
-      
+            
       if (new_score < old_score && frand() > prob_accept_worse)
 	continue;
       old_score = new_score;
@@ -6932,35 +6791,12 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
     }  
   }
 
-  mope_samples_t *M;
-  /*safe_calloc(M, 1, mope_samples_t);
-  safe_calloc(M->W, heap_size, double);
-  safe_calloc(M->samples, heap_size, mope_sample_t);
-  M->num_samples = heap_size;
-  M->num_samples_allocated = heap_size;
-  
-  i = 0;
-  while (heap_size > 0) {
-    printf("Heap size: %d\n", heap_size);
-    mope_heap_node_t *node = max_heap_extract_max(max_heap, min_heap, &heap_size);
-    int curr_num_taken = data[node->idx].num_taken;
-    int **curr_taken = data[node->idx].taken;
-
-    safe_calloc(M->samples[i].model_ids, curr_num_taken, int);
-    safe_calloc(M->samples[i].scores, mope_num_components, double);
-    memcpy(M->samples[i].scores, data[node->idx].components, mope_num_components * sizeof(double));
-    M->samples[i].num_objects = curr_num_taken;
-    M->W[i] = node->key;
-
-    safe_calloc(M->samples[i].objects, curr_num_taken, scope_sample_t);
-    for (j = 0; j < curr_num_taken; ++j) {
-      scope_sample_alloc(&M->samples[i].objects[j], params->num_correspondences);
-      scope_sample_copy(&M->samples[i].objects[j], &(S[curr_taken[j][0]]->samples[curr_taken[j][1]]));
-      free_matrix2i(curr_taken);		
-    }    
-    ++i;
-    free(node);
+  // Testing consistency for simmulated annealing
+  /*for (i = 0; i < MIN(data_size, 10); ++i) {
+    printf("%lf\n", data[i].key);
     }*/
+
+  mope_samples_t *M;
   safe_calloc(M, 1, mope_samples_t);
   safe_calloc(M->W, data_size, double);
   safe_calloc(M->samples, data_size, mope_sample_t);
@@ -7004,18 +6840,13 @@ mope_samples_t *simulated_annealing(int ***best_arr, int *num_best, scope_sample
 }
 
 mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_cnts, int num_segments, mope_params_t *params, int num_correspondences) {
-  printf("TABU SEARCH PROBABLY HAS A BUG WITH NUM TAKEN!!!\n");
-  printf("IT IS ACTUALLY IN SORTING! HISTORY IS A 3D ARRAY!!!\n");
   int i, j, r;
   int num_samples = 50;
-  /*for (i = 0; i < num_objects; ++i) {
-    num_samples += S[i]->num_samples;
-    }*/
 
   int taken[num_samples][2];
   int num_taken = 0;
   
-  int num_steps = 50000; // TODO(sanja): make these params
+  int num_steps = 100000; // TODO(sanja): make these params
   double prob_switch;
   int new_taken[num_samples][2];
   int new_num_taken = 0;
@@ -7024,7 +6855,7 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 
   const double min_score = -10000.0;
 
-  double old_score = min_score;
+  double old_score;
   double new_score;
   double best_score = min_score;
   
@@ -7047,11 +6878,8 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
     data[i].key = min_score;
   }
 
-  int last_update = 0;
-  int last_run = 0;
   int s;
   for (r = 0; r < num_runs; ++r) {
-    //printf("----------- RUN RESTART ----------\n");
     num_taken = 0;
     old_score = min_score;
     for (i = 0; i < num_steps; ++i) {
@@ -7113,7 +6941,7 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 	    continue;
 	  
 	  for (k = 0; k < new_num_taken; ++k) {
-	    if (new_taken[k][0] != history_taken[k][0] || new_taken[k][1] != history_taken[k][1])
+	    if (new_taken[k][0] != history_taken[j][k][0] || new_taken[k][1] != history_taken[j][k][1])
 	      break;
 	  }
 	  if (k == new_num_taken)
@@ -7136,21 +6964,14 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
       if (best_score == min_score)
 	continue;
       int idx = find_spot_data(data, &data_size, data_cap, best_score, best_num_taken, best_taken);
-      if (idx != data_cap) {
-	//printf("r = %d, i = %d, last run update = %d Last update = %d\n", r, i, last_run, last_update);
-	last_update = 0;
-	last_run = r;
-	data[idx].key = best_score;
-	memcpy(&data[idx].components, mope_components, mope_num_components * sizeof(double));
-	data[idx].num_taken = best_num_taken;
-	for (j = 0; j < best_num_taken; ++j) {
-	  data[idx].taken[j][0] = best_taken[j][0];
-	  data[idx].taken[j][1] = best_taken[j][1];
-	}
-      } else {
-	++last_update;
+      data[idx].key = best_score;
+      memcpy(&data[idx].components, mope_components, mope_num_components * sizeof(double));
+      data[idx].num_taken = best_num_taken;
+      for (j = 0; j < best_num_taken; ++j) {
+	data[idx].taken[j][0] = best_taken[j][0];
+	data[idx].taken[j][1] = best_taken[j][1];
       }
-      
+          
       old_score = best_score;
       num_taken = best_num_taken;
       for (j = 0; j < num_taken; ++j) {
@@ -7168,6 +6989,11 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
       if (history_size < history_cap) ++history_size;
     }  
   }
+
+  // Testing consistency for tabu search
+  /*for (i = 0; i < MIN(data_size, 10); ++i) {
+    printf("%lf\n", data[i].key);
+    }*/
 
   mope_samples_t *M;
   safe_calloc(M, 1, mope_samples_t);
@@ -7256,27 +7082,10 @@ void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_para
 
 mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, int round, scope_params_t *scope_params,
 				   mope_params_t *mope_params, int *segment_blacklist) {
-  int **taken;
-  int num_taken;
   mope_samples_t *M;
-  M = simulated_annealing(&taken, &num_taken, S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
-  //M = tabu_search(S, num_models, num_obs_segments, mope_params, scope_params->num_correspondences);
-  
-
-  /*safe_calloc(M, 1, mope_sample_t);
-  safe_calloc(M->objects, num_taken, scope_sample_t);
-  safe_calloc(M->model_ids, num_taken, int);
-  
-  int i;
-  for (i = 0; i < num_taken; ++i) {
-    // add next best object hypothesis
-    M->num_objects++;
-    scope_sample_alloc(&M->objects[i], params->num_correspondences);
-    scope_sample_copy(&M->objects[i], &(S[taken[i][0]]->samples[taken[i][1]]));
-    M->model_ids[i] = taken[i][0];
-  }
-
-  free_matrix2i(taken);*/
+  M = simulated_annealing(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
+  //M = tabu_search(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
+    
   int i;
   for (i = 0; i < num_models; ++i) {
     free_scope_samples(S[i]);
@@ -7292,8 +7101,6 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
       }
     }
     
-    int old = obs_data->num_obs_segments;
-
     remove_found(M, obs_data, scope_params);
     printf("Stuff removed\n");
     if (obs_data->fpfh_obs->num_points < 50) // TODO(sanja): make param
@@ -7402,64 +7209,66 @@ mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_m
   char sbuf[1024];
   char *s = sbuf;
   
+  char *x; // supress warnings
+
   score_comp_models_t score_comp_models[num_models];
   
   for (i = 0; i < num_models; ++i) {
     int num_samples;
     
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_xyz[0], &score_comp_models[i].b_xyz[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_normal[0], &score_comp_models[i].b_normal[1]);
-    //fgets(s, 1024, f);
+    //x = fgets(s, 1024, f);
     //fprintf(s, "%lf %lf", &score_comp_models[i].b_vis[0], &score_comp_models[i].b_vis[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_random_walk[0], &score_comp_models[i].b_random_walk[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_edge[0], &score_comp_models[i].b_edge[1]);
-    //fgets(s, 1024, f);
+    //x = fgets(s, 1024, f);
     //fprintf(s, "%lf %lf", &score_comp_models[i].b_edge_vis[0], &score_comp_models[i].b_edge_vis[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_edge_occ[0], &score_comp_models[i].b_edge_occ[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_color_L[0], &score_comp_models[i].b_color_L[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_color_A[0], &score_comp_models[i].b_color_A[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_color_B[0], &score_comp_models[i].b_color_B[1]);
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%lf %lf", &score_comp_models[i].b_fpfh[0], &score_comp_models[i].b_fpfh[1]);
-    //fgets(s, 1024, f);
+    //x = fgets(s, 1024, f);
     //sscanf(s, "%lf %lf", &score_comp_models[i].b_labdist[0], &score_comp_models[i].b_labdist[1]);
-    //fgets(s, 1024, f);
+    //x = fgets(s, 1024, f);
     //sscanf(s, "%lf %lf", &score_comp_models[i].b_segment_affinity[0], &score_comp_models[i].b_segment_affinity[1]);
 
-    fgets(s, 1024, f);
+    x = fgets(s, 1024, f);
     sscanf(s, "%d", &num_samples);
     S[i] = create_scope_samples(num_samples, scope_params->num_correspondences);
     S[i]->num_samples = num_samples;
     for (j = 0; j < num_samples; ++j) {
-      fgets(s, 1024, f);
+      x = fgets(s, 1024, f);
       sscanf(s, "%lf", &S[i]->W[j]);
-      fgets(s, 1024, f);
+      x = fgets(s, 1024, f);
       sscanf(s, "%lf %lf %lf", &S[i]->samples[j].x[0], &S[i]->samples[j].x[1], &S[i]->samples[j].x[2]);
-      fgets(s, 1024, f);
+      x = fgets(s, 1024, f);
       sscanf(s, "%lf %lf %lf %lf", &S[i]->samples[j].q[0], &S[i]->samples[j].q[1], &S[i]->samples[j].q[2], &S[i]->samples[j].q[3]);
-      fgets(s, 1024, f);
+      x = fgets(s, 1024, f);
       sscanf(s, "%d", &S[i]->samples[j].num_scores);
       safe_calloc(S[i]->samples[j].scores, S[i]->samples[j].num_scores, double);
       for (k = 0; k < S[i]->samples[j].num_scores; ++k) {
-	fgets(s, 1024, f);
+	x = fgets(s, 1024, f);
 	sscanf(s, "%lf", &S[i]->samples[j].scores[k]);	
       }
-      fgets(s, 1024, f);
+      x = fgets(s, 1024, f);
       sscanf(s, "%d", &S[i]->samples[j].num_segments);
       safe_calloc(S[i]->samples[j].segments_idx, S[i]->samples[j].num_segments, int);
       safe_calloc(S[i]->samples[j].segment_probs, S[i]->samples[j].num_segments, double);
       for (k = 0; k < S[i]->samples[j].num_segments; ++k) {
-	fgets(s, 1024, f);
+	x = fgets(s, 1024, f);
 	sscanf(s, "%d", &S[i]->samples[j].segments_idx[k]);
-	fgets(s, 1024, f);
+	x = fgets(s, 1024, f);
 	sscanf(s, "%lf", &S[i]->samples[j].segment_probs[k]);
       }
     }
