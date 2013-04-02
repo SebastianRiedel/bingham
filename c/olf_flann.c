@@ -317,35 +317,6 @@ void compute_orientation_quaternions(double **Q, double **N, double **PCS, int n
   free_matrix2(R);
 }
 
-/*
- * Brute force computation of KNN. Temporary substitute for FLANN.
- */
-void knn_brute_force(double *nn_d2, int *nn_idx, double query[], double **points, int n, int m, int k) {
-  int last = 0;
-  int i, j;
-  double dist, tmp_d2;
-  int tmp_idx;
-  nn_d2[k-1] = 1000000.0;
-  for (i = 0; i < n; ++i) {
-    dist = 0;
-    for (j = 0; j < m; ++j)
-      dist += (points[i][j] - query[j]) * (points[i][j] - query[j]);
-    if (last == k && dist >= nn_d2[last-1])
-      continue;
-    if (last < k)
-      ++last;
-    if (last < k || (last == k && nn_d2[last-1] > dist)) {
-      nn_d2[last-1] = dist;
-      nn_idx[last-1] = i;
-    }
-    for (j = last-1; j > 0; --j) {
-      if (nn_d2[j] < nn_d2[j-1]) {
-	tmp_d2 = nn_d2[j]; nn_d2[j] = nn_d2[j-1]; nn_d2[j-1] = tmp_d2;
-	tmp_idx = nn_idx[j]; nn_idx[j] = nn_idx[j-1]; nn_idx[j-1] = tmp_idx;
-      }
-    }
-  }
-}
 
 /*
  * add data pointers to a pcd
@@ -3447,10 +3418,9 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   for (i = 0; i < data->range_edges_model->pcd->num_points; i++)
     get_olf(&data->range_edges_model_olfs[i], data->range_edges_model->pcd, i, 0);
 
-  /*
   // get combined feature matrices for FLANN
   double **model_xyzn = get_xyzn_features(data->pcd_model, params);
-  
+
   // flann params
   struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
   flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
@@ -3462,7 +3432,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
   // build flann indices
   float speedup;
   data->model_xyz_index = flann_build_index_double(data->pcd_model->points[0], data->pcd_model->num_points, 3, &speedup, &data->model_xyz_params);
-  data->model_xyzn_index = flann_build_index_double(model_xyzn[0], data->pcd_model->num_points, 6, &speedup, &data->model_xyzn_params);*/
+  data->model_xyzn_index = flann_build_index_double(model_xyzn[0], data->pcd_model->num_points, 6, &speedup, &data->model_xyzn_params);
 
   // fpfh data
   if (params->use_fpfh) {
@@ -3473,7 +3443,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
     double *p = compute_model_saliency(data->fpfh_model);
     cumsum(p, p, data->fpfh_model->num_points);
     data->fpfh_model_cmf = p;
-    /*double **fpfh_model_xyzn = get_xyzn_features(data->fpfh_model, params);
+    double **fpfh_model_xyzn = get_xyzn_features(data->fpfh_model, params);
     data->fpfh_model_f_params = flann_params;
     data->fpfh_model_xyzn_params = flann_params_single;
     data->fpfh_model_xyzn_index = flann_build_index_double(fpfh_model_xyzn[0], data->fpfh_model->num_points, 6, &speedup, &data->fpfh_model_xyzn_params);
@@ -3481,10 +3451,9 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
 							&speedup, &data->fpfh_model_f_params);
     safe_calloc(data->model_to_fpfh_map, data->pcd_model->num_points, int);
     double nn_d2[data->pcd_model->num_points];
-
     flann_find_nearest_neighbors_index_double(data->fpfh_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points,
 					      data->model_to_fpfh_map, nn_d2, 1, &data->fpfh_model_xyzn_params);
-					      free_matrix2(fpfh_model_xyzn);*/
+    free_matrix2(fpfh_model_xyzn);
   }
 
   //shot data
@@ -3496,7 +3465,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
     double *p = compute_model_saliency(data->shot_model);
     cumsum(p, p, data->shot_model->num_points);
     data->shot_model_cmf = p;
-    /*double **shot_model_xyzn = get_xyzn_features(data->shot_model, params);
+    double **shot_model_xyzn = get_xyzn_features(data->shot_model, params);
     data->shot_model_f_params = flann_params;
     data->shot_model_xyzn_params = flann_params_single;
     data->shot_model_xyzn_index = flann_build_index_double(shot_model_xyzn[0], data->shot_model->num_points, 6, &speedup, &data->shot_model_xyzn_params);
@@ -3506,7 +3475,7 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
     double nn_d2[data->pcd_model->num_points];
     flann_find_nearest_neighbors_index_double(data->shot_model_xyzn_index, model_xyzn[0], data->pcd_model->num_points,
 					      data->model_to_shot_map, nn_d2, 1, &data->shot_model_xyzn_params);
-					      free_matrix2(shot_model_xyzn);*/
+    free_matrix2(shot_model_xyzn);
   }
 
   //sift data
@@ -3517,9 +3486,8 @@ void get_scope_model_data(scope_model_data_t *data, olf_model_t *model, scope_pa
       get_olf(&data->sift_model_olfs[i], data->sift_model, i, 1);
   }
 
-  /*
   //cleanup
-  free_matrix2(model_xyzn);*/
+  free_matrix2(model_xyzn);
 }
 
 
@@ -3575,13 +3543,13 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
     safe_calloc(data->fpfh_obs_olfs, data->fpfh_obs->num_points, olf_t);
     for (i = 0; i < data->fpfh_obs->num_points; i++)
       get_olf(&data->fpfh_obs_olfs[i], data->fpfh_obs, i, 0);
-    /*double **fpfh_obs_xyzn = get_xyzn_features(data->fpfh_obs, params);
+    double **fpfh_obs_xyzn = get_xyzn_features(data->fpfh_obs, params);
     struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
     flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
     float speedup;
     data->fpfh_obs_xyzn_params = flann_params_single;
     data->fpfh_obs_xyzn_index = flann_build_index_double(fpfh_obs_xyzn[0], data->fpfh_obs->num_points, 6, &speedup, &data->fpfh_obs_xyzn_params);
-    free_matrix2(fpfh_obs_xyzn);*/
+    free_matrix2(fpfh_obs_xyzn);
   }
 
   // shot data
@@ -3590,7 +3558,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
     safe_calloc(data->shot_obs_olfs, data->shot_obs->num_points, olf_t);
     for (i = 0; i < data->shot_obs->num_points; i++)
       get_olf(&data->shot_obs_olfs[i], data->shot_obs, i, 0);
-    /*double **shot_obs_xyzn = get_xyzn_features(data->shot_obs, params);
+    double **shot_obs_xyzn = get_xyzn_features(data->shot_obs, params);
     struct FLANNParameters flann_params_single = DEFAULT_FLANN_PARAMETERS;
     flann_params_single.algorithm = FLANN_INDEX_KDTREE_SINGLE;
     float speedup;
@@ -3599,7 +3567,7 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
     //safe_calloc(data->obs_to_shot_map, data->pcd_obs->num_points, int);
     //double nn_d2[data->pcd_obs->num_points];
     //flann_find_nearest_neighbors_index_double(data->shot_obs_xyzn_index, obs_xyzn[0], data->pcd_obs->num_points, data->obs_to_shot_map, nn_d2, 1, &data->shot_obs_xyzn_params);
-    free_matrix2(shot_obs_xyzn);*/
+    //free_matrix2(shot_obs_xyzn);
   }
 
   // sift data
@@ -3625,8 +3593,8 @@ void free_scope_model_data(scope_model_data_t *data)
 
   //free_pcd_color_model(data->color_model);
   free_multiview_pcd(data->range_edges_model);
-  /*flann_free_index(data->model_xyz_index, &data->model_xyz_params);
-    flann_free_index(data->model_xyzn_index, &data->model_xyzn_params);*/
+  flann_free_index(data->model_xyz_index, &data->model_xyz_params);
+  flann_free_index(data->model_xyzn_index, &data->model_xyzn_params);
 
   if (data->fpfh_model) {
     for (i = 0; i < data->fpfh_model->num_points; i++)
@@ -3634,8 +3602,8 @@ void free_scope_model_data(scope_model_data_t *data)
     free(data->fpfh_model_olfs);
     free(data->fpfh_model_cmf);
     free(data->model_to_fpfh_map);
-    /*flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
-      flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);*/
+    flann_free_index(data->fpfh_model_f_index, &data->fpfh_model_f_params);
+    flann_free_index(data->fpfh_model_xyzn_index, &data->fpfh_model_xyzn_params);
   }
 
   if (data->shot_model) {
@@ -3644,8 +3612,8 @@ void free_scope_model_data(scope_model_data_t *data)
     free(data->shot_model_olfs);
     free(data->shot_model_cmf);
     free(data->model_to_shot_map);
-    /*flann_free_index(data->shot_model_f_index, &data->shot_model_f_params);
-      flann_free_index(data->shot_model_xyzn_index, &data->shot_model_xyzn_params);*/
+    flann_free_index(data->shot_model_f_index, &data->shot_model_f_params);
+    flann_free_index(data->shot_model_xyzn_index, &data->shot_model_xyzn_params);
   }
 
   if (data->sift_model) {
@@ -3676,14 +3644,14 @@ void free_scope_obs_data(scope_obs_data_t *data)
     for (i = 0; i < data->fpfh_obs->num_points; i++)
       free_olf(&data->fpfh_obs_olfs[i]);
     free(data->fpfh_obs_olfs);
-    //flann_free_index(data->fpfh_obs_xyzn_index, &data->fpfh_obs_xyzn_params);
+    flann_free_index(data->fpfh_obs_xyzn_index, &data->fpfh_obs_xyzn_params);
   }
 
   if (data->shot_obs_olfs) {
     for (i = 0; i < data->shot_obs->num_points; i++)
       free_olf(&data->shot_obs_olfs[i]);
     free(data->shot_obs_olfs);
-    //flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
+    flann_free_index(data->shot_obs_xyzn_index, &data->shot_obs_xyzn_params);
   }
 
   if (data->sift_obs_olfs) {
@@ -4767,8 +4735,7 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
 }
 
 
-//double compute_random_walk_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
-double compute_random_walk_score(double *x, double *q, double **cloud, scope_model_data_t *model_data, 
+double compute_random_walk_score(double *x, double *q, double **cloud, flann_index_t model_xyz_index, struct FLANNParameters *model_xyz_params,
 				 double *vis_prob, int n, range_image_t *obs_range_image, double **obs_edge_image,
 				 double *b_random_walk, scope_params_t *params, int score_round)
 {
@@ -4801,8 +4768,7 @@ double compute_random_walk_score(double *x, double *q, double **cloud, scope_mod
 	// find the xyz-distance to the closest model point
 	int nn_idx;
 	double nn_d2;
-	//flann_find_nearest_neighbors_index_double(model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, model_xyz_params);
-	knn_brute_force(&nn_d2, &nn_idx, p, model_data->pcd_model->points, model_data->pcd_model->num_points, 3, 1);
+	flann_find_nearest_neighbors_index_double(model_xyz_index, p, 1, &nn_idx, &nn_d2, 1, model_xyz_params);
 
 	// add score
 	double d = MIN(sqrt(nn_d2), dmax);
@@ -5054,8 +5020,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   double random_walk_score = 0;
   if (score_round >= 3)
-    //random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
-    random_walk_score = compute_random_walk_score(x, q, cloud, model_data, vis_prob,
+    random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
 						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
 						  model_data->score_comp_models->b_random_walk, params, score_round);
 
@@ -5489,8 +5454,7 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
   // get model point
   int nn_idx[params->knn];
   double nn_d2[params->knn];
-  //flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->fpfh_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
-  knn_brute_force(nn_d2, nn_idx, obs_data->fpfh_obs->fpfh[c_obs], model_data->fpfh_model->fpfh, model_data->fpfh_model->num_points, model_data->fpfh_model->fpfh_length, params->knn);
+  flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->fpfh_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
   double p[params->knn];
   int j;
   for (j = 0; j < params->knn; j++)
@@ -5523,8 +5487,7 @@ void sample_first_correspondence_shot(scope_sample_t *sample, scope_model_data_t
   // get model point
   int nn_idx[params->knn];
   double nn_d2[params->knn];
-  //flann_find_nearest_neighbors_index_double(model_data->shot_model_f_index, obs_data->shot_obs->shot[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->shot_model_f_params);
-  knn_brute_force(nn_d2, nn_idx, obs_data->shot_obs->shot[c_obs], model_data->shot_model->shot, model_data->shot_model->num_points, model_data->shot_model->shot_length, params->knn);
+  flann_find_nearest_neighbors_index_double(model_data->shot_model_f_index, obs_data->shot_obs->shot[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->shot_model_f_params);
   double p[params->knn];
   int j;
   for (j = 0; j < params->knn; j++)
@@ -8210,7 +8173,6 @@ int sample_shot_obs_correspondence_given_model_pose(scope_sample_t *sample, int 
   int nn_idx[params->knn];
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
-  //knn_brute_force(nn_d2, nn_idx, xyzn_query, shot_obs_xyzn, obs_data->shot_obs->num_points, 6, params->knn);
   
   // then compute full feature distance on just those k-NN
   int i;
@@ -8269,8 +8231,7 @@ int sample_fpfh_obs_correspondence_given_model_pose(scope_sample_t *sample, int 
   int nn_idx[params->knn];
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(obs_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, obs_xyzn_params);
-  //knn_brute_force(nn_d2, nn_idx, xyzn_query, fpfh_obs_xyzn, obs_data->fpfh_obs->num_points, 6, params->knn);
-
+  
   // then compute full feature distance on just those k-NN
   int i;
   double p[params->knn];
@@ -8331,7 +8292,6 @@ int sample_shot_model_correspondence_given_model_pose(scope_sample_t *sample, in
   int nn_idx[params->knn];
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(shot_model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, shot_model_xyzn_params);
-  //knn_brute_force(nn_d2, nn_idx, xyzn_query, shot_model_xyzn, model_data->shot_model->num_points, 6, params->knn);
 
   // then compute full feature distance on just those k-NN
   if (use_f) {
@@ -8398,7 +8358,6 @@ int sample_fpfh_model_correspondence_given_model_pose(scope_sample_t *sample, in
   int nn_idx[params->knn];
   double nn_d2[params->knn];
   flann_find_nearest_neighbors_index_double(fpfh_model_xyzn_index, xyzn_query, 1, nn_idx, nn_d2, params->knn, fpfh_model_xyzn_params);
-  //knn_brute_force(nn_d2, nn_idx, xyzn_query, fpfh_model_xyzn, model_data->fpfh_model->num_points, 6, params->knn);
 
   // then compute full feature distance on just those k-NN
   if (use_f) {

@@ -5,6 +5,8 @@
 #include "bingham.h"
 #include "hll.h"
 
+#include <flann/flann.h>
+
 #include <stdio.h>
 
 #include "cuda_wrapper.h"
@@ -386,6 +388,18 @@ extern "C" {
     dist_grid_t *model_dist_grid;
     double *fpfh_model_cmf;
     double *shot_model_cmf;
+    struct FLANNParameters model_xyz_params;
+    struct FLANNParameters model_xyzn_params;
+    struct FLANNParameters fpfh_model_f_params;
+    struct FLANNParameters fpfh_model_xyzn_params;
+    struct FLANNParameters shot_model_f_params;
+    struct FLANNParameters shot_model_xyzn_params;
+    flann_index_t model_xyz_index;
+    flann_index_t model_xyzn_index;
+    flann_index_t fpfh_model_f_index;
+    flann_index_t fpfh_model_xyzn_index;
+    flann_index_t shot_model_f_index;
+    flann_index_t shot_model_xyzn_index;
   } scope_model_data_t;
 
 
@@ -413,6 +427,10 @@ extern "C" {
     int **obs_segment_image;
     double **obs_segment_affinities;
     int num_obs_segments;
+    struct FLANNParameters fpfh_obs_xyzn_params;
+    struct FLANNParameters shot_obs_xyzn_params;
+    flann_index_t fpfh_obs_xyzn_index;
+    flann_index_t shot_obs_xyzn_index;
   } scope_obs_data_t;
 
 
