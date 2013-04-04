@@ -46,6 +46,8 @@ double surface_area_sphere(int d);                      /* computes the surface 
 int irand(int n);                                       /* returns a random int between 0 and n-1 */
 double frand();                                         /* returns a random double in [0,1] */
 void randperm(int *x, int n, int d);                    /* samples d integers from 0:n-1 uniformly without replacement */
+void init_lazy_randperm(int n, int *step, int *i0);     /* Inits on-demand randperm */
+int lazy_randperm_request(int n, int step, int *i0);    /* Requests next element of the permutation */
 double erfinv(double x);                                /* approximation to the inverse error function */
 double normrand(double mu, double sigma);               /* generate a random sample from a normal distribution */
 double normpdf(double x, double mu, double sigma);      /* compute the pdf of a normal random variable */
