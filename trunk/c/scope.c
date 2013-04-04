@@ -163,6 +163,8 @@ int main(int argc, char *argv[])
     fprintf(f, "%f, %f, %f;  ", S->samples[i].x0[0], S->samples[i].x0[1], S->samples[i].x0[2]);
   fprintf(f, "];\n");
 
+  
+  
   //**************************************************
 
   //dbug
@@ -183,7 +185,7 @@ int main(int argc, char *argv[])
   }
   fprintf(f, "};\n");
 
-  fprintf(f, "C_obs = {");
+  /*fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
     fprintf(f, "[");
     for (j = 0; j < S->samples[i].nc; j++)
@@ -214,6 +216,9 @@ int main(int argc, char *argv[])
   for (i = 0; i < n; i++)
     fprintf(f, "%d ", S->samples[i].nc);
   fprintf(f, "];\n");
+
+  */
+
 
   /*  fprintf(f, "obs_edge_image = [");
   for (i = 0; i < obs_edge_image_width_; ++i) {

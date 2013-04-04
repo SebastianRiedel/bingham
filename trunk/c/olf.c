@@ -5480,17 +5480,28 @@ void sample_model_pose_given_correspondences(scope_sample_t *sample, scope_model
 //==============================================================================================//
 
 
-void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params)
+void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t *model_data, scope_obs_data_t *obs_data, int idx[], int *curr_idx, scope_params_t *params)
 {
-  // get obs point
-  int c_obs = irand(obs_data->fpfh_obs->num_points);
-  sample->c_obs[0] = c_obs;
-
-  // get model point
   int nn_idx[params->knn];
   double nn_d2[params->knn];
-  //flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->fpfh_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
-  knn_brute_force(nn_d2, nn_idx, obs_data->fpfh_obs->fpfh[c_obs], model_data->fpfh_model->fpfh, model_data->fpfh_model->num_points, model_data->fpfh_model->fpfh_length, params->knn);
+  int c_obs;
+
+  double closest_dist = 10 * params->f_sigma * params->f_sigma;
+
+  while (closest_dist > params->f_sigma * params->f_sigma) {
+    // get obs point
+    if (*curr_idx == obs_data->fpfh_obs->num_points)
+      return;
+    c_obs = idx[*curr_idx];
+    *curr_idx = *curr_idx + 1;
+    c_obs = irand(obs_data->fpfh_obs->num_points);
+    sample->c_obs[0] = c_obs;
+
+    // get model point
+    //flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->fpfh_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
+    knn_brute_force(nn_d2, nn_idx, obs_data->fpfh_obs->fpfh[c_obs], model_data->fpfh_model->fpfh, model_data->fpfh_model->num_points, model_data->fpfh_model->fpfh_length, params->knn);
+    closest_dist = nn_d2[0];
+  }
   double p[params->knn];
   int j;
   for (j = 0; j < params->knn; j++)
@@ -6027,6 +6038,15 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // sample poses from one correspondence
   int i;
+
+  // Create random permutation of points to avoid continuous sampling
+  int idx[obs_data->fpfh_obs->num_points];
+  for (i = 0; i < obs_data->fpfh_obs->num_points; i++) {
+    idx[i] = i;
+  }
+  randperm(idx, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->num_points);
+  int curr_idx = 0;
+
   for (i = 0; i < num_samples_init; i++) {
 
     if (i < num_sift_matches) {  // sift correspondence
@@ -6040,8 +6060,11 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     }
     else {
       double fpfh_ratio = .5;
-      if (params->use_fpfh && (!params->use_shot || frand() < fpfh_ratio))
-	sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, params);
+      if (params->use_fpfh && (!params->use_shot || frand() < fpfh_ratio)) {
+	sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, idx, &curr_idx, params); // Terminates early if there are no more points to sample
+	if (curr_idx == obs_data->fpfh_obs->num_points)
+	  break;
+      }
       else if (params->use_shot)
 	sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
     }
@@ -6049,6 +6072,8 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     // sample a pose
     sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
   }
+  num_samples_init = i; // In case we terminated early because we ran out of good points to sample
+  S->num_samples = num_samples_init;
 
   //dbug
   printf("Sampled c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
@@ -6085,7 +6110,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // sort hypotheses
   sort_pose_samples(S);
-  
+  /*
   double round1_score_thresh = params->round1_score_thresh;  //-.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
@@ -6101,7 +6126,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   if (params->use_sift) {
     free(sift_match_obs_idx);
     free(sift_match_model_idx);
-  }
+    }*/
   
   return S;
 }
@@ -6445,7 +6470,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   // step 2: align with BPA
   //scope_round2(S, model_data, obs_data, params);
-  scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
+  //scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
 
   //dbug: add true pose
   if (have_true_pose_ && params->use_true_pose) {
@@ -6468,7 +6493,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //S->num_samples = 1;
   }
 
-  scope_round3(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
+  //scope_round3(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
 
   //scope_round4(S, model_data, obs_data, params, cu_model, cu_obs);
 
@@ -6480,8 +6505,8 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   //if (params->pose_clustering)
   //  remove_redundant_pose_samples(S, model_data, params);
 
-  if (have_true_pose_)
-    print_good_poses(S);
+  //if (have_true_pose_)
+  //  print_good_poses(S);
 
   return S;
 }
