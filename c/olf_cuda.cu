@@ -31,7 +31,6 @@ const int num_components = 8; //9;
 __device__ __constant__ int cu_num_components = num_components;
 
 __device__ __constant__ int xyz_idx = 0, normal_idx = 1, vis_idx = 2, random_walk_idx = 3, edge_idx = 4, edge_vis_idx = 5, occ_idx = 6, segment_affinity_idx = 7; 
-//lab1_idx = 5, lab2_idx = 6, lab3_idx = 7, segment_idx = 8;
 
 curandGenerator_t gen;
 
@@ -1629,7 +1628,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   curandSetPseudoRandomGeneratorSeed(gen, time(NULL));
   curandGenerate(gen, cu_rands, 4 * num_samples);
 
-  cudaProfilerStart();
+  //cudaProfilerStart();
   int threads_per_block = 8;
   int blocks_per_grid = ceil(num_samples/(1.0*threads_per_block));
 
