@@ -113,12 +113,12 @@ int main(int argc, char *argv[])
     printf("Initializing CUDA\n");
     cu_init();
     printf("CUDA initialized\n");
-    cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs);
+    cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs, &params);
     printf("Data copied\n");
 
     S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs, NULL);
 
-    cu_free_all_the_things(&cu_model, &cu_obs);
+    cu_free_all_the_things(&cu_model, &cu_obs, &params);
   }
   else
     S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), NULL, NULL, NULL);

@@ -27,10 +27,11 @@ __device__ __constant__ double b_EN[3] = {0.1246,     1.4406,   -185.8350};
 __device__ __constant__ double b_EL[3] = {0.2461,     0.2624,   -140.0192};
 __device__ __constant__ double b_EA[3] = {0.1494,     0.2114,   -139.4324};
 __device__ __constant__ double b_EB[3] = {0.2165,     0.2600,   -135.5203};
-const int num_components = 7; //9;
+const int num_components = 8; //9;
 __device__ __constant__ int cu_num_components = num_components;
 
-__device__ __constant__ int xyz_idx = 0, normal_idx = 1, vis_idx = 2, occ_idx = 3, edge_vis_idx = 4, edge_idx = 5, segment_idx = 6; //lab1_idx = 5, lab2_idx = 6, lab3_idx = 7, segment_idx = 8;
+__device__ __constant__ int xyz_idx = 0, normal_idx = 1, vis_idx = 2, random_walk_idx = 3, edge_idx = 4, edge_vis_idx = 5, occ_idx = 6, segment_affinity_idx = 7; 
+//lab1_idx = 5, lab2_idx = 6, lab3_idx = 7, segment_idx = 8;
 
 curandGenerator_t gen;
 
@@ -845,9 +846,7 @@ __device__ double compute_labdist_score(int *xi, int *yi, cu_double_matrix_t *co
     ww = params->score3_labdist_weight;
 
   return ww * score;
-}
-*/
-
+}*/
 
 __device__ double compute_vis_score(double *vis_prob, int n, scope_params_t *params, int score_round, double *score_c)
 {
@@ -1210,6 +1209,137 @@ __device__ double compute_segment_affinity_score(int *segments, int num_segments
   
 }
 
+/*
+ * Brute force computation of KNN. Temporary substitute for FLANN.
+ */
+__device__ void cu_knn_brute_force(double *nn_d2, int *nn_idx, double query[], cu_double_matrix_t *cu_points, int n, int m, int k) {
+  int last = 0;
+  int i, j;
+  double dist, tmp_d2;
+  int tmp_idx;
+  nn_d2[k-1] = 1000000.0;
+  for (i = 0; i < n; ++i) {
+    dist = 0;
+    for (j = 0; j < m; ++j)
+      dist += (cu_points->ptr[i *m + j] - query[j]) * (cu_points->ptr[i * m + j] - query[j]);
+    if (last == k && dist >= nn_d2[last-1])
+      continue;
+    if (last < k)
+      ++last;
+    if (last < k || (last == k && nn_d2[last-1] > dist)) {
+      nn_d2[last-1] = dist;
+      nn_idx[last-1] = i;
+    }
+    for (j = last-1; j > 0; --j) {
+      if (nn_d2[j] < nn_d2[j-1]) {
+	tmp_d2 = nn_d2[j]; nn_d2[j] = nn_d2[j-1]; nn_d2[j-1] = tmp_d2;
+	tmp_idx = nn_idx[j]; nn_idx[j] = nn_idx[j-1]; nn_idx[j-1] = tmp_idx;
+      }
+    }
+  }
+}
+
+__device__ void edge_image_random_walk(int *xi_ptr, int *yi_ptr, cu_double_matrix_t *edge_image, int w, int h, int num_steps, int hops, int sample_endpoint) {
+  /*  int xi = *xi_ptr;
+  int yi = *yi_ptr;
+
+  int i;
+  for (i = 0; i < num_steps; i++) {
+    // shoot a ray from (xi,yi) in a random direction
+    double theta = 2*M_PI*frand();
+    double rx = cos(theta);
+    double ry = sin(theta);
+
+    // at each cell along the ray, stop with prob. = exp(obs_edge_image[xi][yi])
+    int xi2 = xi;
+    int yi2 = yi;
+    double xf = xi + .5;
+    double yf = yi + .5;
+    int hi = 0;
+    while (1) {
+      if (hi++ > hops) {
+	double p = exp(edge_image->ptr[xi2 * edge_image->m + yi2]);
+	if (p > .2 && frand() < p)
+	  break;
+      }
+      xf += rx;
+      yf += ry;
+      if (xf < 0 || yf < 0 || xf >= w || yf >= h)
+	break;
+      xi2 = floor(xf);
+      yi2 = floor(yf);
+    }
+
+    if (sample_endpoint) {
+      xi = xi2;
+      yi = yi2;
+    }
+    else {  // pick a random observed point along the ray
+      double r = frand();
+      xi = floor(r*xi + (1-r)*xi2);
+      yi = floor(r*yi + (1-r)*yi2);
+    }
+  }
+
+  *xi_ptr = xi;
+  *yi_ptr = yi;*/
+}
+
+__device__ double compute_random_walk_score(double *x, double *q, int *xi, int *yi, cu_double_matrix_t *cu_points, double *vis_prob, int n, cu_double_matrix3d_t *range_image_points, 
+					    cu_int_matrix_t *range_image_cnt, cu_double_matrix_t *edge_image, double *b_random_walk, scope_params_t *params, int score_round, double *score_c)
+{
+  double range_sigma = params->range_sigma;
+  double dmax = 2*range_sigma;
+
+  double q_inv[4];
+  cu_quaternion_inverse(q_inv, q);
+  double R_inv[3][3];
+  cu_quaternion_to_rotation_matrix(R_inv, q_inv);
+
+  double score = 0.0;
+  int cnt = 0;
+  int i, xi1, yi1;
+  for (i = 0; i < n; i++) {
+    if (vis_prob[i] > .1 && (xi[i] != -1 && yi[i] != -1)) {
+      
+      edge_image_random_walk(&xi1, &yi1, edge_image, range_image_cnt->n, range_image_cnt->m, 1, 0, 0);
+
+      if (range_image_cnt->ptr[xi1 * range_image_cnt->m + yi1] > 0) {
+
+	// transform observed point into model coordinates
+	double p[3];
+	cu_sub(p, &range_image_points->ptr[xi1 * range_image_points->m * range_image_points->p + yi1 * range_image_points->p], x, 3);
+	cu_matrix_vec_mult_3(p, R_inv, p, 3, 3);
+
+	// find the xyz-distance to the closest model point
+	int nn_idx;
+	double nn_d2;
+	cu_knn_brute_force(&nn_d2, &nn_idx, p, cu_points, cu_points->n, 3, 1);
+
+	// add score
+	double d = MIN(sqrt(nn_d2), dmax);
+	score += log(cu_normpdf(d, 0, range_sigma));
+	cnt++;
+      }
+    }
+  }
+  if (cnt > 0)
+    score /= (double)cnt;
+
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models))
+    score = cu_logistic(score, b_random_walk);
+
+  *score_c = score;
+
+  double weight = 0;
+  if (score_round == 2)
+    weight = params->score2_random_walk_weight;
+  else
+    weight = params->score3_random_walk_weight;
+
+  return weight * score;
+}
+
 __device__ double cu_model_placement_score(double x[], double q[], double *scores, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 					   int *xi, int *yi, int *idx, double *cloud, double *cloud_normals, double *cloud_lab, int num_validation_points, double *vis_prob, double *vis_pmf, uint *r,
 					   scope_noise_model_t *noise_models, int *segments_idx, int num_segments, int *segment_mask,
@@ -1264,6 +1394,12 @@ __device__ double cu_model_placement_score(double x[], double q[], double *score
 					       &(cu_model->color_cnts1), &(cu_model->color_cnts2), idx, vis_pmf, noise_models, num_validation_points, 
 					       &(cu_obs->range_image), cu_obs->range_image_data.w, cu_obs->range_image_data.h, &(cu_obs->obs_lab_image), obs_lab, obs_weights, cu_params, score_round);*/
   double labdist_score = 0;
+
+  double random_walk_score = 0;
+
+  //if (score_round >= 3)
+  //  random_walk_score = compute_random_walk_score(x, q, xi, yi, &(cu_model->points), vis_prob, num_validation_points, &(cu_obs->range_image_points), &(cu_obs->range_image_cnt),
+  //						  &(cu_obs->edge_image), cu_model->score_comp_models.ptr->b_random_walk, cu_params, score_round, &scores[random_walk_idx]);
   
   //TODO: move this to compute_edge_score()
   double edge_score = 0.0;
@@ -1288,10 +1424,12 @@ __device__ double cu_model_placement_score(double x[], double q[], double *score
 					  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image, params, score_round);
   */
   
-  double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round, &scores[segment_idx]);
+  double segment_affinity_score = compute_segment_affinity_score(segments_idx, num_segments, &(cu_obs->segment_affinities), cu_obs->num_obs_segments, segment_mask, cu_params, score_round, 
+								 &scores[segment_affinity_idx]);
 
   //double score = xyz_score + normal_score + vis_score + edge_score + lab_score + segment_affinity_score + labdist_score;
-  double score = xyz_score + normal_score + vis_score + edge_score + segment_affinity_score + labdist_score;
+  //double score = xyz_score + normal_score + vis_score + edge_score + segment_affinity_score + labdist_score;
+  double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + segment_affinity_score;
 
   return score;
 }
@@ -1362,12 +1500,11 @@ __global__ void device_score_samples(double *cu_scores, double *cu_score_compone
 }
 void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, int score_round, 
 		      int num_validation_points, int num_obs_segments) {
-  double t0 = get_time_ms();  
   int *cu_xi, *cu_yi, *cu_idx;
   double *cu_cloud, *cu_normals, *cu_lab;
   double *cu_vis_prob, *cu_vis_pmf;
   scope_noise_model_t *cu_noise_models;
-  
+ 
   // NOTE(sanja): possible perf optimization: do all these in one giant Malloc. Downside: it might be hard to find this big chunk of memory. Solution: chunk it up a little bit.
   if (cudaMalloc(&cu_xi, num_samples * num_validation_points * sizeof(int)) != cudaSuccess) {
     printf("xi malloc\n");
@@ -1444,8 +1581,6 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   if (cudaMalloc(&cu_rands, 2 * num_samples * sizeof(double)) != cudaSuccess) {
     printf("rands\n");
   }      
-  curandSetPseudoRandomGeneratorSeed(gen, time(NULL));
-  curandGenerate(gen, cu_rands, 4 * num_samples);
 
   double **samples_x = new_matrix2(num_samples, 3);  
   double **samples_q = new_matrix2(num_samples, 4);
@@ -1490,8 +1625,11 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   if (cudaMalloc(&cu_score_components, num_samples * num_components * sizeof(double)) != cudaSuccess) {
     printf("score components\n");
   }
-  
-  //cudaProfilerStart();
+
+  curandSetPseudoRandomGeneratorSeed(gen, time(NULL));
+  curandGenerate(gen, cu_rands, 4 * num_samples);
+
+  cudaProfilerStart();
   int threads_per_block = 8;
   int blocks_per_grid = ceil(num_samples/(1.0*threads_per_block));
 
@@ -1499,6 +1637,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
 							       *cu_params, score_round, cu_xi, cu_yi, cu_idx, cu_cloud, cu_normals, cu_lab, cu_vis_prob, cu_vis_pmf, cu_rands, cu_noise_models, cu_idx_edge, 
 							       cu_P, cu_V_edge, cu_V2_edge, cu_occ_edges, cu_vis_prob_edge, cu_vis_pmf_edge, cu_obs_lab, cu_obs_weights, num_validation_points);
   cudaDeviceSynchronize();
+
   //cudaProfilerStop();
   if (cudaMemcpy(scores, cu_scores, num_samples * sizeof(double), cudaMemcpyDeviceToHost) != cudaSuccess) {
     printf("scores error\n");
@@ -1513,7 +1652,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
     memcpy(samples[i].scores, &sample_scores[i * num_components], num_components * sizeof(double));
   }
 
-  printf("scoring: %.2f ms\n", get_time_ms() - t0);
+  //printf("scoring: %.2f ms\n", get_time_ms() - t0);
   
   free_matrix2(samples_x);
   free_matrix2(samples_q);  
@@ -1565,6 +1704,7 @@ void cu_score_samples(double *scores, scope_sample_t *samples, int num_samples, 
   cu_free(cu_segments_idx.ptr, "free segments_idx\n");
   cu_free(cu_num_segments.ptr, "free num_segments\n");
   cu_free(cu_segment_mask, "free segment mask\n");
+
 }
 
 void cu_init() {
@@ -1573,46 +1713,42 @@ void cu_init() {
   printf("Init error: %d\n", err);
 }
 
-void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
-
+void cu_init_model(scope_model_data_t *model_data, cu_model_data_t *cu_model) {
   // Allocate all the memory
   copy_double_matrix_to_gpu(&(cu_model->points), model_data->pcd_model->points, model_data->pcd_model->num_points, 3);
   copy_double_matrix_to_gpu(&(cu_model->normals), model_data->pcd_model->normals, model_data->pcd_model->num_points, 3);
   copy_double_arr_to_gpu(&(cu_model->normalvar), model_data->pcd_model->normalvar, model_data->pcd_model->num_points);
   copy_double_matrix_to_gpu(&(cu_model->lab), model_data->pcd_model->lab, model_data->pcd_model->num_points, 3);
   copy_double_matrix_to_gpu(&(cu_model->ved), model_data->pcd_model->ved, model_data->pcd_model->num_points, 66);
-  copy_double_matrix_to_gpu(&(cu_model->color_avg_cov), model_data->color_model->avg_cov, 3, 3);
+  /*copy_double_matrix_to_gpu(&(cu_model->color_avg_cov), model_data->color_model->avg_cov, 3, 3);
   copy_int_arr_to_gpu(&(cu_model->color_cnts1), model_data->color_model->cnts[0], model_data->color_model->num_points);
   copy_int_arr_to_gpu(&(cu_model->color_cnts2), model_data->color_model->cnts[1], model_data->color_model->num_points);
   copy_double_matrix_to_gpu(&(cu_model->color_means1), model_data->color_model->means[0], model_data->color_model->num_points, 3);
   copy_double_matrix_to_gpu(&(cu_model->color_means2), model_data->color_model->means[1], model_data->color_model->num_points, 3);
   copy_double_matrix3d_to_gpu(&(cu_model->color_cov1), model_data->color_model->covs[0], model_data->color_model->num_points, 3, 3);
-  copy_double_matrix3d_to_gpu(&(cu_model->color_cov2), model_data->color_model->covs[1], model_data->color_model->num_points, 3, 3);
+  copy_double_matrix3d_to_gpu(&(cu_model->color_cov2), model_data->color_model->covs[1], model_data->color_model->num_points, 3, 3);*/
   //copy_double_matrix_to_gpu(&(cu_model->fpfh_shapes), model_data->fpfh_model->shapes, model_data->fpfh_model->shape_length, 33);
   copy_double_matrix_to_gpu(&(cu_model->range_edges_model_views), model_data->range_edges_model->views, model_data->range_edges_model->num_views, 3);
   copy_int_arr_to_gpu(&(cu_model->range_edges_view_idx), model_data->range_edges_model->view_idx, model_data->range_edges_model->num_views);
   copy_int_arr_to_gpu(&(cu_model->range_edges_view_cnt), model_data->range_edges_model->view_cnt, model_data->range_edges_model->num_views);
   copy_double_matrix_to_gpu(&(cu_model->range_edges_points), model_data->range_edges_model->pcd->points, model_data->range_edges_model->pcd->num_points, 3);
 
-  
-  if (cudaMalloc(&(cu_model->score_comp_models.ptr), sizeof(score_comp_models_t)) != cudaSuccess) {
-    printf("score_comp_models malloc\n");
-  }      
-  if (cudaMemcpy(cu_model->score_comp_models.ptr, model_data->score_comp_models, sizeof(score_comp_models_t), cudaMemcpyHostToDevice) != cudaSuccess) {
-    printf("score_comp_models copy\n");
-  }      
+  cudaMalloc(&(cu_model->score_comp_models.ptr), sizeof(score_comp_models_t));
+  cudaMemcpy(cu_model->score_comp_models.ptr, model_data->score_comp_models, sizeof(score_comp_models_t), cudaMemcpyHostToDevice);
     
   cu_model->num_points = model_data->pcd_model->num_points;
   cu_model->num_views = model_data->range_edges_model->num_views;
   int n_edge = arr_max_i(model_data->range_edges_model->view_cnt, model_data->range_edges_model->num_views);
   cu_model->max_num_edges = n_edge;
-  // CONTINUE HERE FOR MODEL DATA COPYING ****************************
+}
 
+void cu_init_obs(scope_obs_data_t *obs_data, cu_obs_data_t *cu_obs, scope_params_t *params) {
   copy_double_matrix_to_gpu(&(cu_obs->range_image), obs_data->obs_range_image->image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_cnt), obs_data->obs_range_image->cnt, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
   copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
-  copy_double_matrix3d_to_gpu(&(cu_obs->obs_lab_image), obs_data->obs_lab_image, 3, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
+  if (params->use_colors)
+    copy_double_matrix3d_to_gpu(&(cu_obs->obs_lab_image), obs_data->obs_lab_image, 3, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
   //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
@@ -1627,94 +1763,52 @@ void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data,
   cu_obs->num_obs_segments = obs_data->num_obs_segments;
 
   // CONTINUE HERE FOR OBS DATA COPYING ********************************
+}
+
+void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *params) {
+
+  cu_init_model(model_data, cu_model);
+  cu_init_obs(obs_data, cu_obs, params);
 
   curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
   //cudaDeviceSynchronize();
 }
 
-void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs) {
+void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, scope_params_t *params) {
   
   // Allocate all the memory
 
   for (int i = 0; i < num_models; ++i) {
-    copy_double_matrix_to_gpu(&(cu_model[i].points), model_data[i].pcd_model->points, model_data[i].pcd_model->num_points, 3);
-    copy_double_matrix_to_gpu(&(cu_model[i].normals), model_data[i].pcd_model->normals, model_data[i].pcd_model->num_points, 3);
-    copy_double_arr_to_gpu(&(cu_model[i].normalvar), model_data[i].pcd_model->normalvar, model_data[i].pcd_model->num_points);
-    copy_double_matrix_to_gpu(&(cu_model[i].lab), model_data[i].pcd_model->lab, model_data[i].pcd_model->num_points, 3);
-    copy_double_matrix_to_gpu(&(cu_model[i].ved), model_data[i].pcd_model->ved, model_data[i].pcd_model->num_points, 66);
-    copy_double_matrix_to_gpu(&(cu_model[i].color_avg_cov), model_data[i].color_model->avg_cov, 3, 3);
-    copy_int_arr_to_gpu(&(cu_model[i].color_cnts1), model_data[i].color_model->cnts[0], model_data[i].color_model->num_points);
-    copy_int_arr_to_gpu(&(cu_model[i].color_cnts2), model_data[i].color_model->cnts[1], model_data[i].color_model->num_points);
-    copy_double_matrix_to_gpu(&(cu_model[i].color_means1), model_data[i].color_model->means[0], model_data[i].color_model->num_points, 3);
-    copy_double_matrix_to_gpu(&(cu_model[i].color_means2), model_data[i].color_model->means[1], model_data[i].color_model->num_points, 3);
-    copy_double_matrix3d_to_gpu(&(cu_model[i].color_cov1), model_data[i].color_model->covs[0], model_data[i].color_model->num_points, 3, 3);
-    copy_double_matrix3d_to_gpu(&(cu_model[i].color_cov2), model_data[i].color_model->covs[1], model_data[i].color_model->num_points, 3, 3);
-    //copy_double_matrix_to_gpu(&(cu_model->fpfh_shapes), model_data->fpfh_model->shapes, model_data->fpfh_model->shape_length, 33);
-    copy_double_matrix_to_gpu(&(cu_model[i].range_edges_model_views), model_data[i].range_edges_model->views, model_data[i].range_edges_model->num_views, 3);
-    copy_int_arr_to_gpu(&(cu_model[i].range_edges_view_idx), model_data[i].range_edges_model->view_idx, model_data[i].range_edges_model->num_views);
-    copy_int_arr_to_gpu(&(cu_model[i].range_edges_view_cnt), model_data[i].range_edges_model->view_cnt, model_data[i].range_edges_model->num_views);
-    copy_double_matrix_to_gpu(&(cu_model[i].range_edges_points), model_data[i].range_edges_model->pcd->points, model_data[i].range_edges_model->pcd->num_points, 3);
-    
-    if (cudaMalloc(&(cu_model[i].score_comp_models.ptr), sizeof(score_comp_models_t)) != cudaSuccess) {
-      printf("score_comp_models malloc\n");
-    }      
-    if (cudaMemcpy(cu_model[i].score_comp_models.ptr, model_data[i].score_comp_models, sizeof(score_comp_models_t), cudaMemcpyHostToDevice) != cudaSuccess) {
-      printf("score_comp_models copy\n");
-    }      
-
-    cu_model[i].num_points = model_data[i].pcd_model->num_points;
-    cu_model[i].num_views = model_data[i].range_edges_model->num_views;
-    int n_edge = arr_max_i(model_data[i].range_edges_model->view_cnt, model_data[i].range_edges_model->num_views);
-    cu_model[i].max_num_edges = n_edge;
-    // CONTINUE HERE FOR MODEL DATA COPYING ****************************
+    cu_init_model(&model_data[i], &cu_model[i]);
   }
-
-  copy_double_matrix_to_gpu(&(cu_obs->range_image), obs_data->obs_range_image->image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_int_matrix_to_gpu(&(cu_obs->range_image_cnt), obs_data->obs_range_image->cnt, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix3d_to_gpu(&(cu_obs->range_image_points), obs_data->obs_range_image->points, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
-  copy_double_matrix3d_to_gpu(&(cu_obs->range_image_normals), obs_data->obs_range_image->normals, obs_data->obs_range_image->w, obs_data->obs_range_image->h, 3);
-  copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
-  copy_double_matrix3d_to_gpu(&(cu_obs->obs_lab_image), obs_data->obs_lab_image, 3, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  //copy_double_matrix_to_gpu(&(cu_obs->pcd_obs_fpfh), obs_data->pcd_obs->fpfh, obs_data->pcd_obs->fpfh_length, 33);
-  copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
-  copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
-
-  cu_obs->range_image_data.res = obs_data->obs_range_image->res;
-  cu_obs->range_image_data.min0 = obs_data->obs_range_image->min[0];
-  cu_obs->range_image_data.min1 = obs_data->obs_range_image->min[1];
-  cu_obs->range_image_data.w = obs_data->obs_range_image->w;
-  cu_obs->range_image_data.h = obs_data->obs_range_image->h;
-  cu_obs->num_obs_segments = obs_data->num_obs_segments;
-
-  // CONTINUE HERE FOR OBS DATA COPYING ********************************
-
+  cu_init_obs(obs_data, cu_obs, params);
+  
   curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
   //cudaDeviceSynchronize();
 }
 
-void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
-  // Free ALL the things!!!
-
+void cu_free_all_the_model_things(cu_model_data_t *cu_model) {
   cudaFree(cu_model->points.ptr);
   cudaFree(cu_model->normals.ptr);
   cudaFree(cu_model->normalvar.ptr);
   cudaFree(cu_model->lab.ptr);
   cudaFree(cu_model->ved.ptr);
-  cudaFree(cu_model->color_avg_cov.ptr);
+  /*cudaFree(cu_model->color_avg_cov.ptr);
   cudaFree(cu_model->color_means1.ptr);
   cudaFree(cu_model->color_means2.ptr);
-  //cudaFree(cu_model->fpfh_shapes.ptr);
-  cudaFree(cu_model->range_edges_model_views.ptr);
-  cudaFree(cu_model->range_edges_points.ptr);
   cudaFree(cu_model->color_cov1.ptr);
   cudaFree(cu_model->color_cov2.ptr);
   cudaFree(cu_model->color_cnts1.ptr);
-  cudaFree(cu_model->color_cnts2.ptr);
+  cudaFree(cu_model->color_cnts2.ptr);*/
+  //cudaFree(cu_model->fpfh_shapes.ptr);
+  cudaFree(cu_model->range_edges_model_views.ptr);
+  cudaFree(cu_model->range_edges_points.ptr);
   cudaFree(cu_model->range_edges_view_idx.ptr);
   cudaFree(cu_model->range_edges_view_cnt.ptr);
   cudaFree(cu_model->score_comp_models.ptr);
+}
 
+void cu_free_all_the_obs_things(cu_obs_data_t *cu_obs, scope_params_t *params) {
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);
   cudaFree(cu_obs->range_image_pcd_obs_lab.ptr);
@@ -1723,46 +1817,25 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs) {
   cudaFree(cu_obs->range_image_points.ptr);
   cudaFree(cu_obs->range_image_normals.ptr);
   cudaFree(cu_obs->range_image_cnt.ptr);
-  cudaFree(cu_obs->obs_lab_image.ptr);
+  if (params->use_colors)
+    cudaFree(cu_obs->obs_lab_image.ptr);
   cudaFree(cu_obs->segment_affinities.ptr);
- 
+}
+
+void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *params) {
+  // Free ALL the things!!!
+  cu_free_all_the_model_things(cu_model);
+  cu_free_all_the_obs_things(cu_obs, params);
   curandDestroyGenerator(gen);
 }
 
-void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models) {
+void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models, scope_params_t *params) {
   // Free ALL the things!!!
   
   for (int i = 0; i < num_models; ++i) {
-    cudaFree(cu_model[i].points.ptr);
-    cudaFree(cu_model[i].normals.ptr);
-    cudaFree(cu_model[i].normalvar.ptr);
-    cudaFree(cu_model[i].lab.ptr);
-    cudaFree(cu_model[i].ved.ptr);
-    cudaFree(cu_model[i].color_avg_cov.ptr);
-    cudaFree(cu_model[i].color_means1.ptr);
-    cudaFree(cu_model[i].color_means2.ptr);
-    //cudaFree(cu_model->fpfh_shapes.ptr);
-    cudaFree(cu_model[i].range_edges_model_views.ptr);
-    cudaFree(cu_model[i].range_edges_points.ptr);
-    cudaFree(cu_model[i].color_cov1.ptr);
-    cudaFree(cu_model[i].color_cov2.ptr);
-    cudaFree(cu_model[i].color_cnts1.ptr);
-    cudaFree(cu_model[i].color_cnts2.ptr);
-    cudaFree(cu_model[i].range_edges_view_idx.ptr);
-    cudaFree(cu_model[i].range_edges_view_cnt.ptr);
-    cudaFree(cu_model[i].score_comp_models.ptr);
+    cu_free_all_the_model_things(&cu_model[i]);
   }
-  cudaFree(cu_obs->range_image.ptr);
-  cudaFree(cu_obs->range_image_idx.ptr);
-  cudaFree(cu_obs->range_image_pcd_obs_lab.ptr);
-  //cudaFree(cu_obs->pcd_obs_fpfh.ptr);
-  cudaFree(cu_obs->edge_image.ptr);
-  cudaFree(cu_obs->range_image_points.ptr);
-  cudaFree(cu_obs->range_image_normals.ptr);
-  cudaFree(cu_obs->range_image_cnt.ptr);
-  cudaFree(cu_obs->obs_lab_image.ptr);
-  cudaFree(cu_obs->segment_affinities.ptr);
-
+  cu_free_all_the_obs_things(cu_obs, params);
   curandDestroyGenerator(gen);
 }
 
