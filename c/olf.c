@@ -6470,7 +6470,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   // step 2: align with BPA
   //scope_round2(S, model_data, obs_data, params);
-  //scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
+  scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
 
   //dbug: add true pose
   if (have_true_pose_ && params->use_true_pose) {
@@ -6493,7 +6493,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //S->num_samples = 1;
   }
 
-  //scope_round3(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
+  scope_round3(S, model_data, obs_data, params, cu_model, cu_obs, segment_blacklist);
 
   //scope_round4(S, model_data, obs_data, params, cu_model, cu_obs);
 
@@ -6505,8 +6505,8 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
   //if (params->pose_clustering)
   //  remove_redundant_pose_samples(S, model_data, params);
 
-  //if (have_true_pose_)
-  //  print_good_poses(S);
+  if (have_true_pose_)
+    print_good_poses(S);
 
   return S;
 }
