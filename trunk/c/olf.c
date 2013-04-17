@@ -7258,7 +7258,6 @@ mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models,
   for (i = 0; i < obs->num_obs_segments; ++i) {
     segment_cnts[i] = obs->obs_segments[i].num_pixels;
   }
-  printf("Finished filling up segment_cnts\n");
   
   return run_mope_annealing(S, models, num_models, segment_cnts, obs, obs->num_obs_segments, round, scope_params, mope_params, segment_blacklist);
 }
