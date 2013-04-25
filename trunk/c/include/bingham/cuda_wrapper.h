@@ -83,8 +83,8 @@ typedef struct cu_obs_data_struct {
   void cu_score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params, int score_round, 
 			int num_validation_points, int num_obs_segments);
 
-  void score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, 
-		     struct scope_params_struct *cu_params, struct scope_params_struct *params, int num_validation_points, int model_points, int num_round);
+  void score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *cu_params, 
+		     struct scope_params_struct *params, int num_validation_points, int model_points, int num_obs_segments, int edge_scoring, int num_round);
   void init_curand();
 
 #ifdef __cplusplus

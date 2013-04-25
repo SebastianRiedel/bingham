@@ -4733,8 +4733,9 @@ double compute_segment_affinity_score(scope_sample_t *sample, scope_obs_data_t *
 
   int i, mask[n];
   memset(mask, 0, n*sizeof(int));
-  for (i = 0; i < sample->num_segments; i++)
+  for (i = 0; i < sample->num_segments; i++) {
     mask[segments[i]] = 1;
+  }
 
   int j;
   //double cnt = 0;  // normalize by the number of model boundary edges
@@ -5098,7 +5099,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   //double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
   //  fpfh_score + segment_affinity_score + segment_score + table_score + italian_xyzn_score + xyz_score2 + outliers_score;
   
-  double score = xyz_score + normal_score + vis_score;
+  double score = xyz_score + normal_score + vis_score + segment_affinity_score;
 
   if (params->verbose) {
     double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
@@ -6110,7 +6111,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
     //cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 1, num_validation_points, obs_data->num_obs_segments);
-    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, 1);
+    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 0, 1);
   }
   else
     for (i = 0; i < num_samples_init; i++)
@@ -6155,7 +6156,8 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
   if (params->use_cuda) {
     int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
     //cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points, obs_data->num_obs_segments);
-    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, 2);
+    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, (obs_data->obs_edge_image != NULL), 
+		  2);
   }
   else
     for (i = 0; i < S->num_samples; i++)
@@ -6200,7 +6202,8 @@ void scope_round2_super(scope_samples_t *S, scope_model_data_t *model_data, scop
     if (params->use_cuda) {
       int num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->pcd_model->num_points);
       //cu_score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, params, 2, num_validation_points, obs_data->num_obs_segments);
-      score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, 2);
+      score_samples(new_scores, samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
+		    (obs_data->obs_edge_image != NULL), 2);
     }
     else {
       //params->verbose = 1; //dbug
@@ -6267,7 +6270,8 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   if (params->use_cuda) {
     int num_validation_points = model_data->pcd_model->num_points;
     //cu_score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, params, 3, num_validation_points, obs_data->num_obs_segments);
-    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, 3);
+    score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
+		  (obs_data->obs_edge_image != NULL), 3);
     // Debugging individual score components on CUDA
     /*double scores[S->num_samples];
     for (i = 0; i < 20; i++)
@@ -6325,6 +6329,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     printf("W[0] = %.2f\n", S->W[0]); //dbug
   }
   */
+
 }
 
 
