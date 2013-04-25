@@ -42,10 +42,6 @@ typedef struct {
   size_t n, m, p;
 } cu_double_matrix3d_t;
 
-typedef struct {
-  struct score_comp_models_struct *ptr;
-} cu_score_comp_models_t;
-  
 typedef struct cu_model_data_struct {
   cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
   cu_double_matrix3d_t color_cov1, color_cov2;
@@ -54,7 +50,7 @@ typedef struct cu_model_data_struct {
   cu_int_arr_t color_cnts1, color_cnts2, range_edges_view_idx, range_edges_view_cnt;
 
   int num_points, num_views, max_num_edges;
-  cu_score_comp_models_t score_comp_models;
+  struct score_comp_models_struct *score_comp_models;
   
 } cu_model_data_t;
 
@@ -74,18 +70,22 @@ typedef struct cu_obs_data_struct {
 } cu_obs_data_t;
 
 
-void cu_init();
+  void cu_init();
 
-void cu_init_scoring(struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data,
-		     cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params);
+  void cu_init_scoring(struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data,
+		       cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct **cu_params, struct scope_params_struct *params);
   void cu_init_scoring_mope(struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, 
 			    struct scope_params_struct *params);
-  void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params);
+  void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *cu_params, struct scope_params_struct *params);
   void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models, struct scope_params_struct *params);
 
 //void cu_noise_models_sigmas(double *range_sigma, double *normal_sigma, double *l_sigma, double *a_sigma, double *b_sigma, const double *surface_angles, const double *edge_dists, int n);
   void cu_score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params, int score_round, 
 			int num_validation_points, int num_obs_segments);
+
+  void score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, 
+		     struct scope_params_struct *cu_params, struct scope_params_struct *params, int num_validation_points, int model_points, int num_round);
+  void init_curand();
 
 #ifdef __cplusplus
 }

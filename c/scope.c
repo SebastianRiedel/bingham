@@ -110,18 +110,19 @@ int main(int argc, char *argv[])
   if (params.use_cuda) {
     cu_model_data_t cu_model;
     cu_obs_data_t cu_obs;
+    scope_params_t *cu_params;
     printf("Initializing CUDA\n");
     cu_init();
     printf("CUDA initialized\n");
-    cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs, &params);
+    cu_init_scoring(&model_data, &obs_data, &cu_model, &cu_obs, &cu_params, &params);
     printf("Data copied\n");
+    
+    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs, cu_params, NULL);
 
-    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), &cu_model, &cu_obs, NULL);
-
-    cu_free_all_the_things(&cu_model, &cu_obs, &params);
+    cu_free_all_the_things(&cu_model, &cu_obs, cu_params, &params);
   }
   else
-    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), NULL, NULL, NULL);
+    S = scope(&model_data, &obs_data, &params, (have_true_pose ? &true_pose : NULL), NULL, NULL, NULL, NULL);
 
   // cleanup
   free_scope_obs_data(&obs_data);
@@ -184,6 +185,14 @@ int main(int argc, char *argv[])
     fprintf(f, "], ");
   }
   fprintf(f, "};\n");
+
+
+  extern double t[4];
+  fprintf(f, "timings = [");
+  for (i = 0; i < 4; ++i)
+    fprintf(f, "%lf ", t[i]);
+  fprintf(f, "];\n");
+    
 
   /*fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
