@@ -11,8 +11,6 @@
 #define cu_malloc(x, sz, msg) do{ if (cudaMalloc(x, sz) != cudaSuccess) printf(msg); } while (0)
 #define cu_free(x, msg) do{ if (cudaFree(x) != cudaSuccess) printf(msg); } while (0)
 
-const dim3 threads_per_block(256, 1, 1);
-
 curandGenerator_t gen;
 
 __device__ __constant__ int big_primes[100] = {996311, 163573, 481123, 187219, 963323, 103769, 786979, 826363, 874891, 168991, 442501, 318679, 810377, 471073, 914519, 251059, 321983, 220009, 211877, 875339, 605603, 578483, 219619, 860089, 644911, 398819, 544927, 444043, 161717, 301447, 201329, 252731, 301463, 458207, 140053, 906713, 946487, 524389, 522857, 387151, 904283, 415213, 191047, 791543, 433337, 302989, 445853, 178859, 208499, 943589, 957331, 601291, 148439, 296801, 400657, 829637, 112337, 134707, 240047, 669667, 746287, 668243, 488329, 575611, 350219, 758449, 257053, 704287, 252283, 414539, 647771, 791201, 166031, 931313, 787021, 520529, 474667, 484361, 358907, 540271, 542251, 825829, 804709, 664843, 423347, 820367, 562577, 398347, 940349, 880603, 578267, 644783, 611833, 273001, 354329, 506101, 292837, 851017, 262103, 288989};
@@ -704,6 +702,57 @@ __global__ void cu_compute_vis_score(double *vis_score, double *vis_sums, int n,
   vis_score[i] *= w;
 }
 
+__global__ void cu_set_mask_for_segment_affinity(int *mask, int *segments, int *num_segments, int num_obs_segments, int num_samples) {
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= num_samples || j >= num_segments[i])
+    return;
+
+  // Assumes mask is initialized to all zeros before kernel execution  
+  mask[segments[j + i * num_obs_segments] + i * num_obs_segments] = 1;
+}
+
+// compute the segment affinity score for a scope sample
+__global__ void cu_compute_segment_affinity_score_per_seg(double *seg_affinity_score_per_seg, int *segments, int *num_segments, cu_double_matrix_t segment_affinities, int num_obs_segments, int *mask, 
+							  int num_samples)	    
+{
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= num_samples || j >= num_obs_segments)
+    return;
+
+  int k;
+  
+  seg_affinity_score_per_seg[j + i * num_obs_segments] = 0.0;
+  if (mask[j + i * num_obs_segments] == 0) {
+    for (k = 0; k < num_segments[i]; ++k) {
+      int s = segments[k + i * num_obs_segments];
+      double a = MIN(segment_affinities.ptr[s * segment_affinities.m + j], .9);
+      if (a > 0.5)
+	seg_affinity_score_per_seg[j + i * num_obs_segments] += log((1-a)/a);
+    }
+  }
+}
+
+__global__ void cu_compute_segment_affinity_score_final(double *seg_affinity_score, scope_params_t *params, int score_round, int num_samples) {
+
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (i >= num_samples)
+    return;
+    
+  seg_affinity_score[i] *= .05;
+
+  double weight = 0;
+  if (score_round == 2)
+    weight = params->score2_segment_affinity_weight;
+  else
+    weight = params->score3_segment_affinity_weight;
+
+  seg_affinity_score[i] *= weight;
+}
+
 __global__ void cu_score_round1(double *scores, int *xi, int *yi, double *cloud, cu_double_matrix_t range_image, int num_samples, int num_validation_points) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -731,21 +780,21 @@ __global__ void cu_score_round1(double *scores, int *xi, int *yi, double *cloud,
   scores[i] = sample_score;
 }
  
-__global__ void cu_add_all_scores(double *cu_scores, double *cu_xyz_score, double *cu_normal_score, double *cu_vis_score, int num_samples) {
+__global__ void cu_add_all_scores(double *cu_scores, double *cu_xyz_score, double *cu_normal_score, double *cu_vis_score, double *cu_seg_affinity_score, double *cu_edge_scores, int num_samples) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
 
   if (i >= num_samples)
     return;
 
-  //cu_scores[i] = cu_xyz_score[i] + cu_normal_score[i];
-  cu_scores[i] = cu_xyz_score[i] + cu_normal_score[i] + cu_vis_score[i];
+  cu_scores[i] = cu_xyz_score[i] + cu_normal_score[i] + cu_vis_score[i] + cu_seg_affinity_score[i] + cu_edge_scores[i];
 }
 
 void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, scope_params_t *params, int num_validation_points, 
-		   int model_points, int round) {
+		   int model_points, int num_obs_segments, int edge_scoring, int round) {
 
   cudaError_t cudaerr;
 
+  dim3 threads_per_block(256, 1, 1);
   dim3 block_size(ceil(1.0 * num_validation_points / threads_per_block.x), num_samples);
 
   dim3 thread_size_small(64);
@@ -753,6 +802,7 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
 
   dim3 thread_size_sum(256);
   dim3 block_size_sum(1, num_samples);
+  dim3 thread_size_sum_small(64);
   
   int num_total = num_samples * num_validation_points;
 
@@ -824,7 +874,7 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
       printf( "vis_prob!\n" );
     double *cu_vis_prob_sums;
     cu_malloc(&cu_vis_prob_sums, num_samples * sizeof(double), "vis_prob_sums");
-    // NOTE(sanja): If we ever get a newer graphics card, we can make this call from another kernel. We can also probably pull the whole normalize thing into a 
+    // NOTE(sanja): If we ever get a newer graphics card, we can make this call from another kernel. We can also probably pull the whole normalize thing into a host function.
     cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_vis_prob_sums, cu_vis_prob, num_samples, num_validation_points); // TODO(sanja): Optimize. ArrayFire?
     if ( cudaSuccess != cudaGetLastError() )
       printf( "Vis prob sums!\n" );
@@ -885,13 +935,54 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     cu_malloc(&cu_vis_score, num_samples * sizeof(double), "vis_score");
     cu_compute_vis_score<<<block_size_small, thread_size_small>>>(cu_vis_score, cu_vis_prob_sums, num_validation_points, cu_params, round);
 
-    cu_add_all_scores<<<block_size_small, thread_size_small>>>(cu_scores, cu_xyz_score, cu_normal_score, cu_vis_score, num_samples);
+    // TODO(sanja): Figure out how to speed up the prep for segment calculation
+    double *cu_seg_affinity_score_per_seg;
+    cu_malloc(&cu_seg_affinity_score_per_seg, num_samples * num_obs_segments * sizeof(double), "seg_aff_per_seg");
+    int *cu_mask;
+    cu_malloc(&cu_mask, num_samples * num_obs_segments * sizeof(int), "mask");
+    cudaMemset(cu_mask, 0, num_samples * num_obs_segments * sizeof(int));
+    int *num_segments;
+    safe_calloc(num_segments, num_samples, int);
+    for (i = 0; i < num_samples; ++i) {
+      num_segments[i] = samples[i].num_segments;
+    }
+    int *cu_num_segments;
+    cu_malloc(&cu_num_segments, num_samples * sizeof(int), "num_segments");
+    cudaMemcpy(cu_num_segments, num_segments, num_samples * sizeof(int), cudaMemcpyHostToDevice);
+    free(num_segments);
+    int *tmp_segments_idx;
+    safe_malloc(tmp_segments_idx, num_samples * num_obs_segments, int);
+    memset(tmp_segments_idx, -1, num_samples * num_obs_segments * sizeof(int));
+    for (i = 0; i < num_samples; ++i) {
+      memcpy(&(tmp_segments_idx[i * num_obs_segments]), samples[i].segments_idx, samples[i].num_segments * sizeof(int));
+    }
+    int *cu_segments_idx;
+    cu_malloc(&cu_segments_idx, num_samples * num_obs_segments * sizeof(int), "segments_idx");
+    cudaMemcpy(cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments * sizeof(int), cudaMemcpyHostToDevice);
+    free(tmp_segments_idx);
+    double *cu_seg_affinity_score;
+    cu_malloc(&cu_seg_affinity_score, num_samples * sizeof(double), "seg_aff_per_seg");
+        
+    cu_set_mask_for_segment_affinity<<<block_size_sum, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
+  
+    cu_compute_segment_affinity_score_per_seg<<<block_size, thread_size_small>>>(cu_seg_affinity_score_per_seg, cu_segments_idx, cu_num_segments, cu_obs->segment_affinities, num_obs_segments, cu_mask, 
+										 num_samples);
+    cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_seg_affinity_score_per_seg, num_samples, num_obs_segments);
+    cu_compute_segment_affinity_score_final<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_params, round, num_samples);
 
+    double *cu_edge_scores;
+    cu_malloc(&cu_edge_scores, num_samples * sizeof(double), "edge_scores");
+    cudaMemset(cu_edge_scores, 0, num_samples * sizeof(double));
+    if (edge_scoring) {
+      
+    }
+    
+    cu_add_all_scores<<<block_size_small, thread_size_small>>>(cu_scores, cu_xyz_score, cu_normal_score, cu_vis_score, cu_seg_affinity_score, cu_edge_scores, num_samples);
+      
     if ( cudaSuccess != cudaGetLastError() )
       printf( "Final addition!\n" );
 
     // NEXT(sanja): Make calls for each score component async.
-    // NEXT(sanja): Optimize summing scores per point for each sample. Presumably, this is only necessary in round 3.
 
     cu_free(cu_normals, "normals");
     cu_free(cu_vis_prob, "vis_prob");
@@ -907,6 +998,12 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     cu_free(cu_wtot_per_point, "wtot_pp");
     cu_free(cu_wtot, "wtot");
     cu_free(cu_vis_score, "vis_score");
+    cu_free(cu_seg_affinity_score_per_seg, "seg_aff_per_seg");
+    cu_free(cu_seg_affinity_score, "seg_aff");
+    cu_free(cu_mask, "mask");
+    cu_free(cu_num_segments, "num_segments");
+    cu_free(cu_segments_idx, "segments_idx");
+    cu_free(cu_edge_scores, "edge_scores");
   }
 
   cudaMemcpy(scores, cu_scores, num_samples * sizeof(double), cudaMemcpyDeviceToHost);
