@@ -91,10 +91,10 @@ int main(int argc, char *argv[])
       cu_obs_data_t cu_obs;
       cu_init_scoring_mope(model_data, &obs_data, num_models, cu_model, &cu_obs, &scope_params);
        
-      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs, sample, 1, NULL);
+      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs, NULL, sample, 1, NULL);
       cu_free_all_the_things_mope(cu_model, &cu_obs, num_models, &scope_params);
     } else {
-      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, NULL, NULL, sample, 1, NULL);
+      M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, NULL, NULL, NULL, sample, 1, NULL);
     }
 
     /*//dbug

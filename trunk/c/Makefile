@@ -14,8 +14,8 @@ CFLAGS=-Wall -I$(IDIR) -O3 -msse2
 #CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
-CUDAFLAGS=-O3 -lcuda -lcudart -arch=compute_20
-#CUDAFLAGS=-g -G -lcuda -lcudart -arch=compute_20
+CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20
+#CUDAFLAGS=-g -G -lcuda -lcudart -lcurand -arch=compute_20
 
 #CYGWIN=1
 #WINDOWS=1
@@ -95,10 +95,10 @@ test_hll: test_hll.o hll.o libbingham.a
 #olf_pose_sample: olf_pose_sample.o olf.o libbingham.a
 #	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-scope: scope.o olf.o olf_cuda.o libbingham.a
+scope: scope.o olf_timing.o olf_cuda.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
-mope: mope.o olf.o olf_cuda.o libbingham.a
+mope: mope.o olf_timing.o olf_cuda.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
 #gauss_mix: gauss_mix.o libbingham.a

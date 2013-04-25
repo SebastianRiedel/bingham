@@ -514,13 +514,13 @@ struct cu_obs_data_struct;
 void test_bpa(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose);
 
 scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params, simple_pose_t *true_pose, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs,
-		       int *segment_blacklist);
+		       scope_params_t *cu_params, int *segment_blacklist);
 
 mope_sample_t *mope_greedy(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *scope_params, mope_params_t *mope_params, 
 			   struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 //mope_sample_t *mope_annealing(scope_model_data_t *models, int num_models, scope_obs_data_t *obs, scope_params_t *params, struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs);
 mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs, scope_params_t *scope_params, mope_params_t *mope_params,
-				     struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs, FILE *f, int round, int *segment_blacklist);
+				     struct cu_model_data_struct *cu_model, struct cu_obs_data_struct *cu_obs, struct scope_params_struct *cu_params, FILE *f, int round, int *segment_blacklist);
 mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, 
 					   scope_params_t *scope_params, mope_params_t *mope_params, FILE *f, int round);
 
