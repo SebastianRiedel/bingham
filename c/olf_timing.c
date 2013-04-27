@@ -49,6 +49,11 @@ int have_true_pose_ = 0;
 
 double t[4];
 
+extern int gpu_n[50000], gpu_idx[50000];
+int cpu_n[50000], cpu_idx[50000];
+int n_ctr = 0;
+int count_n = 0;
+
 int is_good_pose(double *x, double *q)
 {
   double dx[3];
@@ -2475,9 +2480,10 @@ double **get_range_edge_points(int *n_ptr, double *x, double *q, multiview_pcd_t
     randperm(idx, num_edge_points, n);
 
   // make idx be pcd point indices
-  for (i = 0; i < n; i++)
+  for (i = 0; i < n; i++) {
     idx[i] += vp_idx;
-
+  }
+  
   //printf("n = %d, idx[0] = %d, idx[n-1] = %d\n", n, idx[0], idx[n-1]); //dbug
 
   // get the actual points
@@ -4662,6 +4668,10 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
   double score = 0;
   int xi,yi;
   for (i = 0; i < n; i++) {
+    if (count_n) {
+      range_image_xyz2sub(&cpu_idx[n_ctr], &cpu_n[n_ctr], obs_range_image, P[i]);
+      ++n_ctr;
+    }
     if (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i])) {
       score += vis_pmf[i] * obs_edge_image[xi][yi];
 
@@ -5041,9 +5051,11 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 	free_matrix2i(occ_edges);
     }
     else*/
+    count_n = 1;
       edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image,
 				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ, params,
 				      score_round, P_outliers, &num_P_outliers);
+    count_n = 0;
     free_matrix2(P);
 
     /* update sample edge outliers
@@ -5099,7 +5111,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   //double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
   //  fpfh_score + segment_affinity_score + segment_score + table_score + italian_xyzn_score + xyz_score2 + outliers_score;
   
-  double score = xyz_score + normal_score + vis_score + segment_affinity_score;
+  double score = xyz_score + normal_score + vis_score + segment_affinity_score  + edge_score;
 
   if (params->verbose) {
     double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
@@ -6273,18 +6285,29 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
 		  (obs_data->obs_edge_image != NULL), 3);
     // Debugging individual score components on CUDA
-    /*double scores[S->num_samples];
-    for (i = 0; i < 20; i++)
+    double scores[S->num_samples];
+    for (i = 0; i < S->num_samples; i++)
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
-    for (i = 0; i < 20; ++i) {
+    for (i = 0; i < S->num_samples; ++i) {
       if (isnan(S->W[i]))
 	printf("Crap!\n");
       if (fabs(scores[i] - S->W[i]) > 0.00001)
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-	}*/
+	}
+
+    int good = 1;
+    for (i = 0; i < n_ctr; ++i)
+      //if (cpu_idx[i] != gpu_idx[i] && cpu_n[i] != gpu_n[i]) {
+	printf("BUG! i = %d, cpu = %d, gpu = %d\n", i, cpu_idx[i], gpu_idx[i]);
+	printf("BUG! i = %d, cpu = %d, gpu = %d\n", i, cpu_n[i], gpu_n[i]);
+	good = 0;
+	//}
+    if (good)
+      printf("*************YAY!!!!\n");
+
   }
   else {
     params->verbose = 1; //dbug
@@ -6493,6 +6516,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   // step 2: align with BPA
   //scope_round2(S, model_data, obs_data, params);
+  printf("**************** ROUND 2 *****************\n");
   scope_round2_super(S, model_data, obs_data, params, cu_model, cu_obs, cu_params, segment_blacklist);
 
   //dbug: add true pose
@@ -6516,6 +6540,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
     //S->num_samples = 1;
   }
 
+  printf("**************** ROUND 3 *****************\n");
   scope_round3(S, model_data, obs_data, params, cu_model, cu_obs, cu_params, segment_blacklist);
 
   //scope_round4(S, model_data, obs_data, params, cu_model, cu_obs, cu_params);

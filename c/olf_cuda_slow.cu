@@ -316,7 +316,10 @@ __device__ void cu_reorder_rows(double *Y, double *X, int *idx, int n, int m)
     printf("********** fix the call to cu_reorder_rows!\n");
   }
   for (i = 0; i < n; i++)
-    memcpy(&Y[m*i], &X[m*idx[i]], m*sizeof(double));
+    for (j = 0; j < m; ++j)
+      Y[m*i + j] = X[m*idx[i] + j];
+    
+    //memcpy(&Y[m*i], &X[m*idx[i]], m*sizeof(double));
 }
 
 __device__ double* get_row (cu_double_matrix_t *matrix, int i) {
