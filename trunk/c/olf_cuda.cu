@@ -13,6 +13,8 @@
 
 curandGenerator_t gen;
 
+int gpu_n[50000], gpu_idx[50000];
+
 __device__ __constant__ int big_primes[100] = {996311, 163573, 481123, 187219, 963323, 103769, 786979, 826363, 874891, 168991, 442501, 318679, 810377, 471073, 914519, 251059, 321983, 220009, 211877, 875339, 605603, 578483, 219619, 860089, 644911, 398819, 544927, 444043, 161717, 301447, 201329, 252731, 301463, 458207, 140053, 906713, 946487, 524389, 522857, 387151, 904283, 415213, 191047, 791543, 433337, 302989, 445853, 178859, 208499, 943589, 957331, 601291, 148439, 296801, 400657, 829637, 112337, 134707, 240047, 669667, 746287, 668243, 488329, 575611, 350219, 758449, 257053, 704287, 252283, 414539, 647771, 791201, 166031, 931313, 787021, 520529, 474667, 484361, 358907, 540271, 542251, 825829, 804709, 664843, 423347, 820367, 562577, 398347, 940349, 880603, 578267, 644783, 611833, 273001, 354329, 506101, 292837, 851017, 262103, 288989};
 
 __device__ __constant__ double b_SR[3] = {0.2878,    -5.6214,      7.7247};
@@ -359,28 +361,36 @@ __device__ void cu_model_pose_to_viewpoint(double *vp, double *x, double *q)
   cu_mult(vp, vp, -1, 3);
 }
 
-__global__ void cu_add_matrix_rows_slow(double *out_array, double *in_matrix, int n, int m) {
+__global__ void cu_add_matrix_rows_slow(double *out_array, double *in_matrix, int n, int m, int *m_arr) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   
   if (i >= n)
     return;
 
+  int limit = m;
+  if (m_arr)
+    limit = m_arr[i];
+  
   out_array[i] = 0.0;
-  for (int j = 0; j < m; ++j) {
+  for (int j = 0; j < limit; ++j) {
     out_array[i] += in_matrix[j + i * m];
   }
 }
 
-__global__ void cu_add_matrix_rows_medium(double *out_array, double *in_matrix, int n, int m) {
+__global__ void cu_add_matrix_rows_medium(double *out_array, double *in_matrix, int n, int m, int *m_arr) {
   int i = threadIdx.y + blockIdx.y * blockDim.y;
   int j = threadIdx.x + blockIdx.x * blockDim.x;
   
   if (i >= n || j >= m)
     return;
 
+  int limit = m;
+  if (m_arr)
+    limit = m_arr[i];
+
   extern __shared__ double tmps[];
   tmps[threadIdx.x] = 0.0;
-  for (int k = j; k < m; k += blockDim.x) {
+  for (int k = j; k < limit; k += blockDim.x) {
     tmps[threadIdx.x] += in_matrix[k + i * m];
   }
 
@@ -394,29 +404,30 @@ __global__ void cu_add_matrix_rows_medium(double *out_array, double *in_matrix, 
   }
 }
 
-__global__ void cu_divide_matrix_with_vector(double *out_matrix, double *in_matrix, double *scaling_array, int n, int m) {
+__global__ void cu_divide_matrix_with_vector(double *out_matrix, double *in_matrix, double *scaling_array, int n, int m, int *m_arr) {
   int j = threadIdx.x + blockIdx.x * blockDim.x;
   int i = threadIdx.y + blockIdx.y * blockDim.y;
 
-  if (j >= m || i >= n)
+  if (i >= n || j >= m)
     return;
+  if (m_arr && j >= m_arr[i])
+    return;  
 
   out_matrix[j + i * m] = in_matrix[j + i * m] / scaling_array[i];
 }
     
-__global__ void cu_get_validation_points(int *idx, cu_model_data_t cu_model, int num_validation_points, int num_samples, uint *rands)
+__global__ void cu_get_validation_points(int *idx, int total_pts, int needed, int num_samples, uint *rands)
 {
   int j = threadIdx.x + blockIdx.x * blockDim.x;
   int i = threadIdx.y + blockIdx.y * blockDim.y;
 
-  if (j >= num_validation_points || i >= num_samples)
+  if (j >= needed || i >= num_samples)
     return;
 
-  // NOTE(sanja): This is fine from CUDA standpoint because in a given round, all the threads will go down the same branch.
-  if (num_validation_points == cu_model.num_points) {  // use all the points
-    idx[j + i * num_validation_points] = j;
+  if (needed == total_pts) {  // use all the points
+    idx[j + i * needed] = j;
   } else {
-    idx[j + i * num_validation_points] = (rands[i << 1] % num_validation_points) + (j * (big_primes[rands[i << 1 + 1] % 100] % num_validation_points)) % num_validation_points;
+    idx[j + i * needed] = ((rands[(i << 1)] % total_pts) + (j * (big_primes[rands[(i << 1) + 1] % 100] % total_pts))) % total_pts;
   }
 }
 
@@ -432,11 +443,10 @@ __global__ void cu_get_sub_cloud_at_pose(double *cloud, cu_double_matrix_t point
 
   double R[3][3];
   cu_quaternion_to_rotation_matrix(R, &q[i * 4]);
-  double *row;
   double dest[3]; // In local memory so we access global memory less
-
-  row = &points.ptr[idx[i_arr] * points.m];
-  dest[0] = row[0]; dest[1] = row[1]; dest[2] = row[2];
+  dest[0] = points.ptr[idx[i_arr] * points.m]; 
+  dest[1] = points.ptr[idx[i_arr] * points.m + 1]; 
+  dest[2] = points.ptr[idx[i_arr] * points.m + 2];
   double tmp[3];
   cu_matrix_vec_mult_3(tmp, R, dest, 3);
   cu_add(dest, tmp, &x[i * 3], 3);
@@ -466,42 +476,50 @@ __global__ void cu_get_sub_cloud_normals_rotated(double *cloud_normals, cu_doubl
   cloud_normals[3*i_arr] = dest[0]; cloud_normals[3*i_arr+1] = dest[1]; cloud_normals[3*i_arr + 2] = dest[2];
 }
     
-__global__ void cu_populate_xi_yi(int *xi, int *yi, double *cloud, cu_range_image_data_t range_image_data, int num_samples, int n, int round) {
+__global__ void cu_populate_xi_yi(int *xi, int *yi, double *cloud, cu_range_image_data_t range_image_data, int num_samples, int n, int *n_arr) {
   int j = threadIdx.x + blockIdx.x * blockDim.x;
   int i = threadIdx.y + blockIdx.y * blockDim.y;
   
-  if (j >= n || i >= num_samples)
+  if (i >= num_samples || j >= n)
     return;
+  if (n_arr && j >= n_arr[i])
+    return;
+
+  int i_arr = j + i * n;
   
   double dest[3];
-  dest[0] = cloud[i * n*3 + 3*j]; dest[1] = cloud[i * n*3 + 3*j+1]; dest[2] = cloud[i * n*3 + 3*j+2];
-  cu_range_image_xyz2sub(&xi[j + i*n], &yi[j + i*n], range_image_data, dest);
+  dest[0] = cloud[3*i_arr]; dest[1] = cloud[3*i_arr+1]; dest[2] = cloud[3*i_arr+2];
+  cu_range_image_xyz2sub(&xi[i_arr], &yi[i_arr], range_image_data, dest);
 }
 
 __global__ void cu_compute_visibility_prob(double *cu_vis_prob, double *cu_cloud, double *cu_normals, int *cu_xi, int *cu_yi, cu_range_image_data_t ri_data, 
-					   cu_double_matrix_t range_image, double vis_thresh, int search_radius, int num_samples, int n) {
+					   cu_double_matrix_t range_image, double vis_thresh, int search_radius, int num_samples, int n, int *n_arr) {
   int j = threadIdx.x + blockIdx.x * blockDim.x;
   int i = threadIdx.y + blockIdx.y * blockDim.y;
 
-  if (j >= n || i >= num_samples)
+  if (i >= num_samples || j >= n)
+    return;
+  if (n_arr && j >= n_arr[i])
     return;
 
-  int xi = cu_xi[j + i*n];
-  int yi = cu_yi[j + i*n];
+  int i_arr = j + i * n;
+
+  int xi = cu_xi[i_arr];
+  int yi = cu_yi[i_arr];
 
   double V[3];
   double pt[3];
-  pt[0] = cu_cloud[i * n*3 + 3*j]; pt[1] = cu_cloud[i * n*3 + 3*j + 1]; pt[2] = cu_cloud[i * n*3 + 3*j + 2];
+  pt[0] = cu_cloud[3*i_arr]; pt[1] = cu_cloud[3*i_arr + 1]; pt[2] = cu_cloud[3*i_arr + 2];
   cu_normalize(V, pt, 3);
 
-  if (cu_normals != NULL && cu_dot(V, &cu_normals[i*n*3 + 3*j], 3) >= -.1) {  // normals pointing away
-    cu_vis_prob[j + i * n] = 0.0;
+  if (cu_normals != NULL && cu_dot(V, &cu_normals[3*i_arr], 3) >= -.1) {  // normals pointing away
+    cu_vis_prob[i_arr] = 0.0;
     return;
   }
 
 
   if (xi == -1 && yi == -1) {
-    cu_vis_prob[j + i * n] = 0.0;
+    cu_vis_prob[i_arr] = 0.0;
     return;
   }
 
@@ -520,7 +538,7 @@ __global__ void cu_compute_visibility_prob(double *cu_vis_prob, double *cu_cloud
   }
 
   double dR = model_range - obs_range;
-  cu_vis_prob[j + i * n] = (dR < 0 ? 1.0 : cu_normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
+  cu_vis_prob[i_arr] = (dR < 0 ? 1.0 : cu_normpdf(dR/vis_thresh, 0, 1) / .3989);  // .3989 = normpdf(0,0,1)
 }
 
 __global__ void cu_get_viewpoints(int *vi, int num_samples, double *samples_x, double *samples_q, cu_double_matrix_t range_edges_model_views) {
@@ -583,7 +601,6 @@ __global__ void cu_compute_xyz_score_individual(double *xyz_score, double *cloud
     return;
 
   int xyz_score_window = params->xyz_score_window;
-  int xyz_score_use_plane = params->xyz_score_use_plane;
   
   int i_arr = j + i * num_validation_points;
 
@@ -753,6 +770,101 @@ __global__ void cu_compute_segment_affinity_score_final(double *seg_affinity_sco
   seg_affinity_score[i] *= weight;
 }
 
+__global__ void cu_generate_n_for_range_edge(int *n_out, int *vi, int num_samples, int num_validation_points, cu_int_arr_t range_edges_view_cnt) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;  
+  
+  if (i >= num_samples)
+    return;
+  
+  int v_idx = vi[i];
+  int num_edge_points = range_edges_view_cnt.ptr[v_idx];
+
+  int n = num_validation_points;
+
+  if (n >= num_edge_points || n == 0) {
+    n = num_edge_points;
+  }
+  n_out[i] = n;
+}
+
+__global__ void cu_get_range_edge_rnd(int *idx, int *needed, int num_samples, int total_pts, int n, uint *rands, int *vi,cu_int_arr_t range_edges_view_idx)
+{
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= num_samples || j >= needed[i])
+    return;
+
+  // NOTE(sanja): This might need some fixing if I use the function in a broader sense, like on a CPU version
+  if (needed[i] <= n) {  // use all the points
+    if (j == 0 && i == 0)
+      printf("USE ALL THE POINTS!\n");
+    idx[j + i * total_pts] = j;
+  } else {
+    if (j == 0 && i == 0)
+      printf("RND!\n");
+    idx[j + i * total_pts] = ((rands[i << 1] % needed[i]) + (j * (big_primes[rands[(i << 1) + 1] % 100] % needed[i]))) % needed[i];
+  }
+  int vp_idx = range_edges_view_idx.ptr[vi[i]];
+  idx[j + i * total_pts] += vp_idx;
+
+}
+
+__global__ void cu_get_range_edge_points(double *P, int num_samples, int *n, int *idx, int n_edge, cu_double_matrix_t range_edges_points)
+{
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= num_samples || j >= n[i])
+    return;
+
+  // get the actual points in the correct pose
+  P[3 * i * n_edge + 3 * j] = range_edges_points.ptr[3 * idx[j + i * n_edge]];
+  P[3 * i * n_edge + 3 * j + 1] = range_edges_points.ptr[3 * idx[j + i * n_edge] + 1];
+  P[3 * i * n_edge + 3 * j + 2] = range_edges_points.ptr[3 * idx[j + i * n_edge] + 2];
+}
+
+__global__ void cu_compute_edge_score_individual(double *edge_score, double *vis_pmf, int *xi, int *yi, cu_double_matrix_t edge_image, int num_samples, int *n, int n_edge) {
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= num_samples || j >= n[i])
+    return;
+
+  edge_score[j + i * n_edge] = 0.0;
+  if (xi[j + i *n_edge] != -1 && yi[j + i * n_edge] != -1) {
+    edge_score[j + i * n_edge] = vis_pmf[j + i * n_edge] * edge_image.ptr[xi[j + i *n_edge]*edge_image.m + yi[j + i *n_edge]];
+  }
+}
+
+__global__ void cu_compute_edge_score_final(double *edge_score, double *vis_score, double *occ_score, int num_samples, double *b_edge, double *b_edge_occ, scope_params_t *params,
+					    int score_round) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+
+  if ((score_round == 2 && params->score2_use_score_comp_models) || (score_round == 3 && params->score3_use_score_comp_models)) {
+    edge_score[i] = cu_logistic(edge_score[i], b_edge);
+    if (occ_score)
+      occ_score[i] = cu_logistic(occ_score[i], b_edge_occ);
+  }
+
+  double w1=0, w2=0, w3=0;
+  if (score_round == 2) {
+    w1 = params->score2_edge_weight;
+    w2 = params->score2_edge_vis_weight;
+    w3 = params->score2_edge_occ_weight;
+  }
+  else {
+    w1 = params->score3_edge_weight;
+    w2 = params->score3_edge_vis_weight;
+    w3 = params->score3_edge_occ_weight;
+  }
+
+  if (occ_score)
+    edge_score[i] = (w1 * edge_score[i]) + (w2 * vis_score[i]) + (w3 * occ_score[i]);
+  else
+    edge_score[i] = (w1 * edge_score[i]) + (w2 * vis_score[i]);    
+}
+  
 __global__ void cu_score_round1(double *scores, int *xi, int *yi, double *cloud, cu_double_matrix_t range_image, int num_samples, int num_validation_points) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -791,6 +903,7 @@ __global__ void cu_add_all_scores(double *cu_scores, double *cu_xyz_score, doubl
 
 void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, scope_params_t *params, int num_validation_points, 
 		   int model_points, int num_obs_segments, int edge_scoring, int round) {
+  // NEXT(sanja): Figure out why the hell seg mask makes things crappy
 
   cudaError_t cudaerr;
 
@@ -832,7 +945,7 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
 
   int *cu_idx;
   cu_malloc(&cu_idx, num_total * sizeof(int), "idxs");
-  cu_get_validation_points<<<block_size, threads_per_block>>>(cu_idx, *cu_model, num_validation_points, num_samples, cu_rands);
+  cu_get_validation_points<<<block_size, threads_per_block>>>(cu_idx, cu_model->num_points, num_validation_points, num_samples, cu_rands);
   cudaerr = cudaGetLastError();
   if ( cudaSuccess != cudaerr )
     printf( "Validation!\n" );
@@ -850,7 +963,7 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
   cu_malloc(&cu_xi, num_total * sizeof(int), "xi");
   int *cu_yi;
   cu_malloc(&cu_yi, num_total * sizeof(int), "yi");
-  cu_populate_xi_yi<<<block_size, threads_per_block>>>(cu_xi, cu_yi, cu_cloud, cu_obs->range_image_data, num_samples, num_validation_points, round);
+  cu_populate_xi_yi<<<block_size, threads_per_block>>>(cu_xi, cu_yi, cu_cloud, cu_obs->range_image_data, num_samples, num_validation_points, NULL);
 
   double *cu_scores;
   cu_malloc(&cu_scores, num_samples * sizeof(double), "scores");
@@ -869,19 +982,20 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     double *cu_vis_prob;
     cu_malloc(&cu_vis_prob, num_total * sizeof(double), "vis_prob");
     cu_compute_visibility_prob<<<block_size, threads_per_block>>>(cu_vis_prob, cu_cloud, cu_normals, cu_xi, cu_yi, cu_obs->range_image_data, cu_obs->range_image, params->vis_thresh, 0,
-								  num_samples, num_validation_points);
+								  num_samples, num_validation_points, NULL);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "vis_prob!\n" );
     double *cu_vis_prob_sums;
     cu_malloc(&cu_vis_prob_sums, num_samples * sizeof(double), "vis_prob_sums");
     // NOTE(sanja): If we ever get a newer graphics card, we can make this call from another kernel. We can also probably pull the whole normalize thing into a host function.
-    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_vis_prob_sums, cu_vis_prob, num_samples, num_validation_points); // TODO(sanja): Optimize. ArrayFire?
+    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_vis_prob_sums, cu_vis_prob, num_samples, num_validation_points, NULL); 
+    // TODO(sanja): Optimize. ArrayFire?
     if ( cudaSuccess != cudaGetLastError() )
       printf( "Vis prob sums!\n" );
     
     double *cu_vis_pmf;
     cu_malloc(&cu_vis_pmf, num_total * sizeof(double), "vis_pmf");
-    cu_divide_matrix_with_vector<<<block_size, threads_per_block>>>(cu_vis_pmf, cu_vis_prob, cu_vis_prob_sums, num_samples, num_validation_points);
+    cu_divide_matrix_with_vector<<<block_size, threads_per_block>>>(cu_vis_pmf, cu_vis_prob, cu_vis_prob_sums, num_samples, num_validation_points, NULL);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "Vis pmf!\n" );    
 
@@ -906,26 +1020,31 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
 								       cu_obs->range_image, cu_obs->range_image_data, cu_obs->range_image_cnt, cu_params);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "xyz individual!\n" );
-    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_xyz_score, cu_xyz_score_per_point, num_samples, num_validation_points);
+    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_xyz_score, cu_xyz_score_per_point, num_samples, num_validation_points, NULL);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "xyz sums!\n" );
 
     cu_compute_xyz_score_final<<<block_size_small, thread_size_small>>>(cu_xyz_score, num_samples, cu_model->score_comp_models->b_xyz, cu_params, round);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "xyz final!\n" );
     
     double *cu_normal_score_per_point;
     cu_malloc(&cu_normal_score_per_point, num_total * sizeof(double), "normal_score_pp");
+
     double *cu_wtot_per_point;
     cu_malloc(&cu_wtot_per_point, num_total * sizeof(double), "wtot_pp");
     cu_compute_normal_score_individual<<<block_size, threads_per_block>>>(cu_normal_score_per_point, cu_wtot_per_point, cu_normals, cu_vis_pmf, cu_noise_models, num_samples, num_validation_points, cu_xi, cu_yi,
 									  cu_obs->range_image_cnt, cu_obs->range_image_normals, cu_params, round);
-
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "normal individual!\n" );
+    
     double *cu_normal_score, *cu_wtot;
     cu_malloc(&cu_normal_score, num_samples * sizeof(double), "normal_score");
     cu_malloc(&cu_wtot, num_samples * sizeof(double), "wtot");
-    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_normal_score, cu_normal_score_per_point, num_samples, num_validation_points);
+    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_normal_score, cu_normal_score_per_point, num_samples, num_validation_points, NULL);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "add 1!\n" );
-    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_wtot, cu_wtot_per_point, num_samples, num_validation_points);
+    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_wtot, cu_wtot_per_point, num_samples, num_validation_points, NULL);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "add 2!\n" );
 
@@ -934,6 +1053,8 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     double *cu_vis_score;
     cu_malloc(&cu_vis_score, num_samples * sizeof(double), "vis_score");
     cu_compute_vis_score<<<block_size_small, thread_size_small>>>(cu_vis_score, cu_vis_prob_sums, num_validation_points, cu_params, round);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "vis score!\n" );
 
     // TODO(sanja): Figure out how to speed up the prep for segment calculation
     double *cu_seg_affinity_score_per_seg;
@@ -959,22 +1080,100 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     int *cu_segments_idx;
     cu_malloc(&cu_segments_idx, num_samples * num_obs_segments * sizeof(int), "segments_idx");
     cudaMemcpy(cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments * sizeof(int), cudaMemcpyHostToDevice);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "seg idx memcpy!\n" );
+
     free(tmp_segments_idx);
     double *cu_seg_affinity_score;
     cu_malloc(&cu_seg_affinity_score, num_samples * sizeof(double), "seg_aff_per_seg");
-        
-    cu_set_mask_for_segment_affinity<<<block_size_sum, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
-  
-    cu_compute_segment_affinity_score_per_seg<<<block_size, thread_size_small>>>(cu_seg_affinity_score_per_seg, cu_segments_idx, cu_num_segments, cu_obs->segment_affinities, num_obs_segments, cu_mask, 
-										 num_samples);
-    cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_seg_affinity_score_per_seg, num_samples, num_obs_segments);
+    
+    dim3 block_size_seg(ceil(1.0 * num_obs_segments / thread_size_sum.x), num_samples);
+    //cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
+    cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "seg mask!\n" );
+
+    cu_compute_segment_affinity_score_per_seg<<<block_size, thread_size_small>>>(cu_seg_affinity_score_per_seg, cu_segments_idx, cu_num_segments, cu_obs->segment_affinities, num_obs_segments, 
+										 cu_mask, num_samples);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "seg per seg!\n" );
+
+    cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_seg_affinity_score_per_seg, num_samples, num_obs_segments, NULL);
     cu_compute_segment_affinity_score_final<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_params, round, num_samples);
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "seg affinity!\n" );
 
     double *cu_edge_scores;
     cu_malloc(&cu_edge_scores, num_samples * sizeof(double), "edge_scores");
     cudaMemset(cu_edge_scores, 0, num_samples * sizeof(double));
+    if ( cudaSuccess != cudaGetLastError() )
+      printf( "memset!\n" );
     if (edge_scoring) {
-      
+      int n_edge = cu_model->max_num_edges;
+      int *cu_n;
+      cu_malloc(&cu_n, num_samples * sizeof(int), "n");
+      cu_generate_n_for_range_edge<<<block_size_small, thread_size_small>>>(cu_n, cu_vi, num_samples, num_validation_points, cu_model->range_edges_view_cnt);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "n!\n" );
+
+      uint *cu_rands_edge;
+      cu_malloc(&cu_rands_edge, 2 * num_samples * sizeof(uint), "rands");
+      curandGenerate(gen, cu_rands_edge, 2*num_samples);
+      int *cu_idx_edge;
+      cu_malloc(&cu_idx_edge, num_samples * n_edge * sizeof(int), "idx_edge");
+      dim3 block_size_n_edge(ceil(1.0 * n_edge / thread_size_sum.x), num_samples);
+      cu_get_range_edge_rnd<<<block_size_n_edge, thread_size_sum>>>(cu_idx_edge, cu_n, num_samples, n_edge, num_validation_points, cu_rands_edge, cu_vi, cu_model->range_edges_view_idx);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "idx edge!\n" );
+      //cudaMemcpy(gpu_idx, cu_idx_edge, num_samples * n_edge * sizeof(int), cudaMemcpyDeviceToHost);
+      double *cu_P;
+      cu_malloc(&cu_P, num_samples * n_edge * 3, "cu_P");
+      cu_get_range_edge_points<<<block_size_n_edge, thread_size_sum>>>(cu_P, num_samples, cu_n, cu_idx_edge, n_edge, cu_model->range_edges_points);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "edge pts\n" );
+      double *cu_edge_score_individual;
+      cu_malloc(&cu_edge_score_individual, num_samples * n_edge * sizeof(double), "edge_score");
+      double *cu_vis_prob_edge, *cu_vis_prob_sums_edge, *cu_vis_pmf_edge;
+      cu_malloc(&cu_vis_prob_edge, num_samples * n_edge * sizeof(double), "vis_prob_edge");
+      cu_malloc(&cu_vis_prob_sums_edge, num_samples * sizeof(double), "vis_prob_sums_edge");
+      cu_malloc(&cu_vis_pmf_edge, num_samples * sizeof(double), "vis_pmf_edge");
+      int *cu_xi_edge;
+      cu_malloc(&cu_xi_edge, num_samples * n_edge * sizeof(int), "xi");
+      int *cu_yi_edge;
+      cu_malloc(&cu_yi_edge, num_samples * n_edge * sizeof(int), "yi");
+      cu_populate_xi_yi<<<block_size, threads_per_block>>>(cu_xi_edge, cu_yi_edge, cu_P, cu_obs->range_image_data, num_samples, n_edge, cu_n);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "edge xi yi!\n" );
+      cudaMemcpy(gpu_idx, cu_xi, num_samples * n_edge * sizeof(int), cudaMemcpyDeviceToHost);
+      cudaMemcpy(gpu_n, cu_yi, num_samples * n_edge * sizeof(int), cudaMemcpyDeviceToHost);
+      return;
+      int vis_pixel_radius = 2;
+      cu_compute_visibility_prob<<<block_size_n_edge, threads_per_block>>>(cu_vis_prob_edge, cu_P, NULL, cu_xi_edge, cu_yi_edge, cu_obs->range_image_data, cu_obs->range_image, params->vis_thresh, 
+									   vis_pixel_radius, num_samples, n_edge, cu_n);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "edge score vis prob!\n" );
+      cu_add_matrix_rows_medium<<<block_size_n_edge, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_vis_prob_sums_edge, cu_vis_prob_edge, num_samples, n_edge, cu_n);
+      cu_divide_matrix_with_vector<<<block_size_n_edge, threads_per_block>>>(cu_vis_pmf_edge, cu_vis_prob_edge, cu_vis_prob_sums_edge, num_samples, n_edge, cu_n);
+      cu_compute_edge_score_individual<<<block_size_n_edge, threads_per_block>>>(cu_edge_score_individual, cu_vis_pmf_edge, cu_xi_edge, cu_yi_edge, cu_obs->edge_image, num_samples, cu_n, n_edge);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "edge score individual!\n" );
+      cu_add_matrix_rows_medium<<<block_size_n_edge, thread_size_sum, thread_size_sum.x * sizeof(double)>>>(cu_edge_scores, cu_edge_score_individual, num_samples, n_edge, cu_n);
+      cu_compute_edge_score_final<<<block_size_n_edge, threads_per_block>>>(cu_edge_scores, cu_vis_prob_sums_edge, NULL, num_samples, cu_model->score_comp_models->b_edge, cu_model->score_comp_models->b_edge_occ,
+									    cu_params, round);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "edge score final!\n" );
+
+	      
+      cu_free(cu_n, "n");
+      cu_free(cu_idx_edge, "idx_edge");
+      cu_free(cu_rands_edge, "rands_edge");
+      cu_free(cu_P, "P");
+      cu_free(cu_edge_score_individual, "edge_score_individual");
+      cu_free(cu_vis_prob_sums_edge, "vis_prob_sums_edge");
+      cu_free(cu_vis_pmf_edge, "vis_pmf_edge");
+      cu_free(cu_vis_prob_edge, "vis_prob_edge");
+      cu_free(cu_xi_edge, "xi_edge");
+      cu_free(cu_yi_edge, "yi_edge");
     }
     
     cu_add_all_scores<<<block_size_small, thread_size_small>>>(cu_scores, cu_xyz_score, cu_normal_score, cu_vis_score, cu_seg_affinity_score, cu_edge_scores, num_samples);

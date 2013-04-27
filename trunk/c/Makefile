@@ -10,12 +10,12 @@ NVCC=nvcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2
+#CFLAGS=-Wall -I$(IDIR) -O3 -msse2
 #CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
-#CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
+CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
-CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20
-#CUDAFLAGS=-g -G -lcuda -lcudart -lcurand -arch=compute_20
+#CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20
+CUDAFLAGS=-g -G -lcuda -lcudart -lcurand -arch=compute_20
 
 #CYGWIN=1
 #WINDOWS=1
