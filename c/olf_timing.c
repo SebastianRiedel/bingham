@@ -49,11 +49,6 @@ int have_true_pose_ = 0;
 
 double t[4];
 
-extern int gpu_n[50000], gpu_idx[50000];
-int cpu_n[50000], cpu_idx[50000];
-int n_ctr = 0;
-int count_n = 0;
-
 int is_good_pose(double *x, double *q)
 {
   double dx[3];
@@ -4645,6 +4640,7 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
   int i;
   for (i = 0; i < n; i++)
     vis_prob[i] = compute_visibility_prob(P[i], NULL, obs_range_image, params->vis_thresh, vis_pixel_radius);
+
   double vis_pmf[n];
   normalize_pmf(vis_pmf, vis_prob, n);
 
@@ -4668,13 +4664,9 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
   double score = 0;
   int xi,yi;
   for (i = 0; i < n; i++) {
-    if (count_n) {
-      range_image_xyz2sub(&cpu_idx[n_ctr], &cpu_n[n_ctr], obs_range_image, P[i]);
-      ++n_ctr;
-    }
     if (range_image_xyz2sub(&xi, &yi, obs_range_image, P[i])) {
       score += vis_pmf[i] * obs_edge_image[xi][yi];
-
+            
       // update P_outliers
       if (P_outliers && vis_prob[i] > .5 && obs_edge_image[xi][yi] < .5) {
 	P_outliers[*num_P_outliers] = i;
@@ -4688,6 +4680,7 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
       }
     }
   }
+
   double vis_score = log(sum(vis_prob, n) / (double) n);
 
   // add occlusion edges to score
@@ -4718,6 +4711,7 @@ double compute_edge_score(double **P, int n, int **occ_edges, int num_occ_edges,
   }
 
   double w1=0, w2=0, w3=0;
+  w1=1.0, w2=1.0, w3=1.0;
   if (score_round == 2) {
     w1 = params->score2_edge_weight;
     w2 = params->score2_edge_vis_weight;
@@ -5037,6 +5031,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   if (obs_data->obs_edge_image) {
     int n = params->num_validation_points;
     int c_model[n];
+    
     double **P = get_range_edge_points(&n, x, q, model_data->range_edges_model, c_model);
     int P_outliers[n];
     int num_P_outliers;
@@ -5051,11 +5046,10 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 	free_matrix2i(occ_edges);
     }
     else*/
-    count_n = 1;
+    
       edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image,
 				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ, params,
 				      score_round, P_outliers, &num_P_outliers);
-    count_n = 0;
     free_matrix2(P);
 
     /* update sample edge outliers
@@ -5111,7 +5105,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   //double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
   //  fpfh_score + segment_affinity_score + segment_score + table_score + italian_xyzn_score + xyz_score2 + outliers_score;
   
-  double score = xyz_score + normal_score + vis_score + segment_affinity_score  + edge_score;
+  double score = xyz_score + normal_score + vis_score + segment_affinity_score + edge_score;
 
   if (params->verbose) {
     double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
@@ -6285,7 +6279,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
 		  (obs_data->obs_edge_image != NULL), 3);
     // Debugging individual score components on CUDA
-    double scores[S->num_samples];
+    /*double scores[S->num_samples];
     for (i = 0; i < S->num_samples; i++)
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
@@ -6296,18 +6290,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-	}
-
-    int good = 1;
-    for (i = 0; i < n_ctr; ++i)
-      //if (cpu_idx[i] != gpu_idx[i] && cpu_n[i] != gpu_n[i]) {
-	printf("BUG! i = %d, cpu = %d, gpu = %d\n", i, cpu_idx[i], gpu_idx[i]);
-	printf("BUG! i = %d, cpu = %d, gpu = %d\n", i, cpu_n[i], gpu_n[i]);
-	good = 0;
-	//}
-    if (good)
-      printf("*************YAY!!!!\n");
-
+	} */     
   }
   else {
     params->verbose = 1; //dbug
