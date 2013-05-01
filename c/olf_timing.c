@@ -49,6 +49,8 @@ int have_true_pose_ = 0;
 
 double t[4];
 
+double knn_t = 0.0;
+
 int is_good_pose(double *x, double *q)
 {
   double dx[3];
@@ -5501,6 +5503,8 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
 
   double closest_dist = 10 * params->f_sigma * params->f_sigma;
 
+  double t0 = 0.0;
+
   while (closest_dist > params->f_sigma * params->f_sigma) {
     // get obs point
     if (*curr_idx == obs_data->fpfh_obs->num_points)
@@ -5512,7 +5516,9 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
 
     // get model point
     //flann_find_nearest_neighbors_index_double(model_data->fpfh_model_f_index, obs_data->fpfh_obs->fpfh[c_obs], 1, nn_idx, nn_d2, params->knn, &model_data->fpfh_model_f_params);
+    t0 = get_time_ms();
     knn_brute_force(nn_d2, nn_idx, obs_data->fpfh_obs->fpfh[c_obs], model_data->fpfh_model->fpfh, model_data->fpfh_model->num_points, model_data->fpfh_model->fpfh_length, params->knn);
+    knn_t += get_time_ms() - t0;
     closest_dist = nn_d2[0];
   }
   double p[params->knn];
@@ -5934,7 +5940,7 @@ void align_model_gradient(scope_sample_t *sample, scope_model_data_t *model_data
       add(x2, x, &dxq[0], 3);
       add(q2, q, &dxq[3], 4);
       normalize(q2, q2, 4);
-      
+
       //printf("x2 = [%f, %f, %f], q2 = [%f, %f, %f]\n", x2[0], x2[1], x2[2], q2[0], q2[1], q2[2], q2[3]); //dbug
       
       // transform surface points by (x2,q2)
@@ -6046,9 +6052,13 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   // get the max number of samples
   int num_samples_init = num_sift_matches + (params->num_samples_round1 == 0 ? obs_data->pcd_obs->num_points : params->num_samples_round1);
 
+  double t1 = get_time_ms(); //dbug
   // create scope samples
   scope_samples_t *S = create_scope_samples(num_samples_init, params->num_correspondences);
   S->num_samples = num_samples_init;
+
+  printf("Created samples in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+  t1 = get_time_ms();
 
   // sample poses from one correspondence
   int i;
@@ -6061,8 +6071,14 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   randperm(idx, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->num_points);
   int curr_idx = 0;
 
+  printf("Randperm in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+  double t2 = 0.0;
+  double t3 = 0.0;
+  double t4 = 0.0;
+
   for (i = 0; i < num_samples_init; i++) {
 
+    t4 = get_time_ms();
     if (i < num_sift_matches) {  // sift correspondence
       int c_obs = sift_match_obs_idx[i];
       int c_model = sift_match_model_idx[i];
@@ -6082,13 +6098,19 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
       else if (params->use_shot)
 	sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
     }
+    t2 += get_time_ms() - t4;
 
+    t4 = get_time_ms();
     // sample a pose
     sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+    t3 += get_time_ms() - t4;
   }
   num_samples_init = i; // In case we terminated early because we ran out of good points to sample
   S->num_samples = num_samples_init;
 
+  printf("Actual sampling in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+  printf("First: %.3f, model_pose: %.3f\n", t2/1000.0, t3/1000.0);
+  printf("Knn: %.3f\n", knn_t/1000.0);
   //dbug
   printf("Sampled c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   if (have_true_pose_)
@@ -6261,8 +6283,29 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
   // align with gradients
   int iter;
   for (iter = 0; iter < params->final_alignment_iter; iter++)
-    for (i = 0; i < S->num_samples; i++)
-      align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+    if (params->use_cuda) {
+      align_models_gradient(S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, params->num_validation_points, model_data->pcd_model->num_points, 2);
+      //dbug:
+      /*double **x, **q;
+      x = new_matrix2(S->num_samples, 3);
+      q = new_matrix2(S->num_samples, 4);
+      align_models_gradient(x, q, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, 0, model_data->pcd_model->num_points, 2);
+      for (i = 0; i < S->num_samples; i++)
+	align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+
+      for (i = 0; i < S->num_samples; ++i) {
+	if (fabs(x[i][0] - S->samples[i].x[0] > 0.0001) || fabs(x[i][1] - S->samples[i].x[1] > 0.0001) || fabs(x[i][2] - S->samples[i].x[2] > 0.0001) ||
+	    fabs(q[i][0] - S->samples[i].q[0] > 0.0001) || fabs(q[i][1] - S->samples[i].q[1] > 0.0001) || fabs(q[i][2] - S->samples[i].q[2] > 0.0001) || fabs(q[i][3] - S->samples[i].q[3] > 0.0001)) {
+	  printf("i = %d, x_cpu = [%lf %lf %lf], x_gpu = [%lf %lf %lf]\n", i, S->samples[i].x[0], S->samples[i].x[1], S->samples[i].x[2], x[i][0], x[i][1], x[i][2]);
+	  printf("i = %d, q_cpu = [%lf %lf %lf %lf], q_gpu = [%lf %lf %lf %lf]\n", i, S->samples[i].q[0], S->samples[i].q[1], S->samples[i].q[2], S->samples[i].q[3], q[i][0], q[i][1], q[i][2], q[i][3]);
+	} else {
+	  printf("i = %d, Good!\n", i);
+	  }
+	  }    */       
+    } else {
+      for (i = 0; i < S->num_samples; i++)
+	align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+    }
 
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
@@ -6290,7 +6333,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-	} */     
+	}*/
   }
   else {
     params->verbose = 1; //dbug
