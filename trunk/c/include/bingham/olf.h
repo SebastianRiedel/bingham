@@ -524,6 +524,7 @@ mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models,
 mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, 
 					   scope_params_t *scope_params, mope_params_t *mope_params, FILE *f, int round);
 
+
 /*#ifdef __cplusplus
 extern "C" {
 #endif*/

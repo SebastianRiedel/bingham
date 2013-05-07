@@ -6063,53 +6063,62 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   // sample poses from one correspondence
   int i;
 
-  // Create random permutation of points to avoid continuous sampling
-  int idx[obs_data->fpfh_obs->num_points];
-  for (i = 0; i < obs_data->fpfh_obs->num_points; i++) {
-    idx[i] = i;
-  }
-  randperm(idx, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->num_points);
-  int curr_idx = 0;
-
-  printf("Randperm in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
-  double t2 = 0.0;
-  double t3 = 0.0;
-  double t4 = 0.0;
-
-  for (i = 0; i < num_samples_init; i++) {
-
-    t4 = get_time_ms();
-    if (i < num_sift_matches) {  // sift correspondence
-      int c_obs = sift_match_obs_idx[i];
-      int c_model = sift_match_model_idx[i];
-      S->samples[i].c_obs[0] = c_obs;
-      S->samples[i].c_model[0] = c_model;
-      S->samples[i].c_score[0] = 1.0;            //TODO: compute SIFT correspondence likelihood
-      S->samples[i].c_type[0] = C_TYPE_SIFT;
-      S->samples[i].nc = 1;
+  if (params->use_cuda) {
+    sample_all_first_fpfh_correspondences(S->samples, &num_samples_init, S->num_samples, model_data, obs_data, params);
+    t1 = get_time_ms();
+    for (i = 0; i < num_samples_init; ++i)
+      sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+    printf("Poses from correspondences %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+  } else {
+    // Create random permutation of points to avoid continuous sampling
+    int idx[obs_data->fpfh_obs->num_points];
+    for (i = 0; i < obs_data->fpfh_obs->num_points; i++) {
+      idx[i] = i;
     }
-    else {
-      double fpfh_ratio = .5;
-      if (params->use_fpfh && (!params->use_shot || frand() < fpfh_ratio)) {
-	sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, idx, &curr_idx, params); // Terminates early if there are no more points to sample
-	if (curr_idx == obs_data->fpfh_obs->num_points)
-	  break;
+    randperm(idx, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->num_points);
+    int curr_idx = 0;
+    
+    printf("Randperm in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+    double t2 = 0.0;
+    double t3 = 0.0;
+    double t4 = 0.0;
+    
+    for (i = 0; i < num_samples_init; i++) {
+
+      t4 = get_time_ms();
+      if (i < num_sift_matches) {  // sift correspondence
+	int c_obs = sift_match_obs_idx[i];
+	int c_model = sift_match_model_idx[i];
+	S->samples[i].c_obs[0] = c_obs;
+	S->samples[i].c_model[0] = c_model;
+	S->samples[i].c_score[0] = 1.0;            //TODO: compute SIFT correspondence likelihood
+	S->samples[i].c_type[0] = C_TYPE_SIFT;
+	S->samples[i].nc = 1;
       }
-      else if (params->use_shot)
-	sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
+      else {
+	double fpfh_ratio = .5;
+	if (params->use_fpfh && (!params->use_shot || frand() < fpfh_ratio)) {
+	  sample_first_correspondence_fpfh(&S->samples[i], model_data, obs_data, idx, &curr_idx, params); // Terminates early if there are no more points to sample
+	  if (curr_idx == obs_data->fpfh_obs->num_points)
+	    break;
+	}
+	else if (params->use_shot)
+	  sample_first_correspondence_shot(&S->samples[i], model_data, obs_data, params);
+      }
+      t2 += get_time_ms() - t4;
+      
+      t4 = get_time_ms();
+      // sample a pose
+      sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
+      t3 += get_time_ms() - t4;
     }
-    t2 += get_time_ms() - t4;
-
-    t4 = get_time_ms();
-    // sample a pose
-    sample_model_pose_given_correspondences(&S->samples[i], model_data, obs_data, params);
-    t3 += get_time_ms() - t4;
+    num_samples_init = i; // In case we terminated early because we ran out of good points to sample
+    printf("Actual sampling in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
+    printf("First: %.3f, model_pose: %.3f\n", t2/1000.0, t3/1000.0);
   }
-  num_samples_init = i; // In case we terminated early because we ran out of good points to sample
+
   S->num_samples = num_samples_init;
 
-  printf("Actual sampling in %.3f seconds\n", (get_time_ms() - t1) / 1000.0);  //dbug
-  printf("First: %.3f, model_pose: %.3f\n", t2/1000.0, t3/1000.0);
   printf("Knn: %.3f\n", knn_t/1000.0);
   //dbug
   printf("Sampled c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug

@@ -39,6 +39,9 @@ __device__ inline double cu_logistic(double x, double *b)
   return 1.0 / (1.0 + exp(-x*b[1]-b[0]));
 }
 
+#define THREADS_KNN 128
+#define KNN_SIZE 30
+
 void copy_double_matrix_to_gpu(cu_double_matrix_t *dev_dest, double **host_src, int n, int m) {
   dev_dest->n = n;
   dev_dest->m = m;
@@ -1195,7 +1198,6 @@ void compute_edge_score(double *cu_edge_scores, double *cu_P, cu_range_image_dat
 
 void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, scope_params_t *params, int num_validation_points, 
 		   int model_points, int num_obs_segments, int edge_scoring, int round) {
-  // NEXT(sanja): Figure out why the hell seg mask makes things crappy
 
   dim3 threads_per_block(256, 1, 1);
   dim3 block_size(ceil(1.0 * num_validation_points / threads_per_block.x), num_samples);
@@ -2027,4 +2029,177 @@ void align_models_gradient(scope_sample_t *samples, int num_samples, cu_model_da
   cu_free(cu_best_x, "best_x");
   cu_free(cu_best_q, "best_q");
   cu_free(cu_step, "step");
+}
+
+__global__ void cu_knn(float *nn_d2, int *nn_idx, double *ref, double *query, int ref_n, int query_n, int d, int k) {
+
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+
+  if (i >= query_n || j >= ref_n)
+    return;
+
+  __shared__ float shared_d2[THREADS_KNN][KNN_SIZE];
+  __shared__ int shared_idx[THREADS_KNN][KNN_SIZE];
+
+  __shared__ float tmp_d2[THREADS_KNN / 2][KNN_SIZE];
+  __shared__ int tmp_idx[THREADS_KNN / 2][KNN_SIZE];
+
+  
+  for (int k = 0; k < KNN_SIZE; ++k) {
+    shared_d2[j][k] = 1000000.0;
+    shared_idx[j][k] = -1;
+  }
+
+  // Initialize the arrays
+  float dist;
+  int last = 0;
+  for (int kk = j; kk < ref_n; kk += blockDim.x) {
+    dist = 0.0;
+    for (int l = 0; l < d; ++l)
+      dist += (ref[d * kk + l] - query[d * i + l]) * (ref[d * kk + l] - query[d * i + l]);
+    if (last == KNN_SIZE && dist >= shared_d2[j][last-1])
+      continue;
+    if (last < KNN_SIZE)
+      ++last;
+    if (last < KNN_SIZE || (last == KNN_SIZE && shared_d2[j][last-1] > dist)) {
+      shared_d2[j][last-1] = dist;
+      shared_idx[j][last-1] = kk;
+    }
+    for (int l = last-1; l > 0; --l) {
+      if (shared_d2[j][l] < shared_d2[j][l-1]) {
+	float tmp_d2 = shared_d2[j][l]; shared_d2[j][l] = shared_d2[j][l-1]; shared_d2[j][l-1] = tmp_d2;
+	int tmp_idx = shared_idx[j][l]; shared_idx[j][l] = shared_idx[j][l-1]; shared_idx[j][l-1] = tmp_idx;
+      }
+    }
+  }
+  __syncthreads();
+
+  // Merge partial queues
+  for (int num_threads = blockDim.x / 2; num_threads > 0; num_threads >>= 1) {
+    // Merge two partial queues
+    if (j < num_threads) {
+      int a = 0, b = 0;
+      int other = j + num_threads;
+      int c = 0;
+      while (a < KNN_SIZE && b < KNN_SIZE && c < KNN_SIZE) {
+	if (shared_d2[j][a] < shared_d2[other][b]) {
+	  tmp_d2[j][c] = shared_d2[j][a];
+	  tmp_idx[j][c++] = shared_idx[j][a++];
+	} else {
+	  tmp_d2[j][c] = shared_d2[other][b];
+	  tmp_idx[j][c++] = shared_idx[other][b++];
+	}
+      }
+      // Because we only have KNN_SIZE things in tmp, once one array runs out, we are done.
+      // Copy the final list into the correct shared memory location
+      for (a = 0; a < KNN_SIZE; ++a) {
+	shared_d2[j][a] = tmp_d2[j][a];
+	shared_idx[j][a] = tmp_idx[j][a];
+      }
+    }
+    __syncthreads();
+  }
+
+  // Copy data from shared memory into the global memory
+  if (j < KNN_SIZE) {
+    nn_d2[i * KNN_SIZE + j] = shared_d2[0][j];
+    nn_idx[i * KNN_SIZE + j] = shared_idx[0][j];
+  } 
+}
+
+void knn(float *nn_d2, int *nn_idx, double *reference, double *query, int ref_n, int d, int k, int start, int batch_size) {
+
+  dim3 block_size(1, batch_size, 1);
+  dim3 threads_per_block(THREADS_KNN, 1, 1);
+
+  double *cu_ref;
+  double *cu_query;
+  cu_malloc(&cu_ref, ref_n * d * sizeof(double), "ref");
+  cu_malloc(&cu_query, batch_size * d * sizeof(double), "query");
+  cudaMemcpy(cu_ref, reference, ref_n * d * sizeof(double), cudaMemcpyHostToDevice);
+  cudaMemcpy(cu_query, query, batch_size * d * sizeof(double), cudaMemcpyHostToDevice);
+  
+  float *cu_nn_d2;
+  int *cu_nn_idx;
+  cu_malloc(&cu_nn_d2, batch_size * k * sizeof(float), "nn_d2");
+  cu_malloc(&cu_nn_idx, batch_size * k * sizeof(int), "nn_idx");
+  
+  cu_knn<<<block_size, threads_per_block>>>(cu_nn_d2, cu_nn_idx, cu_ref, cu_query, ref_n, batch_size, d, k);
+  if ( cudaSuccess != cudaGetLastError() )
+    printf( "knn!\n" );
+  
+  cudaMemcpy(nn_d2, cu_nn_d2, batch_size * k * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(nn_idx, cu_nn_idx, batch_size * k * sizeof(int), cudaMemcpyDeviceToHost);
+
+  cu_free(cu_ref, "ref");
+  cu_free(cu_query, "query");
+  cu_free(cu_nn_d2, "nn_d2");
+  cu_free(cu_nn_idx, "nn_idx");
+}
+
+void sample_all_first_fpfh_correspondences(scope_sample_t *samples, int *num_samples_init, int num_samples, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params) {
+  
+  extern double knn_t; // dbug
+  knn_t = 0.0;
+  int batch_size = 200;
+
+  params->knn = KNN_SIZE;
+
+  int nn_idx[params->knn * batch_size];
+  float nn_d2[params->knn * batch_size];
+  int i;
+  
+  double t0 = get_time_ms();
+
+  // Create random permutation of points to avoid continuous sampling
+  int idx[obs_data->fpfh_obs->num_points];
+  for (i = 0; i < obs_data->fpfh_obs->num_points; i++) {
+    idx[i] = i;
+  }
+  randperm(idx, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->num_points);
+
+  int picked = 0;
+  int start = 0;
+  int width = obs_data->fpfh_obs->fpfh_length;
+  while (picked < num_samples && start < obs_data->fpfh_obs->num_points) {
+    if (start + batch_size > obs_data->fpfh_obs->num_points) {
+      batch_size = obs_data->fpfh_obs->num_points - start;
+    }
+
+    t0 = get_time_ms();
+    double query_pts[batch_size * width];
+    for (i = 0; i < batch_size; ++i) {
+      memcpy(&query_pts[i * width], obs_data->fpfh_obs->fpfh[idx[i + start]], width * sizeof(double));
+    }
+
+    knn(nn_d2, nn_idx, model_data->fpfh_model->fpfh[0], query_pts, model_data->fpfh_model->num_points, width, params->knn, start, batch_size);
+    cudaDeviceSynchronize();
+    knn_t += get_time_ms() - t0;
+    
+    for (i = 0; i < batch_size && picked < num_samples; ++i) {
+      if (nn_d2[i * params->knn] < params->f_sigma * params->f_sigma) {
+	int c_obs = idx[i + start];
+	double p[params->knn];
+	int j;
+	for (j = 0; j < params->knn; j++)
+	  p[j] = exp(-.5*nn_d2[i * params->knn + j] / (params->f_sigma * params->f_sigma));
+	normalize_pmf(p, p, params->knn);
+	j = pmfrand(p, params->knn);
+	int c_model = nn_idx[i * params->knn + j];
+	
+	samples[picked].c_obs[0] = c_obs;
+	samples[picked].c_model[0] = c_model;
+	samples[picked].c_type[0] = C_TYPE_FPFH;
+	samples[picked].nc = 1;
+	
+	// compute correspondence score
+	samples[picked].c_score[0] = log(normpdf(sqrt(nn_d2[i * params->knn + j]), 0, params->f_sigma));
+	++picked;
+      }
+    }
+    start += batch_size;
+  }
+
+  *num_samples_init = picked; // In case we terminated early because we ran out of good points to sample
 }

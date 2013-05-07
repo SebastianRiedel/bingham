@@ -89,6 +89,9 @@ typedef struct cu_obs_data_struct {
 			     int num_points, int model_points, int round);
   void init_curand();
 
+  void sample_all_first_fpfh_correspondences(struct scope_sample_struct *samples, int *num_samples_init, int num_samples, struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data, 
+					     struct scope_params_struct *params);
+
 #ifdef __cplusplus
 }
 #endif
