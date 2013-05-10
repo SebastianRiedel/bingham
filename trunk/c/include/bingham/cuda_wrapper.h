@@ -75,9 +75,9 @@ typedef struct cu_obs_data_struct {
   void cu_init_scoring(struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data,
 		       cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct **cu_params, struct scope_params_struct *params);
   void cu_init_scoring_mope(struct scope_model_data_struct *model_data, struct scope_obs_data_struct *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, 
-			    struct scope_params_struct *params);
+			    struct scope_params_struct **cu_params, struct scope_params_struct *params);
   void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *cu_params, struct scope_params_struct *params);
-  void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, int num_models, struct scope_params_struct *params);
+  void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, struct scope_params_struct *cu_params, int num_models, struct scope_params_struct *params);
 
 //void cu_noise_models_sigmas(double *range_sigma, double *normal_sigma, double *l_sigma, double *a_sigma, double *b_sigma, const double *surface_angles, const double *edge_dists, int n);
   void cu_score_samples(double *scores, struct scope_sample_struct *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, struct scope_params_struct *params, int score_round, 

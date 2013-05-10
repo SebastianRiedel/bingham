@@ -104,7 +104,6 @@ int main(int argc, char *argv[])
     return 0;
   }
 
-
   scope_samples_t *S;
 
   if (params.use_cuda) {

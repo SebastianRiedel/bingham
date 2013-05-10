@@ -30,6 +30,7 @@ __device__ __constant__ double b_EN[3] = {0.1246,     1.4406,   -185.8350};
 __device__ __constant__ double b_EL[3] = {0.2461,     0.2624,   -140.0192};
 __device__ __constant__ double b_EA[3] = {0.1494,     0.2114,   -139.4324};
 __device__ __constant__ double b_EB[3] = {0.2165,     0.2600,   -135.5203};
+
 const int num_components = 8; //9;
 __device__ __constant__ int cu_num_components = num_components;
 
@@ -1075,7 +1076,7 @@ __device__ double compute_edge_score(double *P, double *vis_prob, double *vis_pm
       occ_score += edge_image->ptr[x * edge_image->m + y];
     }
     occ_score /= (double) num_occ_edges;
-    occ_score = num_occ_edges*occ_score / (double)(n + num_occ_edges);
+    occ_score = num_occ_edges * occ_score / (double) (n + num_occ_edges);
     score = n*score / (double)(n + num_occ_edges);
   }
 
