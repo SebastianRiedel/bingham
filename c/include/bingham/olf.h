@@ -363,6 +363,10 @@ extern "C" {
     int score_comp_models;
     int num_rounds;
 
+    int annealing_steps;
+    int annealing_runs;
+    int use_triangle;
+
     int plot_true; //dbug
 
   } mope_params_t;

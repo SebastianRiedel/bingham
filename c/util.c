@@ -1075,7 +1075,9 @@ static void init_rand()
   static int first = 1;
   if (first) {
     first = 0;
-    srand (time(NULL));
+    int seed = time(NULL);
+    printf("********* seed = %d\n", seed);
+    srand (seed);
   }
 }
 
