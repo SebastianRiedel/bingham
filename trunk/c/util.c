@@ -1075,7 +1075,9 @@ static void init_rand()
   static int first = 1;
   if (first) {
     first = 0;
-    int seed = time(NULL);
+    int seed = time(NULL); 
+    //1368457226; <--- Shows overlap on 5/3
+    //1368388027 <--- This is the seed that had a out-of-memory error;
     printf("********* seed = %d\n", seed);
     srand (seed);
   }

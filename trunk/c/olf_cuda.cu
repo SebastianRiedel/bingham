@@ -29,6 +29,8 @@ __device__ __constant__ double b_EL[3] = {0.2461,     0.2624,   -140.0192};
 __device__ __constant__ double b_EA[3] = {0.1494,     0.2114,   -139.4324};
 __device__ __constant__ double b_EB[3] = {0.2165,     0.2600,   -135.5203};
 
+__device__ __constant__ double round1_dthresh = .05;  //TODO: make this a param
+
 __device__ inline double cu_sigmoid(double x, const double *b)
 {
   return b[0] + (1 - b[0]) / (1 + exp(-b[1]-b[2]*x));
@@ -500,7 +502,7 @@ __global__ void cu_add_matrix_3d_slow(double *out_array, double *in_matrix, int 
   
   for (int j = 0; j < limit; ++j) {
     for (int k = 0; k < p; ++k) {
-      out_array[i*p + k] += in_matrix[j*p + i * m * p + k];
+      out_array[i*p + k] += in_matrix[j * p + i * m * p + k];
     }
   }
 }
@@ -513,23 +515,26 @@ __global__ void cu_add_matrix_3d_medium(double *out_array, double *in_matrix, in
   if (i >= n || j >= m)
     return;
 
-  int limit = m;
+  int limit1 = m;
   if (m_arr)
-    limit = m_arr[i];
+    limit1 = m_arr[i];
+
+  int limit2 = MIN(limit1, blockDim.x);
 
   //extern __shared__ double tmps[];
   __shared__ double tmps[256];
-  for (int l = 1; l < p; ++l) { // Outer loop to save shared memory
+ 
+  for (int l = 0; l < p; ++l) { // Outer loop to save shared memory
     tmps[threadIdx.x] = 0.0;
-    for (int k = j; k < limit; k += blockDim.x) {
+    for (int k = j; k < limit1; k += blockDim.x) {
       tmps[threadIdx.x] += in_matrix[k * p + i * m * p + l];
     }
     
     __syncthreads();
-    
+
     if (j == 0) {
       out_array[i * p + l] = 0.0;
-      for (int k = 0; k < blockDim.x; ++k) {
+      for (int k = 0; k < limit2; ++k) {
 	out_array[i * p + l] += tmps[k];
       }
     }
@@ -1066,31 +1071,32 @@ __global__ void cu_compute_edge_score_final(double *edge_score, double *score_co
     edge_score[i] = (w1 * edge_score[i]) + (w2 * vis_score[i]);    
 }
   
-__global__ void cu_score_round1(double *scores, int *xi, int *yi, double *cloud, cu_double_matrix_t range_image, int num_samples, int num_validation_points) {
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
+__global__ void cu_score_round1(double *scores_ind, int *xi, int *yi, double *cloud, cu_double_matrix_t range_image, int num_samples, int num_validation_points) {
+  int i = threadIdx.y + blockIdx.y * blockDim.y;
+  int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-  if (i >= num_samples)
+  if (i >= num_samples || j >= num_validation_points)
     return;
-
-  double dthresh = .05;  //TODO: make this a param
-  double sample_score = 0;
 
   double dest[3];
   
   int i_arr = i*num_validation_points;
-  int j;
 
-  // TODO(sanja): optimize!
-  for (j = 0; j < num_validation_points; ++j) {
-    dest[0] = cloud[3*(i_arr + j)]; dest[1] = cloud[3*(i_arr + j)+1]; dest[2] = cloud[3*(i_arr + j) + 2];
-    if ((xi[i_arr + j] != -1 && yi[i_arr + j] != -1) && 
-	range_image.ptr[xi[i_arr + j]*range_image.m + yi[i_arr + j]] > dthresh + cu_norm(dest, 3))
-      sample_score -= 1.0;
-  }
+  scores_ind[i_arr + j] = 0.0;
 
-  sample_score /= (double)num_validation_points;
-  
-  scores[i] = sample_score;
+  dest[0] = cloud[3*(i_arr + j)]; dest[1] = cloud[3*(i_arr + j)+1]; dest[2] = cloud[3*(i_arr + j) + 2];
+
+  if ((xi[i_arr + j] != -1 && yi[i_arr + j] != -1) && range_image.ptr[xi[i_arr + j]*range_image.m + yi[i_arr + j]] > round1_dthresh + cu_norm(dest, 3))
+    scores_ind[i_arr + j] = -1.0;
+
+}
+
+__global__ void cu_score_round1_final(double *scores, int num_samples, int num_validation_points) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (i >= num_samples)
+    return;
+
+  scores[i] /= (double)num_validation_points;
 }
  
 
@@ -1258,17 +1264,17 @@ void compute_edge_score(double *cu_edge_scores, double *cu_score_comps, double *
   int vis_pixel_radius = 2;
   
   get_vis_prob_sums_and_pmf(cu_vis_prob_edge, cu_vis_prob_sums_edge, cu_vis_pmf_edge, cu_P, NULL, cu_xi_edge, cu_yi_edge, range_image, range_image_data, vis_pixel_radius, num_samples, n_edge,
-			    //cu_n, params, block_size_n_edge, thread_size_sum, block_size_sum, thread_size_sum, 0); // HERE!!!
-                            cu_n, params, block_size_n_edge, thread_size_sum, block_size_small, thread_size_small, 1); // HERE!!!
+			    cu_n, params, block_size_n_edge, thread_size_sum, block_size_sum, thread_size_sum, 0); // HERE!!!
+  //cu_n, params, block_size_n_edge, thread_size_sum, block_size_small, thread_size_small, 1); // HERE!!!
   
   double *cu_edge_score_individual;
   cu_malloc(&cu_edge_score_individual, num_samples * n_edge * sizeof(double), "edge_score");
-  cu_compute_edge_score_individual<<<block_size_sum, thread_size_sum>>>(cu_edge_score_individual, cu_vis_pmf_edge, cu_xi_edge, cu_yi_edge, edge_image, num_samples, cu_n, n_edge); 
-  //cu_compute_edge_score_individual<<<block_size_n_edge, thread_size_sum>>>(cu_edge_score_individual, cu_vis_pmf_edge, cu_xi_edge, cu_yi_edge, edge_image, num_samples, cu_n, n_edge);
+  //cu_compute_edge_score_individual<<<block_size_sum, thread_size_sum>>>(cu_edge_score_individual, cu_vis_pmf_edge, cu_xi_edge, cu_yi_edge, edge_image, num_samples, cu_n, n_edge); 
+  cu_compute_edge_score_individual<<<block_size_n_edge, thread_size_sum>>>(cu_edge_score_individual, cu_vis_pmf_edge, cu_xi_edge, cu_yi_edge, edge_image, num_samples, cu_n, n_edge); // WEIRD
   if ( cudaSuccess != cudaGetLastError() )
     printf( "edge score individual!\n" );
-  cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_edge_scores, cu_edge_score_individual, num_samples, n_edge, cu_n);
-  //cu_add_matrix_rows_medium<<<block_size_n_edge, thread_size_sum>>>(cu_edge_scores, cu_edge_score_individual, num_samples, n_edge, cu_n); //HERE!!!
+  //cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_edge_scores, cu_edge_score_individual, num_samples, n_edge, cu_n);
+  cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_edge_scores, cu_edge_score_individual, num_samples, n_edge, cu_n);
   
   double *cu_vis_scores;
   cu_malloc(&cu_vis_scores, num_samples * sizeof(double), "vis_scores");
@@ -1328,11 +1334,15 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
 
   double *cu_scores;
   cu_malloc(&cu_scores, num_samples * sizeof(double), "scores");
-
   if (round == 1) {
-    cu_score_round1<<<block_size_small, thread_size_small>>>(cu_scores, cu_xi, cu_yi, cu_cloud, cu_obs->range_image, num_samples, num_validation_points);
+    double *cu_scores_ind;
+    cu_malloc(&cu_scores_ind, num_total * sizeof(double), "scores_ind");
+    cu_score_round1<<<block_size, threads_per_block>>>(cu_scores_ind, cu_xi, cu_yi, cu_cloud, cu_obs->range_image, num_samples, num_validation_points);
     if ( cudaSuccess != cudaGetLastError() )
       printf( "Round 1 score!\n" );
+    cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_scores, cu_scores_ind, num_samples, num_validation_points, NULL);
+    cu_score_round1_final<<<block_size_small, thread_size_small>>>(cu_scores, num_samples, num_validation_points);
+    cu_free(cu_scores_ind, "scores_ind");
   } else {
 
     double *cu_score_comps;
@@ -1386,52 +1396,55 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     if ( cudaSuccess != cudaGetLastError() )
       printf( "vis score!\n" );
 
-    // TODO(sanja): Figure out how to speed up the prep for segment calculation
-    double *cu_seg_affinity_score_per_seg;
-    cu_malloc(&cu_seg_affinity_score_per_seg, num_samples * num_obs_segments * sizeof(double), "seg_aff_per_seg");
-    int *cu_mask;
-    cu_malloc(&cu_mask, num_samples * num_obs_segments * sizeof(int), "mask");
-    cudaMemset(cu_mask, 0, num_samples * num_obs_segments * sizeof(int));
-    int *num_segments;
-    safe_calloc(num_segments, num_samples, int);
-    for (i = 0; i < num_samples; ++i) {
-      num_segments[i] = samples[i].num_segments;
-    }
-    int *cu_num_segments;
-    cu_malloc(&cu_num_segments, num_samples * sizeof(int), "num_segments");
-    cudaMemcpy(cu_num_segments, num_segments, num_samples * sizeof(int), cudaMemcpyHostToDevice);
-    free(num_segments);
-    int *tmp_segments_idx;
-    safe_malloc(tmp_segments_idx, num_samples * num_obs_segments, int);
-    memset(tmp_segments_idx, -1, num_samples * num_obs_segments * sizeof(int));
-    for (i = 0; i < num_samples; ++i) {
-      memcpy(&(tmp_segments_idx[i * num_obs_segments]), samples[i].segments_idx, samples[i].num_segments * sizeof(int));
-    }
-    int *cu_segments_idx;
-    cu_malloc(&cu_segments_idx, num_samples * num_obs_segments * sizeof(int), "segments_idx");
-    cudaMemcpy(cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments * sizeof(int), cudaMemcpyHostToDevice);
-    if ( cudaSuccess != cudaGetLastError() )
-      printf( "seg idx memcpy!\n" );
-
-    free(tmp_segments_idx);
     double *cu_seg_affinity_score;
     cu_malloc(&cu_seg_affinity_score, num_samples * sizeof(double), "seg_aff_per_seg");
-    
-    dim3 block_size_seg(ceil(1.0 * num_obs_segments / thread_size_sum.x), num_samples);
-    //cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
-    cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
-    if ( cudaSuccess != cudaGetLastError() )
-      printf( "seg mask!\n" );
+    cudaMemset(cu_seg_affinity_score, 0, num_samples * sizeof(double));
+    double *cu_seg_affinity_score_per_seg;
+    int *cu_mask;
+    int *cu_num_segments;
+    int *cu_segments_idx;
 
-    cu_compute_segment_affinity_score_per_seg<<<block_size, thread_size_small>>>(cu_seg_affinity_score_per_seg, cu_segments_idx, cu_num_segments, cu_obs->segment_affinities, num_obs_segments, 
-										 cu_mask, num_samples);
-    if ( cudaSuccess != cudaGetLastError() )
-      printf( "seg per seg!\n" );
+    // TODO(sanja): Figure out how to speed up the prep for segment calculation
+    if (round >= 3) {
+      cu_malloc(&cu_seg_affinity_score_per_seg, num_samples * num_obs_segments * sizeof(double), "seg_aff_per_seg");
+      cu_malloc(&cu_mask, num_samples * num_obs_segments * sizeof(int), "mask");
+      cudaMemset(cu_mask, 0, num_samples * num_obs_segments * sizeof(int));
+      int *num_segments;
+      safe_calloc(num_segments, num_samples, int);
+      for (i = 0; i < num_samples; ++i) {
+	num_segments[i] = samples[i].num_segments;
+      }
+      cu_malloc(&cu_num_segments, num_samples * sizeof(int), "num_segments");
+      cudaMemcpy(cu_num_segments, num_segments, num_samples * sizeof(int), cudaMemcpyHostToDevice);
+      free(num_segments);
+      int *tmp_segments_idx;
+      safe_malloc(tmp_segments_idx, num_samples * num_obs_segments, int);
+      memset(tmp_segments_idx, -1, num_samples * num_obs_segments * sizeof(int));
+      for (i = 0; i < num_samples; ++i) {
+	memcpy(&(tmp_segments_idx[i * num_obs_segments]), samples[i].segments_idx, samples[i].num_segments * sizeof(int));
+      }
+      cu_malloc(&cu_segments_idx, num_samples * num_obs_segments * sizeof(int), "segments_idx");
+      cudaMemcpy(cu_segments_idx, tmp_segments_idx, num_samples * num_obs_segments * sizeof(int), cudaMemcpyHostToDevice);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "seg idx memcpy!\n" );
+      free(tmp_segments_idx);
+   
+      dim3 block_size_seg(ceil(1.0 * num_obs_segments / thread_size_sum.x), num_samples);
+      //cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
+      cu_set_mask_for_segment_affinity<<<block_size_seg, thread_size_sum>>>(cu_mask, cu_segments_idx, cu_num_segments, num_obs_segments, num_samples);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "seg mask!\n" );
+      
+      cu_compute_segment_affinity_score_per_seg<<<block_size, thread_size_small>>>(cu_seg_affinity_score_per_seg, cu_segments_idx, cu_num_segments, cu_obs->segment_affinities, num_obs_segments, 
+										   cu_mask, num_samples);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "seg per seg!\n" );
 
-    cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_seg_affinity_score_per_seg, num_samples, num_obs_segments, NULL);
-    cu_compute_segment_affinity_score_final<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_score_comps, cu_params, round, num_samples);
-    if ( cudaSuccess != cudaGetLastError() )
-      printf( "seg affinity!\n" );
+      cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_seg_affinity_score_per_seg, num_samples, num_obs_segments, NULL);
+      cu_compute_segment_affinity_score_final<<<block_size_small, thread_size_small>>>(cu_seg_affinity_score, cu_score_comps, cu_params, round, num_samples);
+      if ( cudaSuccess != cudaGetLastError() )
+	printf( "seg affinity!\n" );
+    }
 
     double *cu_edge_scores;
     cu_malloc(&cu_edge_scores, num_samples * sizeof(double), "edge_scores");
@@ -1489,11 +1502,14 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
     cu_free(cu_xyz_score, "xyz_scores");
     cu_free(cu_normal_score, "normal_scores");
     cu_free(cu_vis_score, "vis_score");
-    cu_free(cu_seg_affinity_score_per_seg, "seg_aff_per_seg");
     cu_free(cu_seg_affinity_score, "seg_aff");
-    cu_free(cu_mask, "mask");
-    cu_free(cu_num_segments, "num_segments");
-    cu_free(cu_segments_idx, "segments_idx");
+    
+    if (round >= 3) {
+      cu_free(cu_seg_affinity_score_per_seg, "seg_aff_per_seg");
+      cu_free(cu_mask, "mask");
+      cu_free(cu_num_segments, "num_segments");
+      cu_free(cu_segments_idx, "segments_idx");
+    }
     cu_free(cu_edge_scores, "edge_scores");
 
     if (round == 3)
@@ -1663,8 +1679,8 @@ void edge_score_gradient(double *cu_edge_gradient_score, double *cu_G_edge, doub
   double *cu_vis_pmf;
   cu_malloc(&cu_vis_pmf, num_samples * n_edge * sizeof(double), "vis_pmf");
   get_vis_prob_sums_and_pmf(cu_vis_prob, cu_vis_prob_sums, cu_vis_pmf, cu_P2, NULL, cu_xi, cu_yi, range_image, range_image_data, vis_pixel_radius, num_samples, n_edge, cu_n, params, block, thread, 
-  			    block_size_small, thread_size_small, 1); // HERE!!!
-//			    block_size_sum, thread_size_sum, 0);
+			    //			    block_size_small, thread_size_small, 1); // HERE!!!
+  			    block_size_sum, thread_size_sum, 0);
 
   
   double *cu_edge_gradient_score_individual;
@@ -1678,11 +1694,11 @@ void edge_score_gradient(double *cu_edge_gradient_score, double *cu_G_edge, doub
     printf( "edge score gradient!\n" );
 
   // sum up edge_scores and gradients <--- HERE!!!
-  cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_edge_gradient_score, cu_edge_gradient_score_individual, num_samples, n_edge, cu_n);
-  cu_add_matrix_3d_slow<<<block_size_small, thread_size_small>>>(cu_G_edge, cu_dI_dxq_individual, num_samples, n_edge, cu_n, 7);
-
-//cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_edge_gradient_score, cu_edge_gradient_score_individual, num_samples, n_edge, cu_n);
-//cu_add_matrix_3d_medium<<<block_size_sum, thread_size_sum>>>(cu_G_edge, cu_dI_dxq_individual, num_samples, n_edge, cu_n, 7);
+  //cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_edge_gradient_score, cu_edge_gradient_score_individual, num_samples, n_edge, cu_n);
+  cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_edge_gradient_score, cu_edge_gradient_score_individual, num_samples, n_edge, cu_n);
+  
+  //cu_add_matrix_3d_slow<<<block_size_small, thread_size_small>>>(cu_G_edge, cu_dI_dxq_individual, num_samples, n_edge, cu_n, 7);
+  cu_add_matrix_3d_medium<<<block_size_sum, thread_size_sum>>>(cu_G_edge, cu_dI_dxq_individual, num_samples, n_edge, cu_n, 7);
   
   cu_edge_gradient_score_final<<<block_size_small, thread_size_small>>>(cu_edge_gradient_score, cu_G_edge, num_samples, n_edge, cu_params, scope_round);
   if ( cudaSuccess != cudaGetLastError() )
@@ -1853,9 +1869,10 @@ void xyzn_score_gradient(double *cu_xyzn_gradient_score, double *cu_G_xyzn, doub
     printf( "xyzn gradient individual!\n" );
 
   // sum up xyzn_scores and gradients
-  cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_xyzn_gradient_score, cu_xyzn_gradient_score_individual, num_samples, num_surface_points, NULL);
-  cu_add_matrix_3d_slow<<<block_size_small, thread_size_small>>>(cu_G_xyzn, cu_G_xyzn_individual, num_samples, num_surface_points, NULL, 7); // HERE!!!
-  //cu_add_matrix_3d_medium<<<block_size_sum, thread_size_sum>>>(cu_G_xyzn, cu_G_xyzn_individual, num_samples, num_surface_points, NULL, 7);
+  //cu_add_matrix_rows_slow<<<block_size_small, thread_size_small>>>(cu_xyzn_gradient_score, cu_xyzn_gradient_score_individual, num_samples, num_surface_points, NULL); // HERE
+  cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_xyzn_gradient_score, cu_xyzn_gradient_score_individual, num_samples, num_surface_points, NULL);
+  //cu_add_matrix_3d_slow<<<block_size_small, thread_size_small>>>(cu_G_xyzn, cu_G_xyzn_individual, num_samples, num_surface_points, NULL, 7); // HERE!!!
+  cu_add_matrix_3d_medium<<<block_size_sum, thread_size_sum>>>(cu_G_xyzn, cu_G_xyzn_individual, num_samples, num_surface_points, NULL, 7);
   if ( cudaSuccess != cudaGetLastError() )
     printf( "add mat 3d slow!\n" );
 
@@ -2157,16 +2174,16 @@ __global__ void cu_knn(float *nn_d2, int *nn_idx, double *ref, double *query, in
   if (i >= query_n || j >= ref_n)
     return;
 
-  __shared__ float shared_d2[THREADS_KNN][KNN_SIZE];
-  __shared__ int shared_idx[THREADS_KNN][KNN_SIZE];
+  __shared__ float shared_d2[THREADS_KNN * KNN_SIZE];
+  __shared__ int shared_idx[THREADS_KNN * KNN_SIZE];
 
-  __shared__ float tmp_d2[THREADS_KNN / 2][KNN_SIZE];
-  __shared__ int tmp_idx[THREADS_KNN / 2][KNN_SIZE];
+  __shared__ float tmp_d2[THREADS_KNN * KNN_SIZE / 2];
+  __shared__ int tmp_idx[THREADS_KNN * KNN_SIZE / 2];
 
   
   for (int k = 0; k < KNN_SIZE; ++k) {
-    shared_d2[j][k] = 1000000.0;
-    shared_idx[j][k] = -1;
+    shared_d2[j * KNN_SIZE + k] = 1000000.0;
+    shared_idx[j * KNN_SIZE + k] = -1;
   }
 
   // Initialize the arrays
@@ -2176,18 +2193,18 @@ __global__ void cu_knn(float *nn_d2, int *nn_idx, double *ref, double *query, in
     dist = 0.0;
     for (int l = 0; l < d; ++l)
       dist += (ref[d * kk + l] - query[d * i + l]) * (ref[d * kk + l] - query[d * i + l]);
-    if (last == KNN_SIZE && dist >= shared_d2[j][last-1])
+    if (last == KNN_SIZE && dist >= shared_d2[j * KNN_SIZE + last-1])
       continue;
     if (last < KNN_SIZE)
       ++last;
-    if (last < KNN_SIZE || (last == KNN_SIZE && shared_d2[j][last-1] > dist)) {
-      shared_d2[j][last-1] = dist;
-      shared_idx[j][last-1] = kk;
+    if (last < KNN_SIZE || (last == KNN_SIZE && shared_d2[j * KNN_SIZE + last-1] > dist)) {
+      shared_d2[j * KNN_SIZE + last-1] = dist;
+      shared_idx[j * KNN_SIZE + last-1] = kk;
     }
     for (int l = last-1; l > 0; --l) {
-      if (shared_d2[j][l] < shared_d2[j][l-1]) {
-	float tmp_d2 = shared_d2[j][l]; shared_d2[j][l] = shared_d2[j][l-1]; shared_d2[j][l-1] = tmp_d2;
-	int tmp_idx = shared_idx[j][l]; shared_idx[j][l] = shared_idx[j][l-1]; shared_idx[j][l-1] = tmp_idx;
+      if (shared_d2[j * KNN_SIZE +l] < shared_d2[j * KNN_SIZE +l-1]) {
+	float tmp_d2 = shared_d2[j * KNN_SIZE + l]; shared_d2[j * KNN_SIZE + l] = shared_d2[j * KNN_SIZE + l-1]; shared_d2[j * KNN_SIZE + l-1] = tmp_d2;
+	int tmp_idx = shared_idx[j * KNN_SIZE + l]; shared_idx[j * KNN_SIZE + l] = shared_idx[j * KNN_SIZE + l-1]; shared_idx[j * KNN_SIZE + l-1] = tmp_idx;
       }
     }
   }
@@ -2201,19 +2218,19 @@ __global__ void cu_knn(float *nn_d2, int *nn_idx, double *ref, double *query, in
       int other = j + num_threads;
       int c = 0;
       while (a < KNN_SIZE && b < KNN_SIZE && c < KNN_SIZE) {
-	if (shared_d2[j][a] < shared_d2[other][b]) {
-	  tmp_d2[j][c] = shared_d2[j][a];
-	  tmp_idx[j][c++] = shared_idx[j][a++];
+	if (shared_d2[j * KNN_SIZE + a] < shared_d2[other * KNN_SIZE + b]) {
+	  tmp_d2[j * KNN_SIZE + c] = shared_d2[j * KNN_SIZE + a];
+	  tmp_idx[j * KNN_SIZE + c++] = shared_idx[j * KNN_SIZE + a++];
 	} else {
-	  tmp_d2[j][c] = shared_d2[other][b];
-	  tmp_idx[j][c++] = shared_idx[other][b++];
+	  tmp_d2[j * KNN_SIZE + c] = shared_d2[other * KNN_SIZE + b];
+	  tmp_idx[j * KNN_SIZE + c++] = shared_idx[other * KNN_SIZE + b++];
 	}
       }
       // Because we only have KNN_SIZE things in tmp, once one array runs out, we are done.
       // Copy the final list into the correct shared memory location
       for (a = 0; a < KNN_SIZE; ++a) {
-	shared_d2[j][a] = tmp_d2[j][a];
-	shared_idx[j][a] = tmp_idx[j][a];
+	shared_d2[j * KNN_SIZE + a] = tmp_d2[j * KNN_SIZE + a];
+	shared_idx[j * KNN_SIZE + a] = tmp_idx[j * KNN_SIZE + a];
       }
     }
     __syncthreads();
@@ -2221,8 +2238,8 @@ __global__ void cu_knn(float *nn_d2, int *nn_idx, double *ref, double *query, in
 
   // Copy data from shared memory into the global memory
   if (j < KNN_SIZE) {
-    nn_d2[i * KNN_SIZE + j] = shared_d2[0][j];
-    nn_idx[i * KNN_SIZE + j] = shared_idx[0][j];
+    nn_d2[i * KNN_SIZE + j] = shared_d2[0 * KNN_SIZE + j];
+    nn_idx[i * KNN_SIZE + j] = shared_idx[0 * KNN_SIZE + j];
   } 
 }
 
@@ -2260,10 +2277,43 @@ void knn(float *nn_d2, int *nn_idx, double *reference, double *query, int ref_n,
 
 }
 
+
+void testAdd3d() {
+  double *A, *B;
+  int side = 100;
+  int total = side*side*side;
+  safe_malloc(A, total, double);
+  safe_malloc(B, side*side, double);
+  for (int i = 0; i < total; ++i) {
+    A[i] = 1;
+  }
+
+  double *cu_A;
+  double *cu_B;
+  cu_malloc(&cu_A, total * sizeof(double), "a");
+  cudaMemcpy(cu_A, A, total * sizeof(double), cudaMemcpyHostToDevice);
+  cu_malloc(&cu_B, side*side * sizeof(double), "a");
+
+  dim3 block(1, side, 1);
+  dim3 thread(side/2, 1, 1);
+  cu_add_matrix_3d_medium<<<block, thread>>>(cu_B, cu_A, side, side, NULL, side);
+  //cu_add_matrix_3d_slow<<<side, 1>>>(cu_B, cu_A, side, side, NULL, side);
+  cudaMemcpy(B, cu_B, side*side*sizeof(double), cudaMemcpyDeviceToHost);
+
+  for (int i = 0; i < side; ++i) {
+    for (int j = 0; j < side; ++j) {
+      printf("%lf ", B[i * side + j]);
+    }
+    printf("\n\n");
+  }
+}
+
 void sample_all_first_fpfh_correspondences(scope_sample_t *samples, int *num_samples_init, int num_samples, scope_model_data_t *model_data, scope_obs_data_t *obs_data, scope_params_t *params) {
-  
+
   extern double knn_t; // dbug
   knn_t = 0.0;
+  extern int knn_calls;
+  knn_calls = 0;
   int batch_size = 200;
 
   params->knn = KNN_SIZE;
@@ -2289,15 +2339,16 @@ void sample_all_first_fpfh_correspondences(scope_sample_t *samples, int *num_sam
       batch_size = obs_data->fpfh_obs->num_points - start;
     }
 
-    t0 = get_time_ms();
     double query_pts[batch_size * width];
     for (i = 0; i < batch_size; ++i) {
       memcpy(&query_pts[i * width], obs_data->fpfh_obs->fpfh[idx[i + start]], width * sizeof(double));
     }
 
+    t0 = get_time_ms();
     knn(nn_d2, nn_idx, model_data->fpfh_model->fpfh[0], query_pts, model_data->fpfh_model->num_points, width, params->knn, start, batch_size);
     cudaDeviceSynchronize();
     knn_t += get_time_ms() - t0;
+    knn_calls += batch_size;
     
     for (i = 0; i < batch_size && picked < num_samples; ++i) {
       if (nn_d2[i * params->knn] < params->f_sigma * params->f_sigma) {

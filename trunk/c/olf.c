@@ -6110,7 +6110,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // sort hypotheses
   sort_pose_samples(S);
-  /*
+  
   double round1_score_thresh = params->round1_score_thresh;  //-.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
@@ -6126,7 +6126,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   if (params->use_sift) {
     free(sift_match_obs_idx);
     free(sift_match_model_idx);
-    }*/
+  }
   
   return S;
 }

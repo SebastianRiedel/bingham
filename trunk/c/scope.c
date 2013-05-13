@@ -192,6 +192,14 @@ int main(int argc, char *argv[])
     fprintf(f, "%lf ", t[i]);
   fprintf(f, "];\n");
     
+  extern double t_align;
+  fprintf(f, "time_align = %lf;\n", t_align);
+
+  extern double knn_t;
+  fprintf(f, "time_knn = %lf;\n", knn_t);
+
+  extern double t_scope;
+  fprintf(f, "time_scope = %lf;\n", t_scope);
 
   /*fprintf(f, "C_obs = {");
   for (i = 0; i < n; i++) {
