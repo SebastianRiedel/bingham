@@ -48,8 +48,10 @@ double *x_true_, *q_true_;
 int have_true_pose_ = 0;
 
 double t[4];
-
 double knn_t = 0.0;
+int knn_calls = 0;
+double t_align = 0.0;
+double t_scope;
 
 int is_good_pose(double *x, double *q)
 {
@@ -5047,7 +5049,9 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
 						  model_data->score_comp_models->b_random_walk, params, score_round);
   */
-  double segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
+  double segment_affinity_score = 0;
+  if (score_round >= 3)
+    segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
   //double segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
   double segment_score = 0;
@@ -5086,11 +5090,15 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double score = xyz_score + normal_score + vis_score + segment_affinity_score + edge_score;
 
   if (params->verbose) {
-    double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
+    /*double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
 			 lab_scores_[0], lab_scores_[1], lab_scores_[2], fpfh_score_, specularity_score_, segment_affinity_score_,
-			 segment_score_, table_score_,      italian_xyzn_score, xyz_score2, outliers_score};  //dbug
+			 segment_score_, table_score_,      italian_xyzn_score, xyz_score2, outliers_score};  //dbug*/
+
+    double scores[7] = {xyz_score_, normal_score_, vis_score_, edge_score_, edge_vis_score_, edge_occ_score_, segment_affinity_score_};
+
+
     if (sample->scores == NULL) {
-      sample->num_scores = 18;
+      sample->num_scores = 7;
       safe_calloc(sample->scores, sample->num_scores, double);
     }
     memcpy(sample->scores, scores, sample->num_scores*sizeof(double));
@@ -5495,6 +5503,7 @@ void sample_first_correspondence_fpfh(scope_sample_t *sample, scope_model_data_t
     t0 = get_time_ms();
     knn_brute_force(nn_d2, nn_idx, obs_data->fpfh_obs->fpfh[c_obs], model_data->fpfh_model->fpfh, model_data->fpfh_model->num_points, model_data->fpfh_model->fpfh_length, params->knn);
     knn_t += get_time_ms() - t0;
+    ++knn_calls;
     closest_dist = nn_d2[0];
   }
   double p[params->knn];
@@ -6086,9 +6095,15 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     }
     num_samples_init = i; // In case we terminated early because we ran out of good points to sample
   }
-
   S->num_samples = num_samples_init;
   printf("KNN: %.3f\n", knn_t / 1000.0);
+
+  knn_t /= (double) knn_calls;
+
+  if (S->num_samples == 0) {
+    printf("No samples found!\n");
+    return S;
+  }
 
   printf("Sampled c=1 poses in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   if (have_true_pose_)
@@ -6128,7 +6143,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
 
   // sort hypotheses
   sort_pose_samples(S);
-  /*
+  
   double round1_score_thresh = params->round1_score_thresh;  //-.2;
   S->num_samples = find_first_lt(S->W, round1_score_thresh, S->num_samples);
   //S->num_samples = MIN(S->num_samples, params->num_samples);
@@ -6144,7 +6159,7 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
   if (params->use_sift) {
     free(sift_match_obs_idx);
     free(sift_match_model_idx);
-    }*/
+  }
   
   return S;
 }
@@ -6260,19 +6275,22 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 
   // align with gradients
   int iter;
-  for (iter = 0; iter < params->final_alignment_iter; iter++)
+  for (iter = 0; iter < params->final_alignment_iter; iter++) {
     if (params->use_cuda) {
-
-      double **old_x, **old_q;
+      
+      //dbug
+      /*double **old_x, **old_q;
       old_x = new_matrix2(S->num_samples, 3);
       old_q = new_matrix2(S->num_samples, 4);
       for (i = 0; i < S->num_samples; i++) {
 	memcpy(old_x[i], S->samples[i].x, 3 * sizeof(double));
 	memcpy(old_q[i], S->samples[i].q, 4 * sizeof(double));
-      }
+	}*/
 
       align_models_gradient(S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, params->num_validation_points, model_data->pcd_model->num_points, 2);
       //dbug:
+      /*align_models_gradient(S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, 0, model_data->pcd_model->num_points, 2);
+      printf("*******CUDA DONE\n");
       double **x, **q;
       x = new_matrix2(S->num_samples, 3);
       q = new_matrix2(S->num_samples, 4);
@@ -6294,11 +6312,15 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 	} else {
 	  printf("i = %d, Good!\n", i);
 	}
-      }    
+	} */   
     } else {
       for (i = 0; i < S->num_samples; i++)
 	align_model_gradient(&S->samples[i], model_data, obs_data, params, 2);
+    
     }
+  }
+  t_align = get_time_ms() - t0;
+  t_align /= S->num_samples;
 
   printf("Finished round 3 alignments in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
   t0 = get_time_ms();
@@ -6315,7 +6337,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
 		  (obs_data->obs_edge_image != NULL), 3);
     // Debugging individual score components on CUDA
-    double scores[S->num_samples];
+    /*double scores[S->num_samples];
     for (i = 0; i < S->num_samples; i++)
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
@@ -6326,7 +6348,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-    }
+	}*/
   }
   else {
     params->verbose = 1; //dbug
@@ -6532,6 +6554,8 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   // step 1: sample initial poses given single correspondences
   scope_samples_t *S = scope_round1(model_data, obs_data, params, cu_model, cu_obs, cu_params);
+  if (S == NULL)
+    return NULL;
 
   // step 2: align with BPA
   //scope_round2(S, model_data, obs_data, params);
@@ -6562,6 +6586,7 @@ scope_samples_t *scope(scope_model_data_t *model_data, scope_obs_data_t *obs_dat
 
   //scope_round4(S, model_data, obs_data, params, cu_model, cu_obs, cu_params);
 
+  t_scope = get_time_ms() - t0;
   printf("Ran scope in %.3f seconds\n", (get_time_ms() - t0) / 1000.0);  //dbug
 
   //cu_free_all_the_things(&cu_model, &cu_obs); - this is for single object
@@ -6671,6 +6696,19 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
   memset(covered, -1, 2 * num_segments * num_taken * sizeof(int));
   memset(seen, 0, num_segments * sizeof(int));
   int i, j, idx;
+
+  /*
+  for (i = 0; i < num_taken; ++i) {
+    if (taken[i][0] > num_objects)
+      printf("object number is wrong!\n");
+    if (taken[i][1] > S[taken[i][0]]->num_samples) {
+      printf("sample number is wrong!\n");
+      printf("%d %d\n", taken[i][1], S[taken[i][0]]->num_samples);
+      printf("%d\n", taken[i][0]);
+    }
+  }
+  */
+
   for (i = 0; i < num_taken; ++i) {
     for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
       idx = S[taken[i][0]]->samples[taken[i][1]].segments_idx[j];
@@ -6887,10 +6925,12 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 	  new_taken[new_num_taken++][1] = i2;
 	}
       }    
+
+      if (new_num_taken > 30)
+	printf("new_taken = %d\n", new_num_taken);
+
       //printf("run = %d, i = %d\n", r, i);
       new_score = evaluate_assignment(mope_components, new_taken, new_num_taken, S, num_objects, segment_cnts, num_segments, 0, params);
-
-      //run = 5, i = 113827
 
       // Sort new_taken
       int q, k;
@@ -6980,7 +7020,7 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 
 mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_cnts, int num_segments, mope_params_t *params, int num_correspondences) {
   int i, j, r;
-  int num_samples = 50;
+  int num_samples = 100;
 
   int taken[num_samples][2];
   int num_taken = 0;
@@ -7050,9 +7090,9 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 	    int i1 = rand() % new_num_taken;
 	    int i2;
 	    if (params->use_triangle)
-	      i2 = sample_triangle(S[i1]->num_samples);
+	      i2 = sample_triangle(S[new_taken[i1][0]]->num_samples);
 	    else
-	      i2 = rand() % S[i1]->num_samples;
+	      i2 = rand() % S[new_taken[i1][0]]->num_samples;
 	    new_taken[i1][1] = i2;
 	  }
 	} else {
@@ -7071,6 +7111,17 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 	    new_taken[new_num_taken++][1] = i2;
 	  }
 	}    
+
+	for (j = 0; j < new_num_taken; ++j) {
+	  if (new_taken[j][0] > num_objects)
+	    printf("object number is wrong!\n");
+	  if (new_taken[j][1] > S[new_taken[j][0]]->num_samples) {
+	    printf("-sample number is wrong!\n");
+	    printf("%d %d\n", new_taken[j][1], S[new_taken[j][0]]->num_samples);
+	    printf("%d\n", new_taken[j][0]);
+	  }
+	}
+		
 	// Check whether the step is tabu
 	int limit = MIN(history_position, history_cap);
 	int tabu = 0;
@@ -7078,7 +7129,7 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 	// Sort new_taken
 	int q, k;
 	int tmp, tmp2;
-	if (new_num_taken > 10)
+	if (new_num_taken > 20)
 	  printf("new_taken = %d\n", new_num_taken);
 	for (q = 0; q < new_num_taken - 1; ++q) {
 	  tmp = q;
@@ -7241,10 +7292,11 @@ void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_para
 mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, int round, scope_params_t *scope_params,
 				   mope_params_t *mope_params, int *segment_blacklist) {
   mope_samples_t *M;
+  int i;
+
   //M = simulated_annealing(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
   M = tabu_search(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
     
-  int i;
   for (i = 0; i < num_models; ++i) {
     free_scope_samples(S[i]);
   }
@@ -7286,6 +7338,12 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
     } else {
       M2 = annealing_with_scope(models, num_models, segment_cnts, obs_data, scope_params, mope_params, NULL, NULL, NULL, NULL, 2, segment_blacklist);
     }
+
+    printf("Objects originally chosen: ");
+    for (i = 0; i < M->samples[0].num_objects; ++i) {
+      printf("% d", M->samples[0].model_ids[i]);
+    }
+    printf("\n");
 
     printf("New chosen: ");
     for (i = 0; i < M2->samples[0].num_objects; ++i) {

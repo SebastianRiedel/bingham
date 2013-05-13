@@ -15,6 +15,7 @@ CFLAGS=-Wall -I$(IDIR) -O3 -msse2
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
 CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20
+#CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20 -lineinfo
 #CUDAFLAGS=-g -G -lcuda -lcudart -lcurand -arch=compute_20
 
 #CYGWIN=1

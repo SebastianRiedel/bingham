@@ -189,17 +189,20 @@ int main(int argc, char *argv[])
     }
     fprintf(f, "];\n");
     
-    double weights[18] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_random_walk_weight, mope_params.scope_edge_weight, 
+    /*    double weights[18] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_random_walk_weight, mope_params.scope_edge_weight, 
 			  mope_params.scope_edge_vis_weight, mope_params.scope_edge_occ_weight, mope_params.scope_L_weight, mope_params.scope_A_weight, mope_params.scope_B_weight, mope_params.scope_fpfh_weight,
 			  mope_params.scope_specularity_weight, mope_params.scope_segment_affinity_weight, mope_params.scope_segment_weight, mope_params.scope_table_weight,
-			  0, 0, 0};
+			  0, 0, 0};*/
+    double weights[7] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_edge_weight, 
+			  mope_params.scope_edge_vis_weight, mope_params.scope_edge_occ_weight, mope_params.scope_segment_affinity_weight};
+
     
-    fprintf(f, "scope_W = [");
+    /*fprintf(f, "scope_W = [");
     for (i = 0; i < n; i++) {
-      double scope_W = dot(weights, M->samples[idx].objects[i].scores, 15);
+      double scope_W = dot(weights, M->samples[idx].objects[i].scores, 7);
       fprintf(f, "%f ", scope_W);
     }
-    fprintf(f, "];\n");
+    fprintf(f, "];\n");*/
 
     fprintf(f, "segments_idx = {");
     for (i = 0; i < n; i++) {
@@ -233,7 +236,7 @@ int main(int argc, char *argv[])
     fprintf(f, "results{%d}.mope_scores = mope_scores;\n", idx+1);
     fprintf(f, "results{%d}.num_segments = num_segments;\n", idx+1);
     fprintf(f, "results{%d}.segments_idx = segments_idx;\n", idx+1);
-    fprintf(f, "results{%d}.scope_W = scope_W;\n", idx+1);	
+    //fprintf(f, "results{%d}.scope_W = scope_W;\n", idx+1);	
     fprintf(f, "results{%d}.num_objects = num_objects;\n", idx+1);
     fprintf(f, "results{%d}.num_obs_segments = num_obs_segments;\n", idx+1);
     fprintf(f, "results{%d}.segment_cnts = segment_cnts;\n", idx+1);
