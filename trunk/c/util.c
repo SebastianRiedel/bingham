@@ -1076,8 +1076,8 @@ static void init_rand()
   if (first) {
     first = 0;
     int seed = time(NULL); 
+    //int seed = 1368560954; <-- Crashes straw bowl on 3/9
     //1368457226; <--- Shows overlap on 5/3
-    //1368388027 <--- This is the seed that had a out-of-memory error;
     printf("********* seed = %d\n", seed);
     srand (seed);
   }

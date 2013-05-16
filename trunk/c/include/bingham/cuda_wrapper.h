@@ -43,7 +43,7 @@ typedef struct {
 } cu_double_matrix3d_t;
 
 typedef struct cu_model_data_struct {
-  cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh_shapes, range_edges_model_views, range_edges_points;
+  cu_double_matrix_t points, normals, lab, ved, color_avg_cov, color_means1, color_means2, fpfh, fpfh_points, fpfh_normals, range_edges_model_views, range_edges_points;
   cu_double_matrix3d_t color_cov1, color_cov2;
   
   cu_double_arr_t normalvar;
@@ -60,12 +60,12 @@ typedef struct {
 } cu_range_image_data_t;
 
 typedef struct cu_obs_data_struct {
-  cu_double_matrix_t range_image, range_image_pcd_obs_lab, pcd_obs_fpfh, edge_image, segment_affinities;
+  cu_double_matrix_t range_image, range_image_pcd_obs_lab, edge_image, segment_affinities, fpfh_obs;
   cu_double_matrix3d_t range_image_points, range_image_normals, obs_lab_image;
 
-  cu_range_image_data_t range_image_data;
+  cu_range_image_data_t range_image_data, fg_range_image_data;
 
-  cu_int_matrix_t range_image_cnt, range_image_idx;
+  cu_int_matrix_t range_image_cnt, range_image_idx, fg_range_image_cnt, fg_range_image_idx;
   int num_obs_segments;
 } cu_obs_data_t;
 
