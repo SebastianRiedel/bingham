@@ -60,6 +60,9 @@ int main(int argc, char *argv[])
 
   int num_obs_segments;
   int *segment_cnts = NULL;
+
+  if (flag == 'w' || flag == 's' || mope_params.num_rounds == 2)
+    cu_init();
   
   if (flag == 'w' || flag == 's') {
 
@@ -86,7 +89,6 @@ int main(int argc, char *argv[])
 
     //mope_sample_t *M = mope_greedy(model_data, num_models, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs);
     if (scope_params.use_cuda) {
-      cu_init();
       cu_model_data_t cu_model[num_models];
       cu_obs_data_t cu_obs;
       scope_params_t *cu_params;
