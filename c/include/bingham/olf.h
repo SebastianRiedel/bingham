@@ -331,21 +331,39 @@ extern "C" {
   typedef struct mope_params_struct {  // mope_params_t
 
     // SCOPE PARAMS
-    double scope_xyz_weight;
-    double scope_normal_weight;
-    double scope_vis_weight;
-    double scope_random_walk_weight;
-    double scope_edge_weight;
-    double scope_edge_vis_weight;
-    double scope_edge_occ_weight;
-    double scope_L_weight;
-    double scope_A_weight;
-    double scope_B_weight;
-    double scope_fpfh_weight;
-    double scope_specularity_weight;
-    double scope_segment_affinity_weight;
-    double scope_segment_weight;
-    double scope_table_weight;
+    int score1_comp_models;
+    double scope1_xyz_weight;
+    double scope1_normal_weight;
+    double scope1_vis_weight;
+    double scope1_random_walk_weight;
+    double scope1_edge_weight;
+    double scope1_edge_vis_weight;
+    double scope1_edge_occ_weight;
+    double scope1_L_weight;
+    double scope1_A_weight;
+    double scope1_B_weight;
+    double scope1_fpfh_weight;
+    double scope1_specularity_weight;
+    double scope1_segment_affinity_weight;
+    double scope1_segment_weight;
+    double scope1_table_weight;
+
+    int score2_comp_models;
+    double scope2_xyz_weight;
+    double scope2_normal_weight;
+    double scope2_vis_weight;
+    double scope2_random_walk_weight;
+    double scope2_edge_weight;
+    double scope2_edge_vis_weight;
+    double scope2_edge_occ_weight;
+    double scope2_L_weight;
+    double scope2_A_weight;
+    double scope2_B_weight;
+    double scope2_fpfh_weight;
+    double scope2_specularity_weight;
+    double scope2_segment_affinity_weight;
+    double scope2_segment_weight;
+    double scope2_table_weight;
 
     // MOPE PARAMS
     double round1_scope_score_weight;
@@ -360,7 +378,6 @@ extern "C" {
     double round2_overlap_per_object_weight;
     double round2_num_taken_weight;
     
-    int score_comp_models;
     int num_rounds;
 
     int annealing_steps;
@@ -485,6 +502,7 @@ extern "C" {
     int num_objects;
     double *scores; //dbg
     int num_scores;
+    double *scope_W;
   } mope_sample_t;
 
   typedef struct {
