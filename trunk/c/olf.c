@@ -4984,7 +4984,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   double normal_score = compute_normal_score(cloud, cloud_normals, vis_pmf, noise_models, num_validation_points, obs_data->obs_range_image,
 					     model_data->score_comp_models->b_normal, params, score_round);
-  double lab_score = compute_lab_score(cloud, vis_pmf, noise_models, idx, num_validation_points, obs_data, model_data, params, score_round);
+  double lab_score = 0; //compute_lab_score(cloud, vis_pmf, noise_models, idx, num_validation_points, obs_data, model_data, params, score_round);
   double vis_score = compute_vis_score(vis_prob, num_validation_points, params, score_round);
 
   //dbug
@@ -5071,7 +5071,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   double italian_xyzn_score = 0;
   double xyz_score2 = 0;
   double outliers_score = 0;
-  if (score_round == 3) {
+  /*if (score_round == 3) {
     italian_xyzn_score = compute_italian_xyzn_score(cloud, cloud_normals, vis_pmf, noise_models,
 						    num_validation_points, obs_data->obs_range_image, params, score_round);
 
@@ -5088,7 +5088,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 	  obs_data->obs_range_image->image[xi][yi] > dthresh + norm(cloud[i],3))
 	outliers_score -= 1.0;
     outliers_score /= (double)num_validation_points;
-  }
+    }*/
 
 
   double score = xyz_score + normal_score + vis_score + random_walk_score + edge_score + lab_score +
@@ -6598,7 +6598,7 @@ double evaluate_mope(double *mope_components, mope_sample_t *M, int *segment_cnt
 
 double evaluate_assignment(double *mope_components, int taken[][2], int num_taken, scope_samples_t *S[], int num_objects, int *segment_cnts, int num_segments, int write, mope_params_t *params) {
 
-  if (num_taken == 0)
+  if (num_taken == 0 || num_taken > 15)
     return -10000.0;
   
   int covered[num_segments][num_taken][2];
@@ -6747,10 +6747,15 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
     num_samples += S[i]->num_samples;
   }
 
+  printf("Weights: %lf %lf %lf %lf %lf %lf\n", params->mope_r1_scope_score_weight, params->mope_r1_unexplained_weight, params->mope_r1_overlap_weight, 
+	 params->mope_r1_overlap_per_object_weight, params->mope_r1_num_taken_weight, 0.0);
+
+
   int taken[num_samples][2];
   int num_taken = 0;
   
-  int num_steps = 600000; // TODO(sanja): make these params
+  int num_steps = 600000; //600000; // TODO(sanja): make these params
+  printf("%d\n", num_steps);
   double prob_switch;
   double prob_accept_worse;
   int new_taken[num_samples][2];
@@ -6813,6 +6818,10 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 	  new_taken[new_num_taken++][1] = i2;
 	}
       }    
+
+      if (new_num_taken > 10)
+	continue;
+
       new_score = evaluate_assignment(mope_components, new_taken, new_num_taken, S, num_objects, segment_cnts, num_segments, 0, params);
 
       // Sort new_taken

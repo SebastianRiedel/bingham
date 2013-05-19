@@ -1075,7 +1075,7 @@ static void init_rand()
   static int first = 1;
   if (first) {
     first = 0;
-    int seed = time(NULL); 
+    int seed = 1368849140; //time(NULL); 
     //int seed = 1368560954; <-- Crashes straw bowl on 3/9
     //1368457226; <--- Shows overlap on 5/3
     printf("********* seed = %d\n", seed);

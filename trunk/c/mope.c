@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
   int num_obs_segments;
   int *segment_cnts = NULL;
 
-  if (flag == 'w' || flag == 's' || mope_params.num_rounds == 2)
+  if ((flag == 'w' || flag == 's' || mope_params.num_rounds == 2) && scope_params.use_cuda)
     cu_init();
   
   if (flag == 'w' || flag == 's') {
@@ -194,12 +194,12 @@ int main(int argc, char *argv[])
     /*    double weights[18] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_random_walk_weight, mope_params.scope_edge_weight, 
 			  mope_params.scope_edge_vis_weight, mope_params.scope_edge_occ_weight, mope_params.scope_L_weight, mope_params.scope_A_weight, mope_params.scope_B_weight, mope_params.scope_fpfh_weight,
 			  mope_params.scope_specularity_weight, mope_params.scope_segment_affinity_weight, mope_params.scope_segment_weight, mope_params.scope_table_weight,
-			  0, 0, 0};*/
+			  0, 0, 0};
     double weights[7] = {mope_params.scope_xyz_weight, mope_params.scope_normal_weight, mope_params.scope_vis_weight, mope_params.scope_edge_weight, 
 			  mope_params.scope_edge_vis_weight, mope_params.scope_edge_occ_weight, mope_params.scope_segment_affinity_weight};
 
     
-    /*fprintf(f, "scope_W = [");
+    fprintf(f, "scope_W = [");
     for (i = 0; i < n; i++) {
       double scope_W = dot(weights, M->samples[idx].objects[i].scores, 7);
       fprintf(f, "%f ", scope_W);

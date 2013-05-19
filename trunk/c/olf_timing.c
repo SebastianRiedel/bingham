@@ -28,7 +28,7 @@ double mps_normal_dists_[100000]; // this
 double normal_score_;
 double fpfh_score_;
 double mps_fpfh_dists_[100000]; // this
-double lab_scores_[3];
+double lab_scores_[3] = {0, 0, 0};
 double specularity_score_;
 double vis_score_;
 int **occ_edge_pixels_ = NULL;
@@ -955,36 +955,71 @@ void load_mope_params(mope_params_t *params, char *param_file)
       char *name = s;
       char *value = sword(s, " \t", 1);
 
-      if (!wordcmp(name, "scope_xyz_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_xyz_weight);
-      else if (!wordcmp(name, "scope_normal_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_normal_weight);
-      else if (!wordcmp(name, "scope_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_vis_weight);
-      else if (!wordcmp(name, "scope_random_walk_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_random_walk_weight);
-      else if (!wordcmp(name, "scope_edge_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_edge_weight);
-      else if (!wordcmp(name, "scope_edge_occ_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_edge_occ_weight);
-      else if (!wordcmp(name, "scope_edge_vis_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_edge_vis_weight);
-      else if (!wordcmp(name, "scope_L_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_L_weight);
-      else if (!wordcmp(name, "scope_A_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_A_weight);
-      else if (!wordcmp(name, "scope_B_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_B_weight);
-      else if (!wordcmp(name, "scope_fpfh_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_fpfh_weight);
-      else if (!wordcmp(name, "scope_specularity_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_specularity_weight);
-      else if (!wordcmp(name, "scope_segment_affinity_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_segment_affinity_weight);
-      else if (!wordcmp(name, "scope_segment_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_segment_weight);
-      else if (!wordcmp(name, "scope_table_weight", " \t\n"))
-	sscanf(value, "%lf", &params->scope_table_weight);
+      if (!wordcmp(name, "score1_comp_models", " \t\n"))
+	sscanf(value, "%d", &params->score1_comp_models);
+      else if (!wordcmp(name, "scope1_xyz_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_xyz_weight);
+      else if (!wordcmp(name, "scope1_normal_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_normal_weight);
+      else if (!wordcmp(name, "scope1_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_vis_weight);
+      else if (!wordcmp(name, "scope1_random_walk_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_random_walk_weight);
+      else if (!wordcmp(name, "scope1_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_edge_weight);
+      else if (!wordcmp(name, "scope1_edge_occ_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_edge_occ_weight);
+      else if (!wordcmp(name, "scope1_edge_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_edge_vis_weight);
+      else if (!wordcmp(name, "scope1_L_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_L_weight);
+      else if (!wordcmp(name, "scope1_A_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_A_weight);
+      else if (!wordcmp(name, "scope1_B_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_B_weight);
+      else if (!wordcmp(name, "scope1_fpfh_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_fpfh_weight);
+      else if (!wordcmp(name, "scope1_specularity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_specularity_weight);
+      else if (!wordcmp(name, "scope1_segment_affinity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_segment_affinity_weight);
+      else if (!wordcmp(name, "scope1_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_segment_weight);
+      else if (!wordcmp(name, "scope1_table_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope1_table_weight);
+
+      else if (!wordcmp(name, "score2_comp_models", " \t\n"))
+	sscanf(value, "%d", &params->score2_comp_models);
+      else if (!wordcmp(name, "scope2_xyz_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_xyz_weight);
+      else if (!wordcmp(name, "scope2_normal_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_normal_weight);
+      else if (!wordcmp(name, "scope2_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_vis_weight);
+      else if (!wordcmp(name, "scope2_random_walk_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_random_walk_weight);
+      else if (!wordcmp(name, "scope2_edge_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_edge_weight);
+      else if (!wordcmp(name, "scope2_edge_occ_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_edge_occ_weight);
+      else if (!wordcmp(name, "scope2_edge_vis_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_edge_vis_weight);
+      else if (!wordcmp(name, "scope2_L_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_L_weight);
+      else if (!wordcmp(name, "scope2_A_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_A_weight);
+      else if (!wordcmp(name, "scope2_B_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_B_weight);
+      else if (!wordcmp(name, "scope2_fpfh_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_fpfh_weight);
+      else if (!wordcmp(name, "scope2_specularity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_specularity_weight);
+      else if (!wordcmp(name, "scope2_segment_affinity_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_segment_affinity_weight);
+      else if (!wordcmp(name, "scope2_segment_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_segment_weight);
+      else if (!wordcmp(name, "scope2_table_weight", " \t\n"))
+	sscanf(value, "%lf", &params->scope2_table_weight);
 
       else if (!wordcmp(name, "round1_scope_score_weight", " \t\n"))
 	sscanf(value, "%lf", &params->round1_scope_score_weight);
@@ -1007,8 +1042,6 @@ void load_mope_params(mope_params_t *params, char *param_file)
 	sscanf(value, "%lf", &params->round2_overlap_per_object_weight);
       else if (!wordcmp(name, "round2_num_taken_weight", " \t\n"))
 	sscanf(value, "%lf", &params->round2_num_taken_weight);
-      else if (!wordcmp(name, "score_comp_models", " \t\n"))
-	sscanf(value, "%d", &params->score_comp_models);
       else if (!wordcmp(name, "plot_true", " \t\n"))
 	sscanf(value, "%d", &params->plot_true);
       else if (!wordcmp(name, "num_rounds", " \t\n"))
@@ -4996,7 +5029,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   // get fpfh score (TODO: add fpfh features to occ_model)
   double fpfh_score = 0;
-  if (params->use_fpfh) {
+  if (params->use_fpfh && !params->use_cuda) {
     int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
     int fpfh_idx[fpfh_num_validation_points];
     get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
@@ -5026,7 +5059,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     int P_outliers[n];
     int num_P_outliers;
     transform_cloud(P, P, n, x, q);
-    if (params->num_validation_points == 0) {
+    if (params->num_validation_points == 0 && !params->use_cuda) {
       int num_occ_edges;
       int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
       edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image,
@@ -5053,7 +5086,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   }
 
   double random_walk_score = 0;
-  if (score_round >= 3)
+  if (score_round >= 3 && !params->use_cuda)
     //random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
     random_walk_score = compute_random_walk_score(x, q, cloud, model_data, vis_prob,
 						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
@@ -5064,7 +5097,8 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
   double segment_score = 0;
-  segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
+  if (!params->use_cuda)
+    segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
 
   double table_score = 0;
   if (params->use_table)
@@ -6144,11 +6178,11 @@ scope_samples_t *scope_round1(scope_model_data_t *model_data, scope_obs_data_t *
     score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 0, 1);
   }
   else
-    for (i = 0; i < num_samples_init; i++)
+    for (i = 0; i < S->num_samples; i++)
       S->W[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 1);
 
   t[0] = get_time_ms() - t0;
-  t[0] /= num_samples_init;
+  t[0] /= S->num_samples;
 
   // sort hypotheses
   sort_pose_samples(S);
@@ -6346,7 +6380,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
     score_samples(S->W, S->samples, S->num_samples, cu_model, cu_obs, cu_params, params, num_validation_points, model_data->pcd_model->num_points, obs_data->num_obs_segments, 
 		  (obs_data->obs_edge_image != NULL), 3);
     // Debugging individual score components on CUDA
-    double scores[S->num_samples];
+    /*double scores[S->num_samples];
     for (i = 0; i < S->num_samples; i++)
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
@@ -6355,7 +6389,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
       /*int j;
       for (j = 0; j < cpu_cnt; ++j)
 	if (gpu_xi[j] != cpu_xi[j] || gpu_yi[j] != cpu_yi[j])
-	printf("xi yi issue! %d, xi: %d, %d, yi: %d %d\n", j, cpu_xi[j], gpu_xi[j], cpu_yi[j], gpu_yi[j]);*/
+	printf("xi yi issue! %d, xi: %d, %d, yi: %d %d\n", j, cpu_xi[j], gpu_xi[j], cpu_yi[j], gpu_yi[j]);
 
       if (isnan(S->W[i]))
 	printf("Crap!\n");
@@ -6363,7 +6397,7 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-    }
+    }*/
   }
   else {
     params->verbose = 1; //dbug
@@ -6648,50 +6682,66 @@ double evaluate_mope(double *mope_components, mope_sample_t *M, int *segment_cnt
   int overlap = 0;
   for (i = 0; i < num_segments; ++i) {
     if (seen[i] == 0) {
-      ++unexplained;
+      unexplained += segment_cnts[i];
+      //++unexplained;
     } else {
       overlap += seen[i] - 1;
       scope_per_segment = 0.0;
       for (j = 0; j < seen[i]; ++j) {
-	scope_per_segment += M->scores[covered[i][j]];
+	if (M->scope_W[covered[i][j]] == 0) {
+	  printf("FINAL ZERO SCOPE SCORE!!!\n");	  
+	}
+	scope_per_segment += M->scope_W[covered[i][j]];
       }      
-      scope_score += (scope_per_segment / seen[i]) * segment_cnts[i];
+      scope_score += (scope_per_segment / (double) seen[i]) * segment_cnts[i];
       //if (write) {
       //  printf("Segment %d, score %lf: \n", i, best);
       //}
     }     
   }
   scope_score /= (double) isum(segment_cnts, num_segments); // (double) num_segments;
+  //  if (scope_score == 0)
+  //printf("What the hell?\n");
 
-  double unexplained_score = (double) unexplained / (double) num_segments;
+  double unexplained_score = (double) unexplained / (double) isum(segment_cnts, num_segments);
+  //double unexplained_score = (double) unexplained / (double) num_segments;
   double overlap_score = (double) overlap / (double) num_segments;
 
   double overlap_per_object = 0.0;
   int object_overlap_count;
+  int object_points_size;
   for (i = 0; i < num_taken; ++i) {
     if (M->objects[i].num_segments == 0) {
       if (write)
 	printf("Empty space...\n");
-      return -1000.0;
+      return -10000.0;
     }
     object_overlap_count = 0;
-    for (j = 0; j < M->objects[i].num_segments; ++j)
-      if (seen[M->objects[i].segments_idx[j]] > 1) {
-	object_overlap_count += seen[M->objects[i].segments_idx[j]] - 1;
+    object_points_size = 0;
+    for (j = 0; j < M->objects[i].num_segments; ++j) {
+      int idx = M->objects[i].segments_idx[j]; 
+      if (seen[idx] > 1) {
+	//++object_overlap_count;
+	object_overlap_count += segment_cnts[idx];
       }
-    overlap_per_object += (double) object_overlap_count / (double) M->objects[i].num_segments;
+      object_points_size += segment_cnts[idx];
+    }
+    //overlap_per_object += (double) object_overlap_count / (double) S[taken[i][0]]->samples[taken[i][1]].num_segments;
+    overlap_per_object += (double) object_overlap_count / (double) object_points_size;
   }
 
-  double total_score = params->round2_scope_score_weight * scope_score - params->round2_unexplained_weight * unexplained_score - params->round2_overlap_weight * overlap_score - 
-    params->round2_overlap_per_object_weight * overlap_per_object - params->round2_num_taken_weight * num_taken;
+  // overlap_per_object /= num_taken; <--- THINK ABOUT THIS
+
+  double total_score = params->round1_scope_score_weight * scope_score - params->round1_unexplained_weight * unexplained_score - params->round1_overlap_weight * overlap_score - 
+    params->round1_overlap_per_object_weight * overlap_per_object - params->round1_num_taken_weight * num_taken;
   if (write) {
     printf("Individual scores:\n");
     for (i = 0; i < num_taken; ++i) {
       printf("Object %d, score = %lf\n", i, M->scores[i]);
     }
     printf("%lf %lf %lf %lf %d %lf\n", scope_score, unexplained_score, overlap_score, overlap_per_object, num_taken, total_score);
-    printf("Weighted: %lf %lf %lf %lf %lf %lf\n", params->round2_scope_score_weight * scope_score, params->round2_unexplained_weight * unexplained_score, params->round2_overlap_weight * overlap_score, 
-	   params->round2_overlap_per_object_weight * overlap_per_object, params->round2_num_taken_weight * num_taken, total_score);
+    printf("Weighted: %lf %lf %lf %lf %lf %lf\n", params->round1_scope_score_weight * scope_score, params->round1_unexplained_weight * unexplained_score, params->round1_overlap_weight * overlap_score, 
+	   params->round1_overlap_per_object_weight * overlap_per_object, params->round1_num_taken_weight * num_taken, total_score);
   }
 
   if (mope_components != NULL) {
@@ -6724,6 +6774,8 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
   
   for (i = 0; i < num_taken; ++i) {
     for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
+      //if (S[taken[i][0]]->samples[taken[i][1]].segment_probs[j] < 0.01)
+      //continue;
       idx = S[taken[i][0]]->samples[taken[i][1]].segments_idx[j];
       covered[idx][seen[idx]][0] = taken[i][0];
       covered[idx][seen[idx]][1] = taken[i][1];
@@ -6739,17 +6791,21 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
   int overlap = 0;
   for (i = 0; i < num_segments; ++i) {
     if (seen[i] == 0) {
-      ++unexplained;
+      unexplained += segment_cnts[i];
+      //++unexplained;
     } else {
       overlap += seen[i] - 1;
       scope_per_segment = 0.0;
       //double best = -10000.0;
       for (j = 0; j < seen[i]; ++j) {
+	if (S[covered[i][j][0]]->W[covered[i][j][1]] == 0) {
+	  printf("ZERO SCOPE SCORE!!!\n");	  
+	}
 	scope_per_segment += S[covered[i][j][0]]->W[covered[i][j][1]];
 	//if (S[covered[i][j][0]]->W[covered[i][j][1]] > best)
 	//  best = S[covered[i][j][0]]->W[covered[i][j][1]];
       }      
-      scope_score += (scope_per_segment / seen[i]) * segment_cnts[i];
+      scope_score += (scope_per_segment / (double) seen[i]) * segment_cnts[i];
       //scope_score += best * segment_cnts[i];
       //if (write) {
       //  printf("Segment %d, score %lf: \n", i, best);
@@ -6757,12 +6813,16 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
     }     
   }
   scope_score /= (double) isum(segment_cnts, num_segments); // (double) num_segments;
+  //  if (scope_score == 0)
+  //printf("What the hell?\n");
 
-  double unexplained_score = (double) unexplained / (double) num_segments;
+  double unexplained_score = (double) unexplained / (double) isum(segment_cnts, num_segments);
+  //double unexplained_score = (double) unexplained / (double) num_segments;
   double overlap_score = (double) overlap / (double) num_segments;
 
   double overlap_per_object = 0.0;
   int object_overlap_count;
+  int object_points_size;
   for (i = 0; i < num_taken; ++i) {
     if (S[taken[i][0]]->samples[taken[i][1]].num_segments == 0) {
       if (write)
@@ -6770,12 +6830,20 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
       return -10000.0;
     }
     object_overlap_count = 0;
-    for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j)
-      if (seen[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]] > 1) {
-	object_overlap_count += seen[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]] - 1;
+    object_points_size = 0;
+    for (j = 0; j < S[taken[i][0]]->samples[taken[i][1]].num_segments; ++j) {
+      int idx = S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]; 
+      if (seen[idx] > 1) {
+	//++object_overlap_count;
+	object_overlap_count += segment_cnts[S[taken[i][0]]->samples[taken[i][1]].segments_idx[j]];
       }
-    overlap_per_object += (double) object_overlap_count / (double) S[taken[i][0]]->samples[taken[i][1]].num_segments;
+      object_points_size += segment_cnts[idx];
+    }
+    //overlap_per_object += (double) object_overlap_count / (double) S[taken[i][0]]->samples[taken[i][1]].num_segments;
+    overlap_per_object += (double) object_overlap_count / (double) object_points_size;
   }
+
+  // overlap_per_object /= num_taken; <--- THINK ABOUT THIS
 
   double total_score = params->round1_scope_score_weight * scope_score - params->round1_unexplained_weight * unexplained_score - params->round1_overlap_weight * overlap_score - 
     params->round1_overlap_per_object_weight * overlap_per_object - params->round1_num_taken_weight * num_taken;
@@ -6797,6 +6865,8 @@ double evaluate_assignment(double *mope_components, int taken[][2], int num_take
 }
 
 int sample_triangle(int n) {
+  if (n == 1)
+    return 0;
   int r1 = rand() % (2*n - 2);
   int r2 = rand() % (2*n - 2);
   r1 -= n-1;
@@ -6860,8 +6930,8 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
   int i, j, r;
   int num_samples = 0;
   for (i = 0; i < num_objects; ++i) {
-    //S[i]->num_samples = 20; // <---------------------------
-        num_samples += S[i]->num_samples;
+    num_samples += S[i]->num_samples;
+    S[i]->num_samples = MIN(20, S[i]->num_samples); // <---------------------------
   }
 
   int taken[num_samples][2];
@@ -6880,7 +6950,7 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
   int num_runs =  params->annealing_runs; //30;
 
   double mope_components[mope_num_components];
-  int data_cap = (params->num_rounds == 2 ? 1 : 100);
+  int data_cap = 100; //(params->num_rounds == 2 ? 1 : 100);
   int data_size = 0;
   mope_sample_data_t data[data_cap + 1];
 
@@ -6894,6 +6964,8 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
     num_taken = 0;
     old_score = min_score;
     for (i = 0; i < num_steps; ++i) {
+      if (num_objects < 18)
+	printf("GOD DAMN IT!\n");
       prob_switch = (num_taken == 0 ? 0 : 1.0/2.0);
       prob_accept_worse = MAX(0, 0.5 * (1 - i / (double) num_steps)); //gets smaller as the time goes by, i.e. the system cools down
       for (j = 0; j < num_taken; ++j) {
@@ -6901,20 +6973,28 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 	new_taken[j][1] = taken[j][1];
       }
       new_num_taken = num_taken;
-      if (frand() < prob_switch) {
+      if (frand() < prob_switch && new_num_taken > 0) {
 	if (frand() < 0.5) {
+	  //printf("SWITCH OBJECT!\n");
 	  int i1 = rand() % new_num_taken;
 	  int i2 = rand() % num_objects;
+	  if (S[i2]->num_samples == 0)
+	    continue;
 	  int i3;
-	  if (params->use_triangle) 
+	  if (S[i2]->num_samples == 1)
+	    i3 = 0;
+	  else if (params->use_triangle) 
 	    i3 = sample_triangle(S[i2]->num_samples);
 	  else
 	    i3 = rand() % S[i2]->num_samples;
 	  new_taken[i1][0] = i2;
 	  new_taken[i1][1] = i3;
 	} else {
+	  //printf("SWITCH SAMPLE!\n");
 	  int i1 = rand() % new_num_taken;
 	  int i2;
+	  if (S[new_taken[i1][0]]->num_samples == 1)
+	    continue;
 	  if (params->use_triangle) 
 	    i2 = sample_triangle(S[new_taken[i1][0]]->num_samples);
 	  else
@@ -6923,13 +7003,23 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 	}
       } else {
 	if (new_num_taken > 0 && frand() < 0.5) { //remove
-	  int i1 = rand() % new_num_taken;
+	  //printf("REMOVE!\n");
+	  int i1;
+	  if (new_num_taken == 1)
+	    i1 = 0;
+	  else
+	    i1 = rand() % new_num_taken;
 	  new_taken[i1][0] = new_taken[--new_num_taken][0];
 	  new_taken[i1][1] = new_taken[new_num_taken][1];
 	} else { // add
+	  //printf("ADD!\n");
 	  int i1 = rand() % num_objects;
+	  if (S[i1]->num_samples == 0)
+	    continue;
 	  int i2;
-	  if (params->use_triangle) 
+	  if (S[i1]->num_samples == 1)
+	    i2 = 0;
+	  else if (params->use_triangle) 
 	    i2 = sample_triangle(S[i1]->num_samples);
 	  else
 	    i2 = rand() % S[i1]->num_samples;
@@ -6938,12 +7028,12 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 	  new_taken[new_num_taken++][1] = i2;
 	}
       }    
-      if (new_num_taken > 10) 
+      if (new_num_taken > MIN(50, num_samples)) 
 	continue;
-	//printf("Num taken: %d\n", num_taken);
+      //printf("Num taken: %d\n", new_num_taken);
 
-      //if (new_num_taken > 30)
-      //	printf("new_taken = %d\n", new_num_taken);
+      /*if (new_num_taken > 30)
+      	printf("new_taken = %d\n", new_num_taken);*/
 
       //printf("run = %d, i = %d\n", r, i);
       new_score = evaluate_assignment(mope_components, new_taken, new_num_taken, S, num_objects, segment_cnts, num_segments, 0, params);
@@ -7016,27 +7106,29 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
       }
     }
 
+    safe_calloc(M->samples[i].scope_W, data[i].num_taken, double);
     safe_calloc(M->samples[i].objects, data[i].num_taken, scope_sample_t);
     for (j = 0; j < data[i].num_taken; ++j) {
       scope_sample_alloc(&M->samples[i].objects[j], num_correspondences);
       scope_sample_copy(&M->samples[i].objects[j], &(S[data[i].taken[j][0]]->samples[data[i].taken[j][1]]));
       M->samples[i].model_ids[j] = data[i].taken[j][0];
+      M->samples[i].scope_W[j] = S[data[i].taken[j][0]]->W[data[i].taken[j][1]];
     }
   }
 
   if (params->plot_true) {
     evaluate_assignment(NULL, data[0].taken, data[0].num_taken, S, num_objects, segment_cnts, num_segments, 1, params);
-    int real_taken = 4;
-    taken[0][0] = 0;
+    int real_taken = 5;
+    taken[0][0] = 2;
     taken[0][1] = 0;
-    taken[1][0] = 1;
+    taken[1][0] = 4;
     taken[1][1] = 0;
-    taken[2][0] = 2;
+    taken[2][0] = 8;
     taken[2][1] = 0;
-    taken[3][0] = 3;
+    taken[3][0] = 17;
     taken[3][1] = 0;
-    /*taken[4][0] = 8;
-    taken[4][1] = 0;*/
+    taken[4][0] = 5;
+    taken[4][1] = 0;
     printf("--------------\n");
     evaluate_assignment(NULL, taken, real_taken, S, num_objects, segment_cnts, num_segments, 1, params);    
   }
@@ -7061,7 +7153,7 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
   const double min_score = -10000.0;
 
   for (i = 0; i < num_objects; ++i) {
-    S[i]->num_samples = 20; // <---------------------------
+    S[i]->num_samples = MIN(20, S[i]->num_samples); //<----------------
   }
 
   double old_score;
@@ -7295,7 +7387,13 @@ void remove_found(mope_samples_t *M, scope_obs_data_t *obs, scope_params_t *para
       }
     }
   }
+
   pcd_t *new_cloud;
+  if (n == 0) {
+    obs = NULL;
+    return ;
+  }
+
   new_cloud = filter_pcd(obs->fpfh_obs, idx, n);
   obs->fpfh_obs = new_cloud;
   get_scope_obs_data(obs, NULL, params);
@@ -7307,6 +7405,13 @@ void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_para
   int n = M1->samples[0].num_objects;
   safe_realloc(M1->samples[0].model_ids, n, int);
   memcpy(&M1->samples[0].model_ids[old_n], M2->samples[0].model_ids, (n - old_n) * sizeof(int));
+
+  safe_realloc(M1->samples[0].scores, n, double);
+  memcpy(&M1->samples[0].scores[old_n], M2->samples[0].scores, (n - old_n) * sizeof(double));
+
+  safe_realloc(M1->samples[0].scope_W, n, double);
+  memcpy(&M1->samples[0].scope_W[old_n], M2->samples[0].scope_W, (n - old_n) * sizeof(double));
+
   safe_realloc(M1->samples[0].objects, n, scope_sample_t); // NOTE(sanja): Shady
   int i;
   for (i = old_n; i < n; ++i) {
@@ -7315,15 +7420,113 @@ void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_para
   }
 }
 
-mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, int round, scope_params_t *scope_params,
-				   mope_params_t *mope_params, int *segment_blacklist) {
+mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *models, int num_models, score_comp_models_t score_comp_models[], int *segment_cnts, scope_obs_data_t *obs_data, int num_obs_segments, 
+				   int round, scope_params_t *scope_params, mope_params_t *mope_params, int *segment_blacklist) {
+
+  int i, j;
+  // reevaluate weights
+  for (i = 0; i < num_models; ++i) {
+    // This is for CPU version!
+    double comps[15][2];
+    if (scope_params->use_cuda || round == 2) {
+      comps[0][0] = score_comp_models[i].b_xyz[0]; comps[0][1] =  score_comp_models[i].b_xyz[1];
+      comps[1][0] = score_comp_models[i].b_normal[0]; comps[1][1] =  score_comp_models[i].b_normal[1];
+      comps[2][0] = 0; comps[2][1] = 0;
+      comps[3][0] = 0; comps[3][1] = 0;
+      comps[4][0] = score_comp_models[i].b_edge[0]; comps[4][1] =  score_comp_models[i].b_edge[1];
+      comps[5][0] = 0; comps[5][1] = 0;
+      comps[6][0] = 0; comps[6][1] = 0;
+      comps[7][0] = 0; comps[7][1] = 0;
+      comps[8][0] = 0; comps[8][1] = 0;
+      comps[9][0] = 0; comps[9][1] = 0;
+      comps[10][0] = 0; comps[10][1] = 0;
+      comps[11][0] = 0; comps[11][1] = 0;
+      comps[12][0] = 0; comps[12][1] = 0;
+      comps[13][0] = 0; comps[13][1] = 0;
+      comps[14][0] = 0; comps[14][1] = 0;
+    } else {
+      comps[0][0] = score_comp_models[i].b_xyz[0]; comps[0][1] =  score_comp_models[i].b_xyz[1];
+      comps[1][0] = score_comp_models[i].b_normal[0]; comps[1][1] =  score_comp_models[i].b_normal[1];
+      comps[2][0] = 0; comps[2][1] = 0;
+      comps[3][0] = score_comp_models[i].b_random_walk[0]; comps[3][1] = score_comp_models[i].b_random_walk[1];
+      comps[4][0] = score_comp_models[i].b_edge[0]; comps[4][1] = score_comp_models[i].b_edge[1];
+      comps[5][0] = 0; comps[5][1] = 0;
+      comps[6][0] = score_comp_models[i].b_edge_occ[0]; comps[6][1] = score_comp_models[i].b_edge_occ[1];
+      comps[7][0] = score_comp_models[i].b_color_L[0]; comps[7][1] = score_comp_models[i].b_color_L[1];
+      comps[8][0] = score_comp_models[i].b_color_A[0]; comps[8][1] = score_comp_models[i].b_color_A[1];
+      comps[9][0] = score_comp_models[i].b_color_B[0]; comps[9][1] = score_comp_models[i].b_color_B[1];
+      comps[10][0] = score_comp_models[i].b_fpfh[0]; comps[10][1] = score_comp_models[i].b_fpfh[1];
+      comps[11][0] = 0; comps[11][1] = 1;
+      comps[12][0] = 0; comps[12][1] = 1;
+      comps[13][0] = 0; comps[13][1] = 1;
+      comps[14][0] = 0; comps[14][1] = 1;
+    }
+    /*double comps[15][2] = {{score_comp_models[i].b_xyz[0], score_comp_models[i].b_xyz[1]}, {score_comp_models[i].b_normal[0], score_comp_models[i].b_normal[1]}, 
+			   {0, 0}, {score_comp_models[i].b_random_walk[0], score_comp_models[i].b_random_walk[1]},
+			   {score_comp_models[i].b_edge[0], score_comp_models[i].b_edge[1]}, {0, 0},
+			   {score_comp_models[i].b_edge_occ[0], score_comp_models[i].b_edge_occ[1]}, {score_comp_models[i].b_color_L[0], score_comp_models[i].b_color_L[1]},
+			   {score_comp_models[i].b_color_A[0], score_comp_models[i].b_color_A[1]}, {score_comp_models[i].b_color_B[0], score_comp_models[i].b_color_B[1]},
+			   {score_comp_models[i].b_fpfh[0], score_comp_models[i].b_fpfh[1]}, 
+			   {0, 0},  {0, 0}, {0, 0}, {0, 0}}; 
+    double comps[15][2] = {{score_comp_models[i].b_xyz[0], score_comp_models[i].b_xyz[1]}, {score_comp_models[i].b_normal[0], score_comp_models[i].b_normal[1]}, 
+			   {0, 0}, {0, 0}, {score_comp_models[i].b_edge[0], score_comp_models[i].b_edge[1]}, {0, 0},
+			   {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};*/
+			   
+      
+    for (j = 0; j < S[i]->num_samples; ++j) {
+      int num_comp = S[i]->samples[j].num_scores;
+
+      int score_comp;
+      if (round == 1)
+	score_comp = mope_params->score1_comp_models;
+      else
+	score_comp = mope_params->score2_comp_models;
+
+      if (score_comp) {
+	int k;
+	for (k = 0; k < num_comp; ++k) {
+	  if (comps[k][0] != 0 && comps[k][0] != 0) {
+	    S[i]->samples[j].scores[k] = logistic(S[i]->samples[j].scores[k], comps[k]);
+	  }
+	}
+      }
+      /*double weights[7] = {mope_params->scope_xyz_weight, mope_params->scope_normal_weight, mope_params->scope_vis_weight, mope_params->scope_edge_occ_weight, mope_params->scope_edge_vis_weight, 
+	mope_params->scope_edge_weight, mope_params->scope_segment_affinity_weight};*/
+
+      if (round == 1) {
+	double weights[18] = {mope_params->scope1_xyz_weight, mope_params->scope1_normal_weight, mope_params->scope1_vis_weight, mope_params->scope1_random_walk_weight, mope_params->scope1_edge_weight, 
+			      mope_params->scope1_edge_vis_weight, mope_params->scope1_edge_occ_weight, mope_params->scope1_L_weight, mope_params->scope1_A_weight, mope_params->scope1_B_weight, 
+			      mope_params->scope1_fpfh_weight, mope_params->scope1_specularity_weight, mope_params->scope1_segment_affinity_weight, mope_params->scope1_segment_weight, 
+			      mope_params->scope1_table_weight,
+			      0, 0, 0};
+	S[i]->W[j] = dot(weights, S[i]->samples[j].scores, num_comp);
+      } else {
+	double weights[18] = {mope_params->scope2_xyz_weight, mope_params->scope2_normal_weight, mope_params->scope2_vis_weight, mope_params->scope2_random_walk_weight, mope_params->scope2_edge_weight, 
+			      mope_params->scope2_edge_vis_weight, mope_params->scope2_edge_occ_weight, mope_params->scope2_L_weight, mope_params->scope2_A_weight, mope_params->scope2_B_weight, 
+			      mope_params->scope2_fpfh_weight, mope_params->scope2_specularity_weight, mope_params->scope2_segment_affinity_weight, mope_params->scope2_segment_weight, 
+			      mope_params->scope2_table_weight,
+			      0, 0, 0};
+	S[i]->W[j] = dot(weights, S[i]->samples[j].scores, num_comp);
+      }
+    }
+    sort_pose_samples(S[i]);
+  }
+
+
+  /*  if (round == 2) {
+    printf("After reweighting: %lf\n", S[0]->samples[0].scores[8]);    
+    }*/
+
   mope_samples_t *M;
-  int i;
 
   M = simulated_annealing(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
   //M = tabu_search(S, num_models, segment_cnts, num_obs_segments, mope_params, scope_params->num_correspondences);
     
   printf("Annealing done!\n");
+
+  /*if (round == 2) {
+    printf("After annealing: %lf\n", S[0]->samples[0].scores[8]);    
+    }*/
 
   for (i = 0; i < num_models; ++i) {
     free_scope_samples(S[i]);
@@ -7341,9 +7544,6 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
     }
 
     printf("Blacklisting done!\n");
-    
-    remove_found(M, obs_data, scope_params);
-    printf("Stuff removed\n");
 
     printf("Objects originally chosen: ");
     for (i = 0; i < M->samples[0].num_objects; ++i) {
@@ -7351,11 +7551,20 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
     }
     printf("\n");
 
-    printf("Remaining points: %d\n", obs_data->fpfh_obs->num_points);
+    
+    remove_found(M, obs_data, scope_params);
+    printf("Stuff removed\n");
 
-    if (obs_data->fpfh_obs->num_points < 200) // TODO(sanja): make param
+    if (obs_data == NULL)
+      printf("obs data!\n");
+    else
+      printf("Remaining points: %d\n", obs_data->fpfh_obs->num_points);
+
+    if (obs_data == NULL || obs_data->fpfh_obs->num_points < 200) // TODO(sanja): make param
       return M;
     mope_samples_t *M2;
+     
+    printf("Remaining points: %d\n", obs_data->fpfh_obs->num_points);
 
     /*if (scope_params->use_cuda) {
       cu_model_data_t cu_model[num_models];
@@ -7367,7 +7576,7 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
       
       cu_free_all_the_things_mope(cu_model, &cu_obs, cu_params, num_models, scope_params);
       } else {*/
-      M2 = annealing_with_scope(models, num_models, segment_cnts, obs_data, scope_params, mope_params, NULL, NULL, NULL, NULL, 2, segment_blacklist);
+    M2 = annealing_with_scope(models, num_models, segment_cnts, obs_data, scope_params, mope_params, NULL, NULL, NULL, NULL, 2, segment_blacklist);
       //}
 
     printf("Objects originally chosen: ");
@@ -7382,17 +7591,24 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
     }
     printf("\n");
 
+    //merge_two_mopes_in_place(M2, M, scope_params);
+    
+    //return M2;
+    
+    for (i = 0; i < M2->samples[0].num_objects; ++i)
+      sample_segments_given_model_pose(&M2->samples[0].objects[i], &models[M2->samples[0].model_ids[i]], obs_data, scope_params, 1, NULL);  
 
-    merge_two_mopes_in_place(M2, M, scope_params);
     double score_M2 = evaluate_mope(NULL, &M2->samples[0], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
-    //double score_M = evaluate_mope(NULL, &M->samples[0], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
-    //if (score_M2 > score_M) {
+    double score_M = evaluate_mope(NULL, &M->samples[0], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
+
+    if (score_M2 > score_M) {
       printf("Merged!\n");
       return M2;
-      //}
-      //else {
-      //return M;
-      // }
+      }
+    else {
+      printf("Rejecting extra stuff!\n");
+      return M;
+    }
   }
 
   return M;
@@ -7404,13 +7620,39 @@ mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models,
 {
   scope_samples_t *S[num_models];
   int i;
+  if (round == 2)
+    scope_params->use_cuda = 0;
   for (i = 0; i < num_models; ++i) {
     printf("----------------- Running scope for object %d\n", i);
-    if (scope_params->use_cuda && round == 1)
+    if (scope_params->use_cuda && round == 1) {
       S[i] = scope(&models[i], obs, scope_params, NULL, &cu_model[i], cu_obs, cu_params, segment_blacklist);
+    }
     else 
       S[i] = scope(&models[i], obs, scope_params, NULL, NULL, NULL, NULL, segment_blacklist);
   }
+
+  score_comp_models_t score_comp_models[num_models];
+  for (i = 0; i < num_models; ++i) {
+    score_comp_models[i].b_xyz[0] = models[i].score_comp_models->b_xyz[0];
+    score_comp_models[i].b_xyz[1] = models[i].score_comp_models->b_xyz[1];
+    score_comp_models[i].b_normal[0] = models[i].score_comp_models->b_normal[0];
+    score_comp_models[i].b_normal[1] = models[i].score_comp_models->b_normal[1];
+    score_comp_models[i].b_random_walk[0] = models[i].score_comp_models->b_random_walk[0];
+    score_comp_models[i].b_random_walk[1] = models[i].score_comp_models->b_random_walk[1];
+    score_comp_models[i].b_edge[0] = models[i].score_comp_models->b_edge[0];
+    score_comp_models[i].b_edge[1] = models[i].score_comp_models->b_edge[1];
+    score_comp_models[i].b_edge_occ[0] = models[i].score_comp_models->b_edge_occ[0];
+    score_comp_models[i].b_edge_occ[1] = models[i].score_comp_models->b_edge_occ[1];
+    score_comp_models[i].b_color_L[0] = models[i].score_comp_models->b_color_L[0];
+    score_comp_models[i].b_color_L[1] = models[i].score_comp_models->b_color_L[1];
+    score_comp_models[i].b_color_A[0] = models[i].score_comp_models->b_color_A[0];
+    score_comp_models[i].b_color_A[1] = models[i].score_comp_models->b_color_A[1];
+    score_comp_models[i].b_color_B[0] = models[i].score_comp_models->b_color_B[0];
+    score_comp_models[i].b_color_B[1] = models[i].score_comp_models->b_color_B[1];
+    score_comp_models[i].b_fpfh[0] = models[i].score_comp_models->b_fpfh[0];
+    score_comp_models[i].b_fpfh[1] = models[i].score_comp_models->b_fpfh[1];
+  }
+
   if (f != NULL) {
     int j, k;
     fprintf(f, "%d\n", num_models);
@@ -7419,6 +7661,8 @@ mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models,
     for (i = 0; i < obs->num_obs_segments; ++i) {
       fprintf(f, "%d\n", obs->obs_segments[i].num_pixels);
     }
+
+    score_comp_models_t score_comp_models[num_models];
 
     for (i = 0; i < num_models; ++i) {
       fprintf(f, "%lf %lf\n", models[i].score_comp_models->b_xyz[0], models[i].score_comp_models->b_xyz[1]);
@@ -7460,7 +7704,8 @@ mope_samples_t *annealing_with_scope(scope_model_data_t *models, int num_models,
   
   printf("Finished scopes!\n");
 
-  return run_mope_annealing(S, models, num_models, segment_cnts, obs, obs->num_obs_segments, round, scope_params, mope_params, segment_blacklist);
+ 
+  return run_mope_annealing(S, models, num_models, score_comp_models, segment_cnts, obs, obs->num_obs_segments, round, scope_params, mope_params, segment_blacklist);
 }
 
 mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_models, int *segment_cnts, scope_obs_data_t *obs, int num_obs_segments, 
@@ -7538,45 +7783,7 @@ mope_samples_t *annealing_existing_samples(scope_model_data_t *models, int num_m
 
   fclose(f);
 
-  // reevaluate weights
-  for (i = 0; i < num_models; ++i) {
-    // This is for CPU version!
-    double comps[15][2] = {{score_comp_models[i].b_xyz[0], score_comp_models[i].b_xyz[1]}, {score_comp_models[i].b_normal[0], score_comp_models[i].b_normal[1]}, 
-			   {0, 0}, {score_comp_models[i].b_random_walk[0], score_comp_models[i].b_random_walk[1]},
-			   {score_comp_models[i].b_edge[0], score_comp_models[i].b_edge[1]}, {0, 0},
-			   {score_comp_models[i].b_edge_occ[0], score_comp_models[i].b_edge_occ[1]}, {score_comp_models[i].b_color_L[0], score_comp_models[i].b_color_L[1]},
-			   {score_comp_models[i].b_color_A[0], score_comp_models[i].b_color_A[1]}, {score_comp_models[i].b_color_B[0], score_comp_models[i].b_color_B[1]},
-			   {score_comp_models[i].b_fpfh[0], score_comp_models[i].b_fpfh[1]}, 
-			   {0, 0},  {0, 0}, {0, 0}, {0, 0}}; 
-    /*double comps[15][2] = {{score_comp_models[i].b_xyz[0], score_comp_models[i].b_xyz[1]}, {score_comp_models[i].b_normal[0], score_comp_models[i].b_normal[1]}, 
-			   {0, 0}, {0, 0}, {score_comp_models[i].b_edge[0], score_comp_models[i].b_edge[1]}, {0, 0},
-			   {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};*/
- 
-      
-    for (j = 0; j < S[i]->num_samples; ++j) {
-      int num_comp = S[i]->samples[j].num_scores;
-
-      if (mope_params->score_comp_models) {
-	int k;
-	for (k = 0; k < num_comp; ++k) {
-	  if (comps[k][0] != 0 && comps[k][0] != 0) {
-	    S[i]->samples[j].scores[k] = logistic(S[i]->samples[j].scores[k], comps[k]);
-	  }
-	}
-      }
-      /*double weights[7] = {mope_params->scope_xyz_weight, mope_params->scope_normal_weight, mope_params->scope_vis_weight, mope_params->scope_edge_occ_weight, mope_params->scope_edge_vis_weight, 
-	mope_params->scope_edge_weight, mope_params->scope_segment_affinity_weight};*/
-
-      double weights[18] = {mope_params->scope_xyz_weight, mope_params->scope_normal_weight, mope_params->scope_vis_weight, mope_params->scope_random_walk_weight, mope_params->scope_edge_weight, 
-			    mope_params->scope_edge_vis_weight, mope_params->scope_edge_occ_weight, mope_params->scope_L_weight, mope_params->scope_A_weight, mope_params->scope_B_weight, 
-			    mope_params->scope_fpfh_weight, mope_params->scope_specularity_weight, mope_params->scope_segment_affinity_weight, mope_params->scope_segment_weight, 
-			    mope_params->scope_table_weight,
-			    0, 0, 0};
-      S[i]->W[j] = dot(weights, S[i]->samples[j].scores, num_comp);
-    }
-    sort_pose_samples(S[i]);
-  }
-  return run_mope_annealing(S, models, num_models, segment_cnts, obs, num_obs_segments, round, scope_params, mope_params, NULL);
+  return run_mope_annealing(S, models, num_models, score_comp_models, segment_cnts, obs, num_obs_segments, round, scope_params, mope_params, NULL);
 }
 //==============================================================================================//
 
