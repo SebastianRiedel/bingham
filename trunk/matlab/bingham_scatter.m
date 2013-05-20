@@ -11,7 +11,7 @@ F = B.F;
 dF = B.dF;
 V = B.V;
 
-v = bingham_mode(B)';
+v = bingham_mode(B);
 sigma = 1 - sum(dF)/F;
 S = sigma*v*v';
 

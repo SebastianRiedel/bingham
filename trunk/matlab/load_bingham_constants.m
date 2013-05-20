@@ -3,6 +3,9 @@ function bingham_constants = load_bingham_constants()
 data = load('bingham_constants.mat');
 bingham_constants = data.bingham_constants;
 
+
+%%%  add symmetries in F-lookup tables  %%%
+% 3-D
 for i=1:length(bingham_constants.Z)
     for j=1:i
         for k=1:j
@@ -15,7 +18,7 @@ for i=1:length(bingham_constants.Z)
         end
     end
 end
-
+% 2-D
 for i=1:length(bingham_constants.Z)
     for j=1:i
         F = bingham_constants.table{2}(i,j);
@@ -23,6 +26,9 @@ for i=1:length(bingham_constants.Z)
     end
 end
 
+
+%%%  add symmetries in dF-lookup tables  %%%
+% 3-D
 perms = [1,3,2; 2,1,3; 2,3,1; 3,1,2; 3,2,1];
 for i=1:length(bingham_constants.Z)
     for j=1:i
@@ -37,7 +43,7 @@ for i=1:length(bingham_constants.Z)
         end
     end
 end
-
+% 2-D
 for i=1:length(bingham_constants.Z)
     for j=1:i
         dF = bingham_constants.dF{2}(:,i,j);
@@ -45,4 +51,42 @@ for i=1:length(bingham_constants.Z)
         bingham_constants.dF{2}(2,j,i) = dF(1);
     end
 end
+
+
+%%%  compute dY = dF/F lookup tables  %%%
+% 1-D
+n = length(bingham_constants.Z);
+bingham_constants.dY{1} = (bingham_constants.dF{1} ./ bingham_constants.table{1});
+bingham_constants.dY_indices{1} = 1:n;
+
+% 2-D
+dY = zeros(n^2, 2);
+dY_indices = zeros(n^2, 2);
+cnt=0;
+for i=1:n
+    for j=1:i
+        cnt=cnt+1;
+        dY(cnt,:) = bingham_constants.dF{2}(:,i,j)' / bingham_constants.table{2}(i,j);
+        dY_indices(cnt,:) = [i,j];
+    end
+end
+bingham_constants.dY{2} = dY(1:cnt, :);
+bingham_constants.dY_indices{2} = dY_indices(1:cnt, :);
+
+% 3-D
+dY = zeros(n^3, 3);
+dY_indices = zeros(n^3, 3);
+cnt=0;
+for i=1:n
+    for j=1:i
+        for k=1:j
+            cnt=cnt+1;
+            dY(cnt,:) = bingham_constants.dF{3}(:,i,j,k)' / bingham_constants.table{3}(i,j,k);
+            dY_indices(cnt,:) = [i,j,k];
+        end
+    end
+end
+bingham_constants.dY{3} = dY(1:cnt, :);
+bingham_constants.dY_indices{3} = dY_indices(1:cnt, :);
+
 
