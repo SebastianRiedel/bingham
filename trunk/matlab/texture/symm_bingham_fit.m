@@ -4,13 +4,13 @@ function B = symm_bingham_fit(X, symm_type)
 
 if strcmp(symm_type, 'cubic')
     
-%     n = size(X,1);
-%     d = size(X,2);
-%     k = size(cubic_symm(X(1,:)), 1);
-%     SX = zeros(k,d,n);
-%     for i=1:n
-%         SX(:,:,i) = cubic_symm(X(i,:));
-%     end
+    n = size(X,1);
+    d = size(X,2);
+    k = size(cubic_symm(X(1,:)), 1);
+    SX = zeros(k,d,n);
+    for i=1:n
+        SX(:,:,i) = cubic_symm(X(i,:));
+    end
     
     % concentration params
     z = -20*ones(1,3);
@@ -23,7 +23,7 @@ if strcmp(symm_type, 'cubic')
 
     %options = optimset('GradObj','on');
     
-    b = fmincon(@(b) -sb_fitness(b,X), [z v1 v2], [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)]); %, [], options);
+    b = fmincon(@(b) -sb_fitness(b,SX), [z v1 v2], [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)]); %, [], options);
     
         
 else
@@ -71,20 +71,35 @@ function B = b2B(b)
 end
 
 
-function [f dfdb] = sb_fitness(b,X)
+function [f dfdb] = sb_fitness(b,SX)
 
     B = b2B(b);
     
-    f = 0;
-    for i=1:size(X,1)
-        f = f + log(symm_bingham_pdf(X(i,:), B));
-    end
+%     f = 0;
+%     for i=1:size(X,1)
+%         f = f + log(symm_bingham_pdf(X(i,:), B));
+%     end
 
+    k = size(SX,1);
+    d = size(SX,2);
+    n = size(SX,3);
+    
+    E = zeros(k,n);
+    for i=1:n
+        E(:,i) = exp((SX(:,:,i)*B.V).^2 * B.Z');
+    end
+    f = -n*log(k*B.F) + sum(log(sum(E)));
+    
     b
     f = 100*f - (1-norm(b(4:7)))^2 - (1-norm(b(8:11)))^2
     
     % compute the gradients
-    
+    dfdV = zeros(d-1,d);
+    for i=1:n
+        for j=1:d-1
+            dfdV(j,i) = dfdv1 + 2*B.Z(j)*sum(SX(:,:,i) .* repmat(E(:,i).*(SX(:,:,i)*B.V(:,j)), [1,d])) / sum(E(:,i));
+        end            
+    end
     
 end
 
