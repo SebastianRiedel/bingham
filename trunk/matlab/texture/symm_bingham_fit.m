@@ -4,6 +4,8 @@ function B = symm_bingham_fit(X, symm_type)
 
 if strcmp(symm_type, 'cubic')
     
+    global SX;
+    
     n = size(X,1);
     d = size(X,2);
     k = size(cubic_symm(X(1,:)), 1);
@@ -21,9 +23,9 @@ if strcmp(symm_type, 'cubic')
     v2 = [1,0,0,0]; %rand(1,4);
     v2 = v2/norm(v2);
 
-    %options = optimset('GradObj','on');
+    options = optimset('GradObj','on');
     
-    b = fmincon(@(b) -sb_fitness(b,SX), [z v1 v2], [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)]); %, [], options);
+    b = fmincon(@sb_cost, [z v1 v2], [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)], [], options);
     
         
 else
@@ -71,7 +73,33 @@ function B = b2B(b)
 end
 
 
-function [f dfdb] = sb_fitness(b,SX)
+function dVdQ = compute_dVdQ(Q)
+
+    a = Q(1);
+    b = Q(2);
+    c = Q(3);
+    d = Q(4);
+    p = Q(5);
+    q = Q(6);
+    r = Q(7);
+    s = Q(8);
+    
+    dVdQ = zeros(4,8,3);
+    
+    dVdQ(:,:,1) = [p, -q, -r, -s, a, -b, -c, -d;  q, p, s, -r, b, a, -d, c;  r, -s, p, q, c, d, a, -b;  s, r, -q, p, d, -c, b, a];
+    dVdQ(:,:,2) = [-q, -p, s, -r, -b, -a, -d, c;  p, -q, r, s, a, -b, c, d;  -s, -r, -q, p, d, -c, -b, -a;  r, -s, -p, -q, -c, -d, a, -b];
+    dVdQ(:,:,3) = [-r, -s, -p, q, -c, d, -a, -b;  s, -r, -q, -p, -d, -c, -b, a;  p, q, -r, s, a, b, -c, d;  -q, p, -s, -r, b, -a, -d, -c];
+end
+
+
+function [f dfdb] = sb_cost(b)
+
+    if nargin == 0
+        f = 0;
+        return
+    end
+
+    global SX
 
     B = b2B(b);
     
@@ -88,19 +116,26 @@ function [f dfdb] = sb_fitness(b,SX)
     for i=1:n
         E(:,i) = exp((SX(:,:,i)*B.V).^2 * B.Z');
     end
-    f = -n*log(k*B.F) + sum(log(sum(E)));
+    f = n*log(k*B.F) - sum(log(sum(E)));  % negative log-likelihood
     
     b
-    f = 100*f - (1-norm(b(4:7)))^2 - (1-norm(b(8:11)))^2
+    f = f + (1-b(4:7)*b(4:7)')^2 + (1-b(8:11)*b(8:11)')^2
     
     % compute the gradients
     dfdV = zeros(d-1,d);
+    dfdZ = -n*B.dF/B.F;
     for i=1:n
         for j=1:d-1
-            dfdV(j,i) = dfdv1 + 2*B.Z(j)*sum(SX(:,:,i) .* repmat(E(:,i).*(SX(:,:,i)*B.V(:,j)), [1,d])) / sum(E(:,i));
+            dfdV(j,:) = dfdV(j,:) + 2*B.Z(j)*sum(SX(:,:,i) .* repmat(E(:,i).*(SX(:,:,i)*B.V(:,j)), [1,d])) / sum(E(:,i));
+            dfdZ(j) = dfdZ(j) + E(:,i)'*(SX(:,:,i)*B.V(:,j)).^2 / sum(E(:,i));
         end            
     end
-    
+    dVdQ = compute_dVdQ(b(4:end));
+    dfdQ = zeros(1,8);
+    for i=1:3
+        dfdQ = dfdQ + dfdV(i,:)*dVdQ(:,:,i);
+    end
+    dfdb = -[dfdZ, dfdQ + [4*(b(4:7)*b(4:7)'-1)*b(4:7), 4*(b(8:11)*b(8:11)'-1)*b(8:11)]];
 end
 
 
