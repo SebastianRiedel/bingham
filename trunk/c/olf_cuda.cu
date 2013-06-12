@@ -41,8 +41,10 @@ __device__ inline double cu_logistic(double x, double *b)
   return 1.0 / (1.0 + exp(-x*b[1]-b[0]));
 }
 
-//int gpu_xi[10000000];
-//int gpu_yi[10000000];
+/*int gpu_xi[10000000];
+int gpu_yi[10000000];
+
+double gpu_cloud[100000000];*/
 
 #define THREADS_KNN 128 // Constant so we can allocate shared memory easier
 #define KNN_SIZE 30
@@ -300,7 +302,7 @@ void cu_init_obs(scope_obs_data_t *obs_data, cu_obs_data_t *cu_obs, scope_params
   copy_int_matrix_to_gpu(&(cu_obs->range_image_idx), obs_data->obs_range_image->idx, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix_to_gpu(&(cu_obs->range_image_pcd_obs_lab), obs_data->pcd_obs->lab, obs_data->pcd_obs->num_points, 3);
 
-  copy_double_matrix_to_gpu(&(cu_obs->fpfh_obs), obs_data->fpfh_obs->fpfh, obs_data->fpfh_obs->num_points, obs_data->pcd_obs->fpfh_length);
+  copy_double_matrix_to_gpu(&(cu_obs->fpfh_obs), obs_data->fpfh_obs->fpfh, obs_data->fpfh_obs->num_points, obs_data->fpfh_obs->fpfh_length);
   copy_double_matrix_to_gpu(&(cu_obs->edge_image), obs_data->obs_edge_image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
   copy_double_matrix_to_gpu(&(cu_obs->segment_affinities), obs_data->obs_segment_affinities, obs_data->num_obs_segments, obs_data->num_obs_segments);
   
@@ -452,6 +454,8 @@ __device__ void cu_range_image_xyz2sub(int *i, int *j, cu_range_image_data_t ran
   if (!((cx >= 0 && cy>=0) && (cx < range_image.w) && (cy < range_image.h))) {
     *i = -1;
     *j = -1;
+    //printf("device res = %lf, min0 = %lf, min1 = %lf, w = %d, h = %d\n", range_image.res, range_image.min0, range_image.min1, range_image.w, range_image.h);
+    //printf("%lf %lf %lf\n", xyz[0], xyz[1], xyz[2]);
   }
 }
 
@@ -666,6 +670,11 @@ __global__ void cu_populate_xi_yi(int *xi, int *yi, double *cloud, cu_range_imag
   cu_range_image_xyz2sub(&xi[i_arr], &yi[i_arr], range_image_data, dest);
   if (0)
     printf("%d %d %d\n", i_arr, xi[i_arr], yi[i_arr]);
+
+  /*if (j == 0) {
+    printf("res = %lf, min0 = %lf, min1 = %lf, w = %d, h = %d\n", range_image_data.res, range_image_data.min0, range_image_data.min1, range_image_data.w, range_image_data.h);
+    }*/
+
 }
 
 __global__ void cu_compute_visibility_prob(double *cu_vis_prob, double *cu_cloud, double *cu_normals, int *cu_xi, int *cu_yi, cu_range_image_data_t ri_data, 
@@ -1198,8 +1207,6 @@ void get_range_edge_points(int *cu_n, double *cu_P, int num_samples, int n_edge,
       printf( "Viewpoints!\n" );
   }	
   
-  printf("NUM SAMPLES: %d\n", num_samples);
-
   int *cu_idx_edge;
   cu_malloc(&cu_idx_edge, num_samples * n_edge * sizeof(int), "idx_edge");
   uint *cu_rands_edge;
@@ -1343,7 +1350,7 @@ __global__ void cu_compute_fpfh_score_individual(double *cu_fpfh_score_individua
   
   int i_arr = i * fpfh_num_validation_points + j;
   cu_fpfh_score_individual[i_arr] = 0.0;
-
+  
   if (cu_vis_pmf[i_arr] > .01/(double)fpfh_num_validation_points) {
     double f_sigma = cu_params->f_sigma;
     double dmax = 2*f_sigma; // * 2*noise_models[i].range_sigma;  //TODO: get FPFH noise model
@@ -1385,15 +1392,22 @@ __global__ void cu_compute_fpfh_score_final(double *cu_fpfh_scores, double *cu_s
 void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_double_matrix_t cu_fpfh_points, cu_double_matrix_t cu_fpfh_normals, cu_double_matrix_t cu_fpfh, cu_double_matrix_t fpfh_obs,
 			cu_range_image_data_t range_image_data, cu_double_matrix_t range_image, cu_range_image_data_t fg_range_image_data, cu_int_matrix_t fg_range_image_cnt, 
 			cu_int_matrix_t fg_range_image_idx, double *cu_samples_x, double *cu_samples_q, int num_samples, int num_validation_points, double *b_fpfh, 
-			scope_params_t *params, scope_params_t *cu_params, int round, 
-			dim3 block_size, dim3 threads_per_block, dim3 block_size_sum, dim3 thread_size_sum, dim3 block_size_small, dim3 thread_size_small) {
-    
+			scope_params_t *params, scope_params_t *cu_params, int round) {
+  
   int num_fpfh_points = cu_fpfh.n;
   int fpfh_length = cu_fpfh.m;
 
   int fpfh_num_validation_points = (num_validation_points > 0 ? num_validation_points : num_fpfh_points);
-  printf("%d\n", fpfh_num_validation_points);
-    
+ 
+  dim3 threads_per_block(256, 1, 1);
+  dim3 block_size(ceil(1.0 * fpfh_num_validation_points / threads_per_block.x), num_samples);
+
+  dim3 thread_size_small(64);
+  dim3 block_size_small(ceil(1.0 * num_samples/thread_size_small.x));
+
+  dim3 thread_size_sum(256);
+  dim3 block_size_sum(1, num_samples);
+
   int *cu_fpfh_idx; 
   cu_malloc(&cu_fpfh_idx, fpfh_num_validation_points * num_samples * sizeof(int), "fpfh_idx_malloc\n");
   get_validation_points(cu_fpfh_idx, num_fpfh_points, fpfh_num_validation_points, num_samples, block_size, threads_per_block);
@@ -1403,7 +1417,7 @@ void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_doubl
   cu_get_sub_cloud_at_pose<<<block_size, threads_per_block>>>(cu_cloud, cu_fpfh_points, cu_samples_x, cu_samples_q, cu_fpfh_idx, num_samples, fpfh_num_validation_points);
   if ( cudaSuccess != cudaGetLastError() )
     printf( "fpfh Subcloud!\n" );
-  
+
   double *cu_normals;
   cu_malloc(&cu_normals, 3 * fpfh_num_validation_points * num_samples * sizeof(double), "normals");
   cu_get_sub_cloud_normals_rotated<<<block_size, threads_per_block>>>(cu_normals, cu_fpfh_normals, cu_samples_q, cu_fpfh_idx, num_samples, fpfh_num_validation_points);
@@ -1413,6 +1427,10 @@ void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_doubl
   double *cu_fpfh_cloud_f;
   cu_malloc(&cu_fpfh_cloud_f, fpfh_num_validation_points * num_samples * fpfh_length * sizeof(double), "fpfh_cloud_f alloc\n");
   cu_reorder_rows<<<block_size, threads_per_block>>>(cu_fpfh_cloud_f, cu_fpfh, cu_fpfh_idx, num_samples, fpfh_num_validation_points, fpfh_length, NULL);
+  if ( cudaSuccess != cudaGetLastError() )
+    printf( "reorder rows fpfh!\n" );
+  //cudaMemcpy(gpu_cloud, cu_fpfh_cloud_f, fpfh_length * fpfh_num_validation_points * num_samples * sizeof(double), cudaMemcpyDeviceToHost);
+
   
   double *cu_vis_prob;
   cu_malloc(&cu_vis_prob, num_samples * fpfh_num_validation_points * sizeof(double), "fpfh vis_prob");
@@ -1426,20 +1444,23 @@ void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_doubl
   int *cu_yi;
   cu_malloc(&cu_yi, num_samples * fpfh_num_validation_points * sizeof(int), "fpfh yi");
   cu_populate_xi_yi<<<block_size, threads_per_block>>>(cu_xi, cu_yi, cu_cloud, range_image_data, num_samples, fpfh_num_validation_points, NULL);
-  
+  if ( cudaSuccess != cudaGetLastError() )
+    printf( "fpfh xi yi, vis_pmf!\n" );
+
   get_vis_prob_sums_and_pmf(cu_vis_prob, cu_vis_prob_sums, cu_vis_pmf, cu_cloud, cu_normals, cu_xi, cu_yi, range_image, range_image_data, 0, num_samples, fpfh_num_validation_points, NULL, params,
 			    block_size, threads_per_block, block_size_sum, thread_size_sum, 0);
-
   
   cu_populate_xi_yi<<<block_size, threads_per_block>>>(cu_xi, cu_yi, cu_cloud, fg_range_image_data, num_samples, fpfh_num_validation_points, NULL);
-  
-  //  cudaMemcpy(gpu_xi, cu_xi, num_samples * fpfh_num_validation_points * sizeof(int), cudaMemcpyDeviceToHost);
-  // cudaMemcpy(gpu_yi, cu_yi, num_samples * fpfh_num_validation_points * sizeof(int), cudaMemcpyDeviceToHost);
+  if ( cudaSuccess != cudaGetLastError() )
+    printf( "fpfh xi, yi\n" );
 
+  //cudaMemcpy(gpu_xi, cu_xi, num_samples * fpfh_num_validation_points * sizeof(int), cudaMemcpyDeviceToHost);
+  //cudaMemcpy(gpu_yi, cu_yi, num_samples * fpfh_num_validation_points * sizeof(int), cudaMemcpyDeviceToHost);
+  
   double *cu_fpfh_score_individual;
   cu_malloc(&cu_fpfh_score_individual, num_samples * fpfh_num_validation_points * sizeof(double), "fpfh_individual");
   
-  /*cu_compute_fpfh_score_individual<<<block_size, threads_per_block>>>(cu_fpfh_score_individual, cu_cloud, cu_fpfh_cloud_f, cu_vis_pmf, cu_xi, cu_yi, fg_range_image_cnt, fg_range_image_idx,
+  cu_compute_fpfh_score_individual<<<block_size, threads_per_block>>>(cu_fpfh_score_individual, cu_cloud, cu_fpfh_cloud_f, cu_vis_pmf, cu_xi, cu_yi, fg_range_image_cnt, fg_range_image_idx,
 								      fpfh_obs, fpfh_length, num_samples, fpfh_num_validation_points, cu_params);
   cudaError_t error = cudaGetLastError();
   if(error != cudaSuccess)
@@ -1450,7 +1471,7 @@ void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_doubl
     }
 
   cu_add_matrix_rows_medium<<<block_size_sum, thread_size_sum>>>(cu_fpfh_scores, cu_fpfh_score_individual, num_samples, fpfh_num_validation_points, NULL);    
-  cu_compute_fpfh_score_final<<<block_size_small, thread_size_small>>>(cu_fpfh_scores, cu_score_comps, num_samples, b_fpfh, cu_params, round);*/
+  cu_compute_fpfh_score_final<<<block_size_small, thread_size_small>>>(cu_fpfh_scores, cu_score_comps, num_samples, b_fpfh, cu_params, round);
     
   cu_free(cu_fpfh_idx, "fpfh_idx");
   cu_free(cu_cloud, "fpfh_cloud");
@@ -1469,7 +1490,8 @@ void compute_fpfh_score(double *cu_fpfh_scores, double *cu_score_comps, cu_doubl
 void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, scope_params_t *params, int num_validation_points, 
 		   int model_points, int num_obs_segments, int edge_scoring, int round) {
 
-  printf("SCORE NUM SAMPLES: %d\n", num_samples);
+  if (round == 3)
+    params->num_validation_points = 0;
 
   dim3 threads_per_block(256, 1, 1);
   dim3 block_size(ceil(1.0 * num_validation_points / threads_per_block.x), num_samples);
@@ -1626,10 +1648,10 @@ void score_samples(double *scores, scope_sample_t *samples, int num_samples, cu_
       if ( cudaSuccess != cudaGetLastError() )
 	printf( "seg affinity!\n" );
 
-      if (params->use_fpfh)
+      /*if (params->use_fpfh)
 	compute_fpfh_score(cu_fpfh_score, cu_score_comps, cu_model->fpfh_points, cu_model->fpfh_normals, cu_model->fpfh, cu_obs->fpfh_obs, cu_obs->range_image_data, cu_obs->range_image,
-			   cu_obs->fg_range_image_data, cu_obs->fg_range_image_cnt, cu_obs->fg_range_image_idx, cu_samples_x, cu_samples_q, num_samples, num_validation_points,
-			   cu_model->score_comp_models->b_fpfh, params, cu_params, round, block_size, threads_per_block, block_size_sum, thread_size_sum, block_size_small, thread_size_small);
+			   cu_obs->fg_range_image_data, cu_obs->fg_range_image_cnt, cu_obs->fg_range_image_idx, cu_samples_x, cu_samples_q, num_samples, params->num_validation_points,
+			   cu_model->score_comp_models->b_fpfh, params, cu_params, round);*/
 
     }
 
