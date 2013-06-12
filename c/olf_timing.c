@@ -12,7 +12,6 @@
 typedef unsigned char uchar;
 
 
-
 //--------------------------- dbug global data ---------------------------//
 
 double **X_align_history_ = NULL;
@@ -55,10 +54,13 @@ double t_scope;
 
 /*extern int gpu_xi[10000000];
 extern int gpu_yi[10000000];
+extern double gpu_cloud[10000000];
 
 int cpu_xi[10000000];
 int cpu_yi[10000000];
-int cpu_cnt = 0;*/
+int cpu_cnt = 0;
+double cpu_cloud[100000000];
+int cloud_cnt = 0;*/
 
 int is_good_pose(double *x, double *q)
 {
@@ -4329,13 +4331,10 @@ double compute_fpfh_score(double **cloud, double **cloud_fpfh, double *vis_pmf, 
 {
   double score = 0.0;
   int i;
-  //cpu_cnt = MIN(num_validation_points, pcd_obs->num_points);
   for (i = 0; i < MIN(num_validation_points, pcd_obs->num_points); i++) {
     if (vis_pmf[i] > .01/(double)num_validation_points) {
-      int xi,yi;
+      int xi, yi;
       range_image_xyz2sub(&xi, &yi, obs_fg_range_image, cloud[i]);
-      //cpu_xi[i] = xi;
-      //cpu_yi[i] = yi;
       double f_sigma = params->f_sigma; // * 2*noise_models[i].range_sigma;  //TODO: get FPFH noise model
       double dmax = 2*f_sigma;
       double d = dmax;
@@ -5029,13 +5028,15 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 
   // get fpfh score (TODO: add fpfh features to occ_model)
   double fpfh_score = 0;
-  if (params->use_fpfh && !params->use_cuda) {
+  if (params->use_fpfh) {
     int fpfh_num_validation_points = (params->num_validation_points > 0 ? params->num_validation_points : model_data->fpfh_model->num_points);
     int fpfh_idx[fpfh_num_validation_points];
     get_validation_points(fpfh_idx, model_data->fpfh_model, fpfh_num_validation_points);
     double **fpfh_cloud = get_sub_cloud_at_pose(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, x, q);
+
     double **fpfh_cloud_normals = get_sub_cloud_normals_rotated(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points, q);
     double **fpfh_cloud_f = get_sub_cloud_fpfh(model_data->fpfh_model, fpfh_idx, fpfh_num_validation_points);
+
     double fpfh_vis_prob[fpfh_num_validation_points];
     for (i = 0; i < fpfh_num_validation_points; i++)
       fpfh_vis_prob[i] = compute_visibility_prob(fpfh_cloud[i], fpfh_cloud_normals[i], obs_data->obs_range_image, params->vis_thresh, 0);
@@ -5059,7 +5060,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
     int P_outliers[n];
     int num_P_outliers;
     transform_cloud(P, P, n, x, q);
-    if (params->num_validation_points == 0 && !params->use_cuda) {
+    if (params->num_validation_points == 0) {
       int num_occ_edges;
       int **occ_edges = compute_occ_edges(&num_occ_edges, cloud, vis_prob, num_validation_points, obs_data->obs_range_image, params);
       edge_score = compute_edge_score(P, n, occ_edges, num_occ_edges, obs_data->obs_range_image, obs_data->obs_edge_image,
@@ -5069,7 +5070,6 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
 	free_matrix2i(occ_edges);
     }
     else
-    
       edge_score = compute_edge_score(P, n, NULL, 0, obs_data->obs_range_image, obs_data->obs_edge_image,
 				      model_data->score_comp_models->b_edge, model_data->score_comp_models->b_edge_occ, params,
 				      score_round, P_outliers, &num_P_outliers);
@@ -5086,19 +5086,18 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
   }
 
   double random_walk_score = 0;
-  if (score_round >= 3 && !params->use_cuda)
+  if (score_round >= 3)
     //random_walk_score = compute_random_walk_score(x, q, cloud, model_data->model_xyz_index, &model_data->model_xyz_params, vis_prob,
     random_walk_score = compute_random_walk_score(x, q, cloud, model_data, vis_prob,
-						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
-						  model_data->score_comp_models->b_random_walk, params, score_round);
+    						  num_validation_points, obs_data->obs_range_image, obs_data->obs_edge_image,
+    						  model_data->score_comp_models->b_random_walk, params, score_round);
   
   double segment_affinity_score = 0;
   if (score_round >= 3)
     segment_affinity_score = compute_segment_affinity_score(sample, obs_data, params, score_round);
 
   double segment_score = 0;
-  if (!params->use_cuda)
-    segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
+  segment_score = compute_segment_score(sample, model_data, obs_data, params, score_round);
 
   double table_score = 0;
   if (params->use_table)
@@ -5132,7 +5131,7 @@ double model_placement_score(scope_sample_t *sample, scope_model_data_t *model_d
       fpfh_score + segment_affinity_score + segment_score + table_score + italian_xyzn_score + xyz_score2 + outliers_score;
   //double score = xyz_score + normal_score + vis_score + edge_score + fpfh_score + segment_affinity_score + segment_score + random_walk_score;
   
-  //double score = xyz_score + normal_score + vis_score + segment_affinity_score + edge_score;
+  //double score = fpfh_score + xyz_score + normal_score + vis_score + segment_affinity_score + edge_score;
   
   if (params->verbose) {
     double scores[18] = {xyz_score_, normal_score_, vis_score_, random_walk_score_, edge_score_, edge_vis_score_, edge_occ_score_,
@@ -6385,19 +6384,26 @@ void scope_round3(scope_samples_t *S, scope_model_data_t *model_data, scope_obs_
       scores[i] = model_placement_score(&S->samples[i], model_data, obs_data, params, 3);
 
     for (i = 0; i < S->num_samples; ++i) {
-
-      /*int j;
-      for (j = 0; j < cpu_cnt; ++j)
-	if (gpu_xi[j] != cpu_xi[j] || gpu_yi[j] != cpu_yi[j])
-	printf("xi yi issue! %d, xi: %d, %d, yi: %d %d\n", j, cpu_xi[j], gpu_xi[j], cpu_yi[j], gpu_yi[j]);
-
       if (isnan(S->W[i]))
 	printf("Crap!\n");
       if (fabs(scores[i] - S->W[i]) > 0.00001)
 	printf("Big difference for i = %d is %f\n", i, fabs(scores[i] - S->W[i]));
       else
 	printf("Good!\n");
-    }*/
+    }
+
+    int j;
+    /*for (j = 0; j < MIN(100, cpu_cnt); ++j) {
+      if (gpu_xi[j] != cpu_xi[j] || gpu_yi[j] != cpu_yi[j])
+	printf("xi yi issue! %d, xi: %d, %d, yi: %d %d\n", j, cpu_xi[j], gpu_xi[j], cpu_yi[j], gpu_yi[j]);
+      else
+	printf("xi yi good!\n");
+	}
+    for (j = 0; j < cloud_cnt; ++j) {
+      if (fabs(gpu_cloud[j] - cpu_cloud[j]) > 0.00000001) {
+	printf("cloud issue! %d, cpu: %lf, gpu: %lf \n", j, cpu_cloud[j], gpu_cloud[j]);
+      }
+      }*/
   }
   else {
     params->verbose = 1; //dbug
@@ -7399,24 +7405,24 @@ void remove_found(mope_samples_t *M, scope_obs_data_t *obs, scope_params_t *para
   get_scope_obs_data(obs, NULL, params);
 }
 
-void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_params_t *params) {
-  int old_n = M1->samples[0].num_objects;
-  M1->samples[0].num_objects += M2->samples[0].num_objects;
-  int n = M1->samples[0].num_objects;
-  safe_realloc(M1->samples[0].model_ids, n, int);
-  memcpy(&M1->samples[0].model_ids[old_n], M2->samples[0].model_ids, (n - old_n) * sizeof(int));
+void merge_two_mopes_in_place(mope_samples_t *M1, mope_samples_t *M2, scope_params_t *params, int x) {
+  int old_n = M1->samples[x].num_objects;
+  M1->samples[x].num_objects += M2->samples[0].num_objects;
+  int n = M1->samples[x].num_objects;
+  safe_realloc(M1->samples[x].model_ids, n, int);
+  memcpy(&M1->samples[x].model_ids[old_n], M2->samples[0].model_ids, (n - old_n) * sizeof(int));
 
-  safe_realloc(M1->samples[0].scores, n, double);
-  memcpy(&M1->samples[0].scores[old_n], M2->samples[0].scores, (n - old_n) * sizeof(double));
+  safe_realloc(M1->samples[x].scores, n, double);
+  memcpy(&M1->samples[x].scores[old_n], M2->samples[0].scores, (n - old_n) * sizeof(double));
 
-  safe_realloc(M1->samples[0].scope_W, n, double);
-  memcpy(&M1->samples[0].scope_W[old_n], M2->samples[0].scope_W, (n - old_n) * sizeof(double));
+  safe_realloc(M1->samples[x].scope_W, n, double);
+  memcpy(&M1->samples[x].scope_W[old_n], M2->samples[0].scope_W, (n - old_n) * sizeof(double));
 
-  safe_realloc(M1->samples[0].objects, n, scope_sample_t); // NOTE(sanja): Shady
+  safe_realloc(M1->samples[x].objects, n, scope_sample_t); // NOTE(sanja): Shady
   int i;
   for (i = old_n; i < n; ++i) {
-    scope_sample_alloc(&M1->samples[0].objects[i], params->num_correspondences);
-    scope_sample_copy(&M1->samples[0].objects[i], &M2->samples[0].objects[i - old_n]);
+    scope_sample_alloc(&M1->samples[x].objects[i], params->num_correspondences);
+    scope_sample_copy(&M1->samples[x].objects[i], &M2->samples[0].objects[i - old_n]);
   }
 }
 
@@ -7560,7 +7566,7 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
     else
       printf("Remaining points: %d\n", obs_data->fpfh_obs->num_points);
 
-    if (obs_data == NULL || obs_data->fpfh_obs->num_points < 200) // TODO(sanja): make param
+    if (obs_data == NULL || obs_data->fpfh_obs->num_points < 300) // TODO(sanja): make param
       return M;
     mope_samples_t *M2;
      
@@ -7576,41 +7582,67 @@ mope_samples_t *run_mope_annealing(scope_samples_t *S[], scope_model_data_t *mod
       
       cu_free_all_the_things_mope(cu_model, &cu_obs, cu_params, num_models, scope_params);
       } else {*/
+
     M2 = annealing_with_scope(models, num_models, segment_cnts, obs_data, scope_params, mope_params, NULL, NULL, NULL, NULL, 2, segment_blacklist);
-      //}
+    //}
 
-    printf("Objects originally chosen: ");
-    for (i = 0; i < M->samples[0].num_objects; ++i) {
-      printf("% d", M->samples[0].model_ids[i]);
-    }
-    printf("\n");
-
-    printf("New chosen: ");
-    for (i = 0; i < M2->samples[0].num_objects; ++i) {
-      printf("% d", M2->samples[0].model_ids[i]);
-    }
-    printf("\n");
-
-    //merge_two_mopes_in_place(M2, M, scope_params);
-    
-    //return M2;
-    
-    for (i = 0; i < M2->samples[0].num_objects; ++i)
-      sample_segments_given_model_pose(&M2->samples[0].objects[i], &models[M2->samples[0].model_ids[i]], obs_data, scope_params, 1, NULL);  
-
-    double score_M2 = evaluate_mope(NULL, &M2->samples[0], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
     double score_M = evaluate_mope(NULL, &M->samples[0], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
 
-    if (score_M2 > score_M) {
-      printf("Merged!\n");
-      return M2;
+    int x;
+    int top = -1;
+    double top_score = -100000.0;
+    for (x = 0; x < MIN(10, M2->num_samples); ++x) {
+
+      printf("Objects originally chosen: ");
+      for (i = 0; i < M->samples[0].num_objects; ++i) {
+	printf("% d", M->samples[0].model_ids[i]);
       }
-    else {
-      printf("Rejecting extra stuff!\n");
-      return M;
+      printf("\n");
+
+      if (M2->samples[x].num_objects == 0)
+	continue;
+
+      printf("New chosen: ");
+      for (i = 0; i < M2->samples[x].num_objects; ++i) {
+	printf("% d", M2->samples[x].model_ids[i]);
+      }
+      printf("\n");
+      
+      merge_two_mopes_in_place(M2, M, scope_params, x);
+      
+      //return M2;
+      
+      for (i = 0; i < M2->samples[x].num_objects; ++i)
+	sample_segments_given_model_pose(&M2->samples[x].objects[i], &models[M2->samples[x].model_ids[i]], obs_data, scope_params, 1, NULL);  
+      
+      double score_M2 = evaluate_mope(NULL, &M2->samples[x], segment_cnts, obs_data->num_obs_segments, 0, mope_params);
+      
+      if (score_M2 > top_score) {
+	top_score = score_M2;
+	top = x;
+	//printf("Merged!\n");
+	//return M2;
+      }
+      /*else {
+	printf("Rejecting extra stuff!\n");
+	return M;
+	}*/
+    }
+    if (top_score > score_M) {
+      /*    mope_sample_t *tmp;
+	    tmp = M2->samples[0];
+	    M2->samples[0] = M2->samples[x];
+	    M2->samples[x] = tmp;
+	    double tmp_W;
+	    tmp_W = M2->samples[0];
+	    M2->samples[0] = M2->samples[x];
+	    M2->samples[x] = tmp;*/
+      printf("Merged, best sample is %d:\n", top);
+      return M2;
+    } else {
+      return M2;
     }
   }
-
   return M;
 }
 
