@@ -27,7 +27,7 @@ CFLAGS += -static -mno-cygwin -I"C:\Program Files\GnuWin32\include" -DHAVE_WINDO
 #CFLAGS = -I$(IDIR) -I"C:\Program*\GnuWin32\include" -DHAVE_WINDOWS
 endif
 
-LFLAGS=-lm -lflann #-lduma
+LFLAGS=-lm #-lflann #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
 	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h #bingham/gauss_mix.h
@@ -41,7 +41,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope mope #olf_pose_sample gauss_mix test_olf
+TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample #scope mope #olf_pose_sample gauss_mix test_olf
 endif
 
 

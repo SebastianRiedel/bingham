@@ -4,9 +4,9 @@
 
 #include <stdlib.h>
 
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-#endif*/
+#endif
 
 
 #define MAXFACT 10000
@@ -258,9 +258,9 @@ int kdtree_NN(kdtree_t *tree, double *x);
 
 
 
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 }
-#endif*/
+#endif
 
 
 #endif
