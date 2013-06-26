@@ -238,19 +238,6 @@ __device__ double cu_dist(double *x, double *y, int n) {
   return sqrt(d);
 }
 
-// computes the max of x
-int arr_max_i(int *x, int n)
-{
-  int i;
-
-  int y = x[0];
-  for (i = 1; i < n; i++)
-    if (x[i] > y)
-      y = x[i];
-
-  return y;
-}
-
 void cu_init() {
   CUresult err = cuInit(0);
   //if (err != 0) 

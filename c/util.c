@@ -496,6 +496,18 @@ double arr_max(double x[], int n)
   return y;
 }
 
+// computes the max of x
+double arr_max_i(int x[], int n)
+{
+  int i;
+
+  int y = x[0];
+  for (i = 1; i < n; i++)
+    if (x[i] > y)
+      y = x[i];
+
+  return y;
+}
 
 // computes the min of x
 double arr_min(double x[], int n)
@@ -503,6 +515,19 @@ double arr_min(double x[], int n)
   int i;
 
   double y = x[0];
+  for (i = 1; i < n; i++)
+    if (x[i] < y)
+      y = x[i];
+
+  return y;
+}
+
+// computes the min of x
+double arr_min_i(int x[], int n)
+{
+  int i;
+
+  int y = x[0];
   for (i = 1; i < n; i++)
     if (x[i] < y)
       y = x[i];
@@ -1075,7 +1100,8 @@ static void init_rand()
   static int first = 1;
   if (first) {
     first = 0;
-    int seed = 1368849140; //time(NULL); 
+    int seed = time(NULL); 
+    //    seed = 1371836140;
     //int seed = 1368560954; <-- Crashes straw bowl on 3/9
     //1368457226; <--- Shows overlap on 5/3
     printf("********* seed = %d\n", seed);
