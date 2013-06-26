@@ -4,9 +4,9 @@
 
 #include <stdlib.h>
 
-#ifdef __cplusplus
+/*#ifdef __cplusplus
 extern "C" {
-#endif
+#endif*/
 
 
 #define MAXFACT 10000
@@ -72,6 +72,8 @@ double sum(double x[], int n);                                        /* compute
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double arr_max(double x[], int n);                                        /* computes the max of x */
 double arr_min(double x[], int n) ;                                       /* computes the min of x */
+double arr_max_i(int x[], int n);                                        /* computes the max of x */
+double arr_min_i(int x[], int n) ;                                       /* computes the min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
@@ -258,9 +260,9 @@ int kdtree_NN(kdtree_t *tree, double *x);
 
 
 
-#ifdef __cplusplus
+/*#ifdef __cplusplus
 }
-#endif
+#endif*/
 
 
 #endif

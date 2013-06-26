@@ -517,6 +517,8 @@ extern "C" {
   int pcd_channel(pcd_t *pcd, char *channel_name);     // gets the index of a channel by name
   int pcd_add_channel(pcd_t *pcd, char *channel);      // adds a channel to pcd
 
+  void pcd_add_data_pointers(pcd_t *pcd);
+
   range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
 
   void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params);

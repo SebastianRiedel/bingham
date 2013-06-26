@@ -30,7 +30,7 @@ endif
 LFLAGS=-lm #-lflann #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
-	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h #bingham/gauss_mix.h
+	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h bingham/cuda_wrapper.h #bingham/gauss_mix.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 ifdef CYGWIN
@@ -41,7 +41,7 @@ endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
 else
-TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample #scope mope #olf_pose_sample gauss_mix test_olf
+TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope mope #olf_pose_sample gauss_mix test_olf
 endif
 
 
@@ -60,13 +60,17 @@ $(ODIR)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< $(CUDAFLAGS)
 #endif
 
-libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+libolf.a: olf.o olf_cuda.o
 	$(LINK) $@ $^
 
-libbingham.so.1.0.1: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+
+libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o #olf.o olf_cuda.o
+	$(LINK) $@ $^
+
+libbingham.so.1.0.1: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o #olf.o olf_cuda.o
 	$(CC) -shared -Wl,-soname,libbingham.so.1 -o $@ $^ $(LFLAGS)
 
-$(LDIR)/bingham.dll: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
+$(LDIR)/bingham.dll: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o #olf.o olf_cuda.o
 	$(CC) -shared -o $@ $^ $(LFLAGS)
 
 test_bingham: test_bingham.o libbingham.a
@@ -96,11 +100,11 @@ test_hll: test_hll.o hll.o libbingham.a
 #olf_pose_sample: olf_pose_sample.o olf.o libbingham.a
 #	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
-scope: scope.o olf_timing.o olf_cuda.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
+scope: scope.o olf.o olf_cuda.o libbingham.a
+	$(CPP) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
-mope: mope.o olf_timing.o olf_cuda.o libbingham.a
-	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
+mope: mope.o olf.o olf_cuda.o libbingham.a
+	$(CPP) -o $@ $^ $(CFLAGS) $(LFLAGS) -L/usr/local/cuda/lib64 -lcuda -lcudart -lcurand
 
 #gauss_mix: gauss_mix.o libbingham.a
 #	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
