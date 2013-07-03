@@ -1562,8 +1562,8 @@ double **load_matrix(char *fin, int *n, int *m)
     return NULL;
   }
 
-  char sbuf[1024], *s = sbuf;
-  if (fgets(s, 1024, f) == NULL || sscanf(s, "%d %d", n, m) < 2) {
+  char sbuf0[128], *s = sbuf0;
+  if (fgets(s, 128, f) == NULL || sscanf(s, "%d %d", n, m) < 2) {
     fprintf(stderr, "Corrupt matrix header in file %s\n", fin);
     fclose(f);
     return NULL;
@@ -1571,10 +1571,13 @@ double **load_matrix(char *fin, int *n, int *m)
 
   double **X = new_matrix2(*n, *m);
 
+  const int CHARS_PER_FLOAT = 20;
+  char sbuf[CHARS_PER_FLOAT * (*m)];
+
   int i, j;
   for (i = 0; i < *n; i++) {
     s = sbuf;
-    if (fgets(s, 1024, f) == NULL)
+    if (fgets(s, 10000, f) == NULL)
       break;
     for (j = 0; j < *m; j++) {
       if (sscanf(s, "%lf", &X[i][j]) < 1)
