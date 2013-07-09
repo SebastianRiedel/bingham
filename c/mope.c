@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
       cu_model_data_t cu_model[num_models];
       cu_obs_data_t cu_obs;
       scope_params_t *cu_params;
-      cu_init_scoring_mope(model_data, &obs_data, num_models, cu_model, &cu_obs, &cu_params, &scope_params);
+      cu_init_scoring_mope_models_obs(model_data, &obs_data, num_models, cu_model, &cu_obs, &cu_params, &scope_params);
        
       M = annealing_with_scope(model_data, num_models, segment_cnts, &obs_data, &scope_params, &mope_params, cu_model, &cu_obs, cu_params, sample, 1, NULL);
       cu_free_all_the_things_mope(cu_model, &cu_obs, cu_params, num_models, &scope_params);

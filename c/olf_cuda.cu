@@ -278,6 +278,12 @@ void cu_init_model(scope_model_data_t *model_data, cu_model_data_t *cu_model) {
   cu_model->max_num_edges = n_edge;
 }
 
+void cu_init_all_models(scope_model_data_t model_data[], int num_models, cu_model_data_t cu_model[]) {
+  for (int i = 0; i < num_models; ++i) {
+    cu_init_model(&model_data[i], &cu_model[i]);
+  }
+}
+
 void cu_init_obs(scope_obs_data_t *obs_data, cu_obs_data_t *cu_obs, scope_params_t *params) {
 
   copy_double_matrix_to_gpu(&(cu_obs->range_image), obs_data->obs_range_image->image, obs_data->obs_range_image->w, obs_data->obs_range_image->h);
@@ -312,8 +318,6 @@ void cu_init_obs(scope_obs_data_t *obs_data, cu_obs_data_t *cu_obs, scope_params
   // CONTINUE HERE FOR OBS DATA COPYING ********************************
 }
 
-
-
 void cu_free_all_the_model_things(cu_model_data_t *cu_model) {
   cudaFree(cu_model->points.ptr);
   cudaFree(cu_model->normals.ptr);
@@ -337,6 +341,12 @@ void cu_free_all_the_model_things(cu_model_data_t *cu_model) {
   cudaFree(cu_model->score_comp_models);
 }
 
+void cu_free_all_the_things_all_models(cu_model_data_t cu_model[], int num_models) {
+  for (int i = 0; i < num_models; ++i) {
+    cu_free_all_the_model_things(&cu_model[i]);
+  }
+}
+
 void cu_free_all_the_obs_things(cu_obs_data_t *cu_obs, scope_params_t *params) {
   cudaFree(cu_obs->range_image.ptr);
   cudaFree(cu_obs->range_image_idx.ptr);
@@ -352,6 +362,11 @@ void cu_free_all_the_obs_things(cu_obs_data_t *cu_obs, scope_params_t *params) {
   if (params->use_colors)
     cudaFree(cu_obs->obs_lab_image.ptr);
   cudaFree(cu_obs->segment_affinities.ptr);
+}
+
+void cu_free_all_the_things_init(scope_params_t *cu_params) {
+  cu_free(cu_params, "params");
+  curandDestroyGenerator(gen);
 }
 
 void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t *cu_params, scope_params_t *params) {
@@ -377,51 +392,46 @@ void cu_free_all_the_things(cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, sc
          ALL THE THINGS
   */
 
-  cu_free(cu_params, "params");
+  cu_free_all_the_things_init(cu_params);
 
   cu_free_all_the_model_things(cu_model);
   cu_free_all_the_obs_things(cu_obs, params);
-  curandDestroyGenerator(gen);
 }
 
 void cu_free_all_the_things_mope(cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, scope_params_t *cu_params, int num_models, scope_params_t *params) {
   // Free ALL the things!!!
-  cu_free(cu_params, "params");  
-  for (int i = 0; i < num_models; ++i) {
-    cu_free_all_the_model_things(&cu_model[i]);
-
-  }
+  cu_free_all_the_things_init(cu_params);
+  
+  cu_free_all_the_things_all_models(cu_model, num_models);
   cu_free_all_the_obs_things(cu_obs, params);
-  curandDestroyGenerator(gen);
 }
 
-void cu_init_scoring(scope_model_data_t *model_data, scope_obs_data_t *obs_data, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t **cu_params, scope_params_t *params) {
-
+void cu_init_scoring(scope_params_t **cu_params, scope_params_t *params) {
   cu_malloc(cu_params, sizeof(scope_params_t), "params");
   cudaMemcpy(*cu_params, params, sizeof(scope_params_t), cudaMemcpyHostToDevice);
 
-  cu_init_model(model_data, cu_model);
-  cu_init_obs(obs_data, cu_obs, params);
-
-  curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-  curandSetPseudoRandomGeneratorSeed(gen, time(NULL));
-}
-
-void cu_init_scoring_mope(scope_model_data_t model_data[], scope_obs_data_t *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, scope_params_t **cu_params, scope_params_t *params) {
-  
-  cu_malloc(cu_params, sizeof(scope_params_t), "params");
-  cudaMemcpy(*cu_params, params, sizeof(scope_params_t), cudaMemcpyHostToDevice);
-  
-  // Allocate all the memory
-  for (int i = 0; i < num_models; ++i) {
-    cu_init_model(&model_data[i], &cu_model[i]);
-  }
-  cu_init_obs(obs_data, cu_obs, params);
-  
   curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
   int mope_seed = time(NULL); // 1368460607; <--- There is still an unresolved issue with this seed
   printf("********* mope seed = %d\n", mope_seed);
   curandSetPseudoRandomGeneratorSeed(gen, mope_seed);
+}
+
+void cu_init_scoring_model_obs(scope_model_data_t *model_data, scope_obs_data_t *obs_data, cu_model_data_t *cu_model, cu_obs_data_t *cu_obs, scope_params_t **cu_params, scope_params_t *params) {
+  cu_init_scoring(cu_params, params);
+
+  cu_init_model(model_data, cu_model);
+  cu_init_obs(obs_data, cu_obs, params);
+
+}
+
+void cu_init_scoring_mope_models_obs(scope_model_data_t *model_data, scope_obs_data_t *obs_data, int num_models, cu_model_data_t cu_model[], cu_obs_data_t *cu_obs, 
+				    scope_params_t **cu_params, scope_params_t *params) {
+  
+  cu_init_scoring(cu_params, params);
+  
+  // Allocate all the memory
+  cu_init_all_models(model_data, num_models, cu_model);
+  cu_init_obs(obs_data, cu_obs, params); 
 }
 
 __device__ void cu_range_image_xyz2sub(int *i, int *j, cu_range_image_data_t range_image, double xyz[])
