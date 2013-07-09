@@ -3551,6 +3551,8 @@ void get_scope_obs_data(scope_obs_data_t *data, olf_obs_t *obs, scope_params_t *
 
   if (obs != NULL) { // When we run scope in round 2 of mope, we won't need obs stuff
     memset(data, 0, sizeof(scope_obs_data_t));
+    
+    printf("Unpacking!\n");
 
     // unpack obs arguments
     data->pcd_obs = obs->bg_pcd;
@@ -5466,7 +5468,9 @@ void get_sample_olfs(olf_t *model_olfs[], olf_t *obs_olfs[], scope_sample_t *sam
     }
     else if (sample->c_type[i] == C_TYPE_SURFACE) {
       model_olfs[i] = &model_data->pcd_model_olfs[ sample->c_model[i] ];
-      obs_olfs[i] = &obs_data->pcd_obs_olfs[ sample->c_obs[i] ];
+      obs_olfs[i] = &obs_data->pcd_obs_olfs[ sample->c_obs[i] ]; 
+    } else {
+      printf("Did not make an OLF for this sample\n");
     }
   }
 }

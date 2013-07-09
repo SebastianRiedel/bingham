@@ -1115,6 +1115,8 @@ int irand(int n)
 {
   init_rand();
 
+  if (n < 0)
+    printf("Negative n: %d\n", n);
   return rand() % n;
 }
 
@@ -1382,6 +1384,20 @@ double **new_matrix2(int n, int m)
     X[i] = raw + m*i;
 
   return X;
+}
+
+void add_rows_matrix2(double ***X, int n, int m, int new_n) {
+  if (new_n < n) {
+    printf("Invalid new n.\n");
+  }
+  int i;
+  double *raw = (*X)[0];
+  safe_realloc(raw, m * new_n, double);
+  safe_realloc(*X, new_n, double*);
+  for (i = 0; i < new_n; i++) {
+    //printf("Added row!\n");
+    (*X)[i] = raw + m*i;
+  }
 }
 
 // create a new n-by-m 2d matrix of floats

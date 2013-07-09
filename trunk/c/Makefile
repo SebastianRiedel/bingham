@@ -36,7 +36,7 @@ DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 ifdef CYGWIN
 LIBS += libbingham.so.1.0.1 #$(LDIR)/bingham.dll
 else
-LIBS = libbingham.a
+LIBS = libbingham.a libolf.a
 endif
 ifdef WINDOWS
 TARGETS = $(LIBS)
@@ -60,9 +60,8 @@ $(ODIR)/%.o: %.cu $(DEPS)
 	$(NVCC) -c -o $@ $< $(CUDAFLAGS)
 #endif
 
-libolf.a: olf.o olf_cuda.o
+libolf.a: olf.o olf_cuda.o bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
 	$(LINK) $@ $^
-
 
 libbingham.a: bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o #olf.o olf_cuda.o
 	$(LINK) $@ $^

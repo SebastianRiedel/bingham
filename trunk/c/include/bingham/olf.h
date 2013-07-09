@@ -9,9 +9,9 @@
 
 #include "cuda_wrapper.h"
 
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-#endif*/
+#endif
 
   // point cloud data structure
   typedef struct {
@@ -35,6 +35,7 @@ extern "C" {
     double **colors;
     double **normals;
     double **principal_curvatures;
+    double *pcs_curvature;
     double **fpfh;
     double **shot;
     double **sift;
@@ -521,6 +522,7 @@ extern "C" {
 
   range_image_t *pcd_to_range_image(pcd_t *pcd, double *vp, double res, int padding);
 
+  pcd_t *load_pcd(char *f_pcd);
   void load_olf_model(olf_model_t *model, char *model_file, scope_params_t *params);
   olf_model_t *load_olf_models(int *n, char *models_file, scope_params_t *params);
 
@@ -528,9 +530,15 @@ extern "C" {
   void load_mope_params(mope_params_t *params, char *param_file);
   void get_scope_model_data(scope_model_data_t *model_data, olf_model_t *model, scope_params_t *params);
   void get_scope_obs_data(scope_obs_data_t *obs_data, olf_obs_t *obs, scope_params_t *params);
+  void compute_orientation_quaternions(double **Q, double **N, double **PCS, int num_points);
 
   void free_scope_model_data(scope_model_data_t *data);
   void free_scope_obs_data(scope_obs_data_t *data);
+
+  void knn_brute_force(double *nn_d2, int *nn_idx, double query[], double **points, int n, int m, int k);
+
+  void transform_cloud(double **cloud2, double **cloud, int n, double *x, double *q);
+  void pcd_free(pcd_t *pcd);
 
 struct cu_model_data_struct;
 struct cu_obs_data_struct;
@@ -656,9 +664,9 @@ extern "C" {
 
 
 
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 }
-#endif */
+#endif
 
 
 #endif
