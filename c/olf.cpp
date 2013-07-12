@@ -6941,7 +6941,7 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
   int num_samples = 0;
   for (i = 0; i < num_objects; ++i) {
     num_samples += S[i]->num_samples;
-    S[i]->num_samples = MIN(20, S[i]->num_samples); // <---------------------------
+    //S[i]->num_samples = MIN(20, S[i]->num_samples); // <---------------------------
   }
 
   int taken[num_samples][2];
@@ -7117,17 +7117,17 @@ mope_samples_t *simulated_annealing(scope_samples_t *S[], int num_objects, int *
 
   if (params->plot_true) {
     evaluate_assignment(NULL, data[0].taken, data[0].num_taken, S, num_objects, segment_cnts, num_segments, 1, params);
-    int real_taken = 5;
-    taken[0][0] = 2;
+    int real_taken = 3;
+    taken[0][0] = 0;
     taken[0][1] = 0;
-    taken[1][0] = 4;
+    taken[1][0] = 15;
     taken[1][1] = 0;
-    taken[2][0] = 8;
+    taken[2][0] = 16;
     taken[2][1] = 0;
-    taken[3][0] = 17;
+    /*taken[3][0] = 17;
     taken[3][1] = 0;
     taken[4][0] = 5;
-    taken[4][1] = 0;
+    taken[4][1] = 0;*/
     printf("--------------\n");
     evaluate_assignment(NULL, taken, real_taken, S, num_objects, segment_cnts, num_segments, 1, params);    
   }
@@ -7151,9 +7151,9 @@ mope_samples_t *tabu_search(scope_samples_t *S[], int num_objects, int *segment_
 
   const double min_score = -10000.0;
 
-  for (i = 0; i < num_objects; ++i) {
+  /*for (i = 0; i < num_objects; ++i) {
     S[i]->num_samples = MIN(20, S[i]->num_samples); //<----------------
-  }
+    }*/
 
   double old_score;
   double new_score;
