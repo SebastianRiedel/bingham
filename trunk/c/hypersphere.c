@@ -96,7 +96,7 @@ static void octetramesh_to_tessellation(hypersphere_tessellation_t *T, octetrame
   T->centroids = new_matrix2(n, d);
   safe_calloc(T->volumes, n, double);
   tetramesh_centroids(T->centroids, T->volumes, T->tetramesh);
-
+  reproject_vertices(T->centroids, n, d);
 
   /**********************************
   // compute cell radii

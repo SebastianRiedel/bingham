@@ -1712,7 +1712,7 @@ void matrix_add(double **Z, double **X, double **Y, int n, int m)
   add(Z[0], X[0], Y[0], n*m);
 }
 
-// matrix subtraction, Z = X+Y
+// matrix subtraction, Z = X-Y
 void matrix_sub(double **Z, double **X, double **Y, int n, int m)
 {
   sub(Z[0], X[0], Y[0], n*m);
@@ -2235,6 +2235,27 @@ void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m)
   // repeat top of B downwards
   for (rep_i = 1; rep_i < rep_n; ++rep_i)
     memcpy(B[rep_i * n], B[0], m * rep_m * n * sizeof(int));
+}
+
+/*
+ * blur matrix with a 3x3 gaussian filter with sigma=.5
+ */
+void blur_matrix(double **dst, double **src, int n, int m)
+{
+  double G[3] = {.6193, .0838, .0113};
+
+  double **I = (dst==src ? new_matrix2(n,m) : dst);
+  memcpy(dst[0], src[0], n*m*sizeof(double));
+
+  int i,j;
+  for (i = 1; i < n-1; i++)
+    for (j = 1; j < m-1; j++)
+      I[i][j] = G[0]*src[i][j] + G[1]*(src[i+1][j] + src[i-1][j] + src[i][j+1] + src[i][j-1]) + G[2]*(src[i+1][j+1] + src[i+1][j-1] + src[i-1][j+1] + src[i-1][j-1]);
+
+  if (dst==src) {
+    memcpy(dst[0], I[0], n*m*sizeof(double));
+    free_matrix2(I);
+  }
 }
 
 void print_matrix(double **X, int n, int m)

@@ -36,14 +36,13 @@ DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 ifdef CYGWIN
 LIBS += libbingham.so.1.0.1 #$(LDIR)/bingham.dll
 else
-LIBS = libbingham.a libolf.a
+LIBS = libbingham.a  #libolf.a
 endif
-ifdef WINDOWS
-TARGETS = $(LIBS)
-else
-TARGETS = $(LIBS) test_bingham test_hll test_util fit_bingham cluster_bingham bingham_lookup bingham_sample scope mope #olf_pose_sample gauss_mix test_olf
+ifndef WINDOWS
+PROGRAMS = fit_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3  #scope mope olf_pose_sample gauss_mix test_olf test_bingham test_hll test_util
 endif
 
+TARGETS = $(LIBS) $(PROGRAMS)
 
 
 all: $(TARGETS)
@@ -56,8 +55,8 @@ $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 $(ODIR)/%.o: %.cpp $(DEPS)
 	$(CPP) -c -o $@ $< $(CFLAGS)
-$(ODIR)/%.o: %.cu $(DEPS)
-	$(NVCC) -c -o $@ $< $(CUDAFLAGS)
+#$(ODIR)/%.o: %.cu $(DEPS)
+#	$(NVCC) -c -o $@ $< $(CUDAFLAGS)
 #endif
 
 libolf.a: olf.o olf_cuda.o bingham.o bingham_constants.o tetramesh.o octetramesh.o hypersphere.o util.o
@@ -85,6 +84,9 @@ bingham_sample: bingham_sample.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 cluster_bingham: cluster_bingham.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+tessellate_S3: tessellate_S3.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 test_util: test_util.o util.o
@@ -118,6 +120,7 @@ install:
 	cp $(DEPS) $(INSTALL_DIR)/include/bingham/
 	mv $(INSTALL_DIR)/include/bingham/bingham.h $(INSTALL_DIR)/include/
 	cp $(LIBS) $(INSTALL_DIR)/lib/
+	cp $(PROGRAMS) $(INSTALL_DIR)/bin/
 
 doc:
 	doxygen Doxyfile

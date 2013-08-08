@@ -863,7 +863,8 @@ void bingham_merge(bingham_t *B, bingham_t *B1, bingham_t *B2, double alpha)
 void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
 {
   bingham_stats(B1);
-  bingham_stats(B2);
+  if (B1 != B2)
+    bingham_stats(B2);
 
   double d = B1->d;
 
@@ -922,6 +923,9 @@ void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
     a33*b12 + a34*b11 + a23*b24 + a24*b23 - a12*b44 - a22*b34 - a34*b22 + a44*b12;
   S[3][3] =
     2*a14*b14 - 2*a13*b24 + 2*a24*b13 + 2*a12*b34 - 2*a23*b23 - 2*a34*b12 + a11*b44 + a22*b33 + a33*b22 + a44*b11;
+
+  if (B == B1 || B == B2)
+    bingham_free(B);
 
   bingham_fit_scatter(B, S, d);
   free_matrix2(S);
