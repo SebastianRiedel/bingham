@@ -14,6 +14,12 @@ extern "C" {
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
+//TODO: check for cuda
+#define max(x,n) arr_max(x,n)
+#define min(x,n) arr_min(x,n)
+#define maxi(x,n) arr_max_i(x,n)
+#define mini(x,n) arr_min_i(x,n)
+
 
 #define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
 #define safe_calloc(x, n, type) do{ x = (type*)calloc(n, sizeof(type)); test_alloc(x); } while (0)
@@ -156,6 +162,7 @@ void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* r
 void reorder_rowsi(int **Y, int **X, int *idx, int n, int m);               /* reorder the rows of X, Y = X(idx,:) */
 void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m);    /* replicates and tiles a 2D matrix of ints */
 void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m);         /* replicates and tiles a 2D matrix of ints */
+void blur_matrix(double **dst, double **src, int n, int m);                 /* blur matrix with a 3x3 gaussian filter with sigma=.5 */
 
 void linear_regression(double *b, double **X, double *y, int n, int d);     /* perform linear regression: dot(b,x[i]) = y[i], i=1..n */
 void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d */
