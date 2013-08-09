@@ -131,38 +131,39 @@ void add_rows_matrix2(double ***X, int n, int m, int new_n);                 /* 
 void add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
-void free_matrix2(double **X);                                              /* free a 2d matrix of doubles */
-void free_matrix2f(float **X);                                              /* free a 2d matrix of floats */
-void free_matrix2i(int **X);                                                /* free a 2d matrix of ints */
-void save_matrix(char *fout, double **X, int n, int m);                     /* save a matrix to a file */
-void save_matrixi(char *fout, int **X, int n, int m);                       /* save a matrix to a file */
-double **load_matrix(char *fin, int *n, int *m);                            /* load a matrix from a file */
-void transpose(double **Y, double **X, int n, int m);                       /* transpose a matrix */
-void solve(double *x, double **A, double *b, int n);                        /* solve the equation Ax = b, where A is a square n-by-n matrix */
-double det(double **X, int n);                                              /* compute the determinant of the n-by-n matrix X */
-void inv(double **Y, double **X, int n);                                    /* compute the inverse (Y) of the n-by-n matrix X*/
-void matrix_copy(double **Y, double **X, int n, int m);                     /* matrix copy, Y = X */
-double **matrix_clone(double **X, int n, int m);                            /* matrix clone, Y = new(X) */
-void matrix_add(double **Z, double **X, double **Y, int n, int m);          /* matrix addition, Z = X+Y */
-void matrix_sub(double **Z, double **X, double **Y, int n, int m);          /* matrix subtaction, Z = X-Y */
-void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);  /* matrix multiplication, Z = X*Y */
-void matrix_vec_mult(double *y, double **A, double *x, int n, int m);       /* matrix-vector multiplication, y = A*x */
-void vec_matrix_mult(double *y, double *x, double **A, int n, int m);       /* vector-matrix multiplication, y = x*A */
-void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);     /* element-wise multiplication, Z[i][j] = X[i][j] * Y[i][j] */
-void matrix_pow(double **Y, double **X, int n, int m, double pw);           /* taking every element of a matrix to the power of pw */ 
-void matrix_sum(double y[], double **X, int n, int m);                      /* sums the columns of the matrix */
-void outer_prod(double **Z, double x[], double y[], int n, int m);          /* outer product of x and y, Z = x'*y */
-void mean(double *mu, double **X, int n, int m);                            /* row vector mean */
-void variance(double *vars, double **X, int n, int m);                      /* returns a row-vector of variances for each column */
-void cov(double **S, double **X, double *mu, int n, int m);                 /* compute the covariance of the rows of X, given mean mu */
-void wmean(double *mu, double **X, double *w, int n, int m);                /* weighted row vector mean */
-void wcov(double **S, double **X, double *w, double *mu, int n, int m);     /* compute the weighted covariance of the rows of X, given mean mu */
-void eigen_symm(double z[], double **V, double **X, int n);                 /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
-void reorder_rows(double **Y, double **X, int *idx, int n, int m);          /* reorder the rows of X, Y = X(idx,:) */
-void reorder_rowsi(int **Y, int **X, int *idx, int n, int m);               /* reorder the rows of X, Y = X(idx,:) */
-void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m);    /* replicates and tiles a 2D matrix of ints */
-void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m);         /* replicates and tiles a 2D matrix of ints */
-void blur_matrix(double **dst, double **src, int n, int m);                 /* blur matrix with a 3x3 gaussian filter with sigma=.5 */
+void free_matrix2(double **X);                                                  /* free a 2d matrix of doubles */
+void free_matrix2f(float **X);                                                  /* free a 2d matrix of floats */
+void free_matrix2i(int **X);                                                    /* free a 2d matrix of ints */
+void save_matrix(char *fout, double **X, int n, int m);                         /* save a matrix to a file */
+void save_matrixi(char *fout, int **X, int n, int m);                           /* save a matrix to a file */
+double **load_matrix(char *fin, int *n, int *m);                                /* load a matrix from a file */
+void transpose(double **Y, double **X, int n, int m);                           /* transpose a matrix */
+void solve(double *x, double **A, double *b, int n);                            /* solve the equation Ax = b, where A is a square n-by-n matrix */
+double det(double **X, int n);                                                  /* compute the determinant of the n-by-n matrix X */
+void inv(double **Y, double **X, int n);                                        /* compute the inverse (Y) of the n-by-n matrix X*/
+void matrix_copy(double **Y, double **X, int n, int m);                         /* matrix copy, Y = X */
+double **matrix_clone(double **X, int n, int m);                                /* matrix clone, Y = new(X) */
+void matrix_add(double **Z, double **X, double **Y, int n, int m);              /* matrix addition, Z = X+Y */
+void matrix_sub(double **Z, double **X, double **Y, int n, int m);              /* matrix subtaction, Z = X-Y */
+void matrix_mult(double **Z, double **X, double **Y, int n, int p, int m);      /* matrix multiplication, Z = X*Y */
+void matrix_vec_mult(double *y, double **A, double *x, int n, int m);           /* matrix-vector multiplication, y = A*x */
+void vec_matrix_mult(double *y, double *x, double **A, int n, int m);           /* vector-matrix multiplication, y = x*A */
+void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);         /* element-wise multiplication, Z[i][j] = X[i][j] * Y[i][j] */
+void matrix_pow(double **Y, double **X, int n, int m, double pw);               /* taking every element of a matrix to the power of pw */ 
+void matrix_sum(double y[], double **X, int n, int m);                          /* sums the columns of the matrix */
+void outer_prod(double **Z, double x[], double y[], int n, int m);              /* outer product of x and y, Z = x'*y */
+void mean(double *mu, double **X, int n, int m);                                /* row vector mean */
+void variance(double *vars, double **X, int n, int m);                          /* returns a row-vector of variances for each column */
+void cov(double **S, double **X, double *mu, int n, int m);                     /* compute the covariance of the rows of X, given mean mu */
+void wmean(double *mu, double **X, double *w, int n, int m);                    /* weighted row vector mean */
+void wcov(double **S, double **X, double *w, double *mu, int n, int m);         /* compute the weighted covariance of the rows of X, given mean mu */
+void eigen_symm(double z[], double **V, double **X, int n);                     /* get evals. z and evecs. V of a real symm. n-by-n matrix X */
+void reorder_rows(double **Y, double **X, int *idx, int n, int m);              /* reorder the rows of X, Y = X(idx,:) */
+void reorder_rowsi(int **Y, int **X, int *idx, int n, int m);                   /* reorder the rows of X, Y = X(idx,:) */
+void repmat(double **B, double **A, int rep_n, int rep_m, int n, int m);        /* replicates and tiles a 2D matrix of ints */
+void repmati(int **B, int **A, int rep_n, int rep_m, int n, int m);             /* replicates and tiles a 2D matrix of ints */
+void blur_matrix(double **dst, double **src, int n, int m);                     /* blur matrix with a 3x3 gaussian filter with sigma=.5 */
+void blur_matrix_masked(double **dst, double **src, int **mask, int n, int m);  /* blur masked matrix with a 3x3 gaussian filter with sigma=.5 */
 
 void linear_regression(double *b, double **X, double *y, int n, int d);     /* perform linear regression: dot(b,x[i]) = y[i], i=1..n */
 void polynomial_regression(double *b, double *x, double *y, int n, int d);  /* fit a polynomial: \sum{b[i]*x[j]^i} = y[j], i=1..n, j=1..d */
