@@ -43,5 +43,6 @@ end
 hold off;
 axis vis3d
 axis equal
-set(gca, 'Color', [0,0,0]);
+%set(gca, 'Color', [0,0,0]);
+set(gca, 'Color', [0,.5,0]);
 
