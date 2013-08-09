@@ -2258,6 +2258,39 @@ void blur_matrix(double **dst, double **src, int n, int m)
   }
 }
 
+/*
+ * blur masked matrix with a 3x3 gaussian filter with sigma=.5
+ */
+void blur_matrix_masked(double **dst, double **src, int **mask, int n, int m)
+{
+  double G[3] = {.6193, .0838, .0113};
+
+  double **I = (dst==src ? new_matrix2(n,m) : dst);
+  memcpy(dst[0], src[0], n*m*sizeof(double));
+
+  int i,j;
+  for (i = 1; i < n-1; i++) {
+    for (j = 1; j < m-1; j++) {
+      double x[9] = {mask[i][j] ? src[i][j] : 0., mask[i+1][j] ? src[i+1][j] : 0., mask[i-1][j] ? src[i-1][j] : 0., mask[i][j+1] ? src[i][j+1] : 0., mask[i][j-1] ? src[i][j-1] : 0.,
+		  mask[i+1][j+1] ? src[i+1][j+1] : 0., mask[i+1][j-1] ? src[i+1][j-1] : 0., mask[i-1][j+1] ? src[i-1][j+1] : 0., mask[i-1][j-1] ? src[i-1][j-1] : 0.};
+
+      double v = G[0]*x[0] + G[1]*(x[1] + x[2] + x[3] + x[4]) + G[2]*(x[5] + x[6] + x[7] + x[8]);
+
+      int n0 = !!mask[i][j];
+      int n1 = !!mask[i+1][j] + !!mask[i-1][j] + !!mask[i][j+1] + !!mask[i][j-1];
+      int n2 = !!mask[i+1][j+1] + !!mask[i-1][j-1] + !!mask[i-1][j+1] + !!mask[i+1][j-1];
+      double g_tot = n0*G[0] + n1*G[1] + n2*G[2];
+
+      I[i][j] = v / g_tot;
+    }
+  }
+
+  if (dst==src) {
+    memcpy(dst[0], I[0], n*m*sizeof(double));
+    free_matrix2(I);
+  }
+}
+
 void print_matrix(double **X, int n, int m)
 {
   int i, j;
