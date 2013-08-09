@@ -14,19 +14,27 @@ if strcmp(symm_type, 'cubic')
         SX(:,:,i) = cubic_symm(X(i,:));
     end
     
+    % fit a Bingham to X to initialize params
+    B = bingham_fit(X);
+    b = B2b(B);
+    
+    b(1:3) = [-20,-20,-20];  %dbug
+    
     % concentration params
-    z = -20*ones(1,3);
+    %z = -20*ones(1,3);
     
     % dual quaternions for V
-    v1 = [1,0,0,0]; %rand(1,4);
-    v1 = v1/norm(v1);
-    v2 = [1,0,0,0]; %rand(1,4);
-    v2 = v2/norm(v2);
-
-    options = optimset('GradObj','on');
+    %v1 = [1,0,0,0]; %rand(1,4);
+    %v1 = v1/norm(v1);
+    %v2 = [1,0,0,0]; %rand(1,4);
+    %v2 = v2/norm(v2);
+    %b = [z v1 v2];
     
-    b = fmincon(@sb_cost, [z v1 v2], [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)], [], options);
+    %options = optimset('GradObj','on');
     
+    b = fmincon(@sb_cost, b, [],[],[],[],[], [zeros(1,3), Inf*ones(1,8)], @sb_constraints); %, options);
+    
+    B = b2B(b);
         
 else
     fprintf('ERROR: Unsupported symmetry type.\n');
@@ -70,6 +78,52 @@ function B = b2B(b)
     V = V1*V2;
     B.V = V(:,1:3);
     [B.F B.dF] = bingham_F(B.Z);
+end
+
+
+function b = B2b(B)
+
+    V = [B.V, bingham_mode(B)];
+    if det(V) < 0
+        V(:,4) = -V(:,4);
+    end
+    
+    cq = -.25*(V(1,4) + V(2,3) + V(3,2) + V(4,1));
+    dp = -.25*(V(1,4) + V(2,3) - V(3,2) - V(4,1));
+    as = -.25*(V(1,4) - V(2,3) + V(3,2) - V(4,1));
+    br = .25*(V(1,4) - V(2,3) - V(3,2) + V(4,1));
+    bs = -.25*(V(1,3) + V(2,4) + V(3,1) + V(4,2));
+    ar = -.25*(V(1,3) + V(2,4) - V(3,1) - V(4,2));
+    dq = .25*(V(1,3) - V(2,4) + V(3,1) - V(4,2));
+    cp = -.25*(V(1,3) - V(2,4) - V(3,1) + V(4,2));
+    dr = -.25*(V(1,2) + V(2,1) + V(3,4) + V(4,3));
+    cs = .25*(V(1,2) + V(2,1) - V(3,4) - V(4,3));
+    bp = -.25*(V(1,2) - V(2,1) + V(3,4) - V(4,3));
+    aq = -.25*(V(1,2) - V(2,1) - V(3,4) + V(4,3));
+    ap = .25*(V(1,1) + V(2,2) + V(3,3) + V(4,4));
+    bq = -.25*(V(1,1) + V(2,2) - V(3,3) - V(4,4));
+    cr = -.25*(V(1,1) - V(2,2) + V(3,3) - V(4,4));
+    ds = -.25*(V(1,1) - V(2,2) - V(3,3) + V(4,4));
+    
+    S = [ap,aq,ar,as; bp,bq,br,bs; cp,cq,cr,cs; dp,dq,dr,ds];
+    
+    j = find(max(abs(S)) > eps, 1);  % find the first non-zero column of S
+    i = find(abs(S(:,j)) > eps, 1);  % find the first non-zero entry in column j
+    not_j = setdiff(1:4, j);
+    pqrs = [0,0,0,0];
+    pqrs(j) = 1;
+    pqrs(not_j) = S(i,not_j) / S(i,j);
+    v2 = pqrs / norm(pqrs);
+    abcd = S(:,j)' / v2(j);
+    v1 = abcd / norm(abcd);
+
+    b = [B.Z, v1, v2];
+    
+    %syms a b c d p q r s real;
+    %BV = [B.V, bingham_mode(B)];
+    %V = [a -b -c -d; b a -d c; c d a -b; d -c b a] * [p -q -r -s; q p s -r; r -s p q; s r -q p];
+    %S = solve(V==BV);
+    %b = [B.Z, S.a, S.b, S.c, S.d, S.p, S.q, S.r, S.s];
 end
 
 
@@ -119,7 +173,7 @@ function [f dfdb] = sb_cost(b)
     f = n*log(k*B.F) - sum(log(sum(E)));  % negative log-likelihood
     
     b
-    f = f + (1-b(4:7)*b(4:7)')^2 + (1-b(8:11)*b(8:11)')^2
+    f %= f + (1-b(4:7)*b(4:7)')^2 + (1-b(8:11)*b(8:11)')^2
     
     % compute the gradients
     dfdV = zeros(d-1,d);
@@ -135,17 +189,17 @@ function [f dfdb] = sb_cost(b)
     for i=1:3
         dfdQ = dfdQ + dfdV(i,:)*dVdQ(:,:,i);
     end
-    dfdb = -[dfdZ, dfdQ + [4*(b(4:7)*b(4:7)'-1)*b(4:7), 4*(b(8:11)*b(8:11)'-1)*b(8:11)]];
+    dfdb = -[dfdZ, dfdQ] % + [4*(b(4:7)*b(4:7)'-1)*b(4:7), 4*(b(8:11)*b(8:11)'-1)*b(8:11)]]
 end
 
 
-% function [c,ceq] = sb_constraints(b)
-% 
-%     c = 0;
-%     ceq = [0,0];
-%     
-%     if nargin == 1
-%         ceq = [1 - norm(b(3:7)), 1 - norm(b(8:11))];
-%     end
-% end
+function [c,ceq] = sb_constraints(b)
+
+    c = 0;
+    ceq = [0,0];
+    
+    if nargin == 1
+        ceq = [1 - norm(b(3:7)), 1 - norm(b(8:11))];
+    end
+end
 

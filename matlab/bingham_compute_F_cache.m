@@ -12,413 +12,251 @@ Y = [ 0.00, 0.10,  0.20,  0.30,  0.40,  0.50,  0.60,  0.70,  0.80,  0.90,  1.00,
 
 % (negative) concentration parameters table
 Z = Y.^2;
+NZ = length(Z);
 F_cache.Z = Z;
 
 
-% 1F1(1/2; 1; z) for z<0
-F_cache.table{1} = zeros(1, length(Z));
-a = 1/2;
-b = 1;
-n = 10;
-F_cache.table{1}(1) = 2*sqrt(pi)*gamma(a)/gamma(b);  % z=0
-for zi=2:length(Z)
-    z = Z(zi);
-    logz = log(z);
-    while 1
-        i = 0:n-1;
-        X = gammaln(i+a) - gammaln(i+b) + i*logz - gammaln(i+1);
-        c = max(X);
-        if X(end) < c-16
-            break
-        end
-        n = n+10;
-    end
-    %F = 2*sqrt(pi)*exp(c)*sum(exp(X-c))
-    logF = log(2*sqrt(pi)) + c + log(sum(exp(X-c)));
-    F_cache.table{1}(zi) = exp(logF - z);
-end
 
 
-% log 1F1(1/2; b; z) for z>0
-F_cache.btable{1} = zeros(6*max(Z), length(Z));
-for b=.5:.5:3*max(Z)
-    fprintf('.');
-    a = 1/2;
-    F_cache.btable{1}(2*b,1) = log(2*sqrt(pi)) + gammaln(a) - gammaln(b);  % z=0
-    n = 10;
-    for zi=2:length(Z)
-        z = Z(zi);
-        logz = log(z);
-        while 1
-            i = 0:n-1;
-            X = gammaln(i+a) - gammaln(i+b) + i*logz - gammaln(i+1);
-            xmax = max(X);
-            if X(end) < xmax-16
-                break
-            end
-            n = n+10;
-        end
-        %F = 2*sqrt(pi)*exp(c)*sum(exp(X-c))
-        logF = xmax + log(sum(exp(X-xmax))) + log(2*sqrt(pi));
-        F_cache.btable{1}(2*b,zi) = logF;
-        %[b,z,logF]
-    end
-end
-fprintf('\n');    
+
+%========================================================================%
+
+%-------------  log(1F1), log(2F1), log(3F1) lookup tables  -------------%
+
+%========================================================================%
 
 
-% log 1F1(1/2; b; z1-z2) for z1>z2>0
-F_cache.btable{2} = zeros(6*max(Z), length(Z), length(Z));
-for b=.5:.5:3*max(Z)   %.5:.5:2*max(Z)
-    fprintf('.');
-    a = 1/2;
-    n = 10;
-    for zi1=1:length(Z)
-        z1 = Z(zi1);
-        for zi2=1:zi1-1
-            z2 = Z(zi2);
-            z = z1-z2;
-            logz = log(z);
+% log 1F1(a; b; z) for z >= 0
+A = [.5, 1.5, 2.5]; B = .5:.5:3*max(Z);
+F_cache.log1F1 = zeros(length(A), length(B), length(Z));
+for ai=1:length(A), a = A(ai);
+    for bi=1:length(B), b = B(bi); n = 10; fprintf('.');
+        for zi=1:length(Z), z = Z(zi);
             while 1
-                i = 0:n-1;
-                X = gammaln(i+a) - gammaln(i+b) + i*logz - gammaln(i+1);
-                xmax = max(X);
-                if X(end) < xmax-16
-                    break
-                end
-                n = n+10;
+                i = 0:n-1; ilogz = i*log(z); if z==0, ilogz(1) = 0; end
+                %=====================================================%
+                X = ilogz - gammaln(i+1) + gammaln(i+a) - gammaln(i+b);
+                %=====================================================%
+                xmax = max(X); if X(end) < xmax-16, break, end, n = n+10;
             end
-            %F = 2*sqrt(pi)*exp(c)*sum(exp(X-c))
-            logF = xmax + log(sum(exp(X-xmax))) + log(2*sqrt(pi));
-            F_cache.btable{2}(2*b,zi1,zi2) = logF;
-            %[b,z,logF]
+            F_cache.log1F1(ai,bi,zi) = xmax + log(sum(exp(X-xmax))) + log(sqrt(pi));
         end
-        F_cache.btable{2}(2*b,zi1,zi1) = F_cache.btable{1}(2*b,1);  % z1=z2
     end
+    fprintf('\n');
 end
-fprintf('\n');    
+save F_cache.mat F_cache
 
 
-% 1F1(1/2; 3/2; z1,z2) for z1,z2 < 0
-F_cache.table{2} = zeros(length(Z), length(Z));
-a = 1/2;
-b = 3/2;
-nmax = 0;
-for zi=1:length(Z)
-    z = Z(zi);
-    logz = log(z);
-    F_cache.table{2}(zi,zi) = exp(gammaln(a) + F_cache.btable{1}(2*b,zi) - z);
-    n = 10;
-    for zi2=1:zi-1
-        z2 = Z(zi2);
-        while 1
-            i = 0:n-1;
-            bi = 2*(b+i);
-            X = gammaln(i+a) + i*logz - gammaln(i+1) + F_cache.btable{2}(bi,zi,zi2)';
-            xmax = max(X);
-            if X(end) < xmax-16
-                break
+% log 2F1(a1,a2; b; z1,z1-z2) for z1 >= z2 >= 0
+A = [.5, 1.5, 2.5]; B = .5:.5:2*max(Z); nmax = 0;
+F_cache.log2F1 = zeros(length(A), length(A), length(B), length(Z), length(Z));
+for ai1=1:length(A), a1 = A(ai1);
+    for ai2=1:length(A), a2 = A(ai2);      %if ai1>1 || ai2==3, continue, end  %dbug!
+        for bi=1:length(B), b = B(bi); fprintf('.'); n = 10;
+            for zi1=1:length(Z)
+                for zi2=1:zi1, dz = Z(zi1) - Z(zi2);
+                    while 1
+                        i = 0:n-1; ilogdz = i*log(dz); if dz==0, ilogdz(1) = 0; end
+                        %============================================================================%
+                        X = ilogdz - gammaln(i+1) + gammaln(i+a2) + F_cache.log1F1(ai1, 2*(b+i), zi1);
+                        %============================================================================%
+                        xmax = max(X); if X(end) < xmax-16, break, end, n = n+10; if n > nmax, nmax = n; end
+                    end
+                    F_cache.log2F1(ai1,ai2,bi,zi1,zi2) = xmax + log(sum(exp(X-xmax)));
+                end
             end
-            n = n + 10;
-            if n > nmax
-                nmax = n
-            end
+            fprintf('bi=%d, n=%d\n', bi, n);
         end
-        %F = exp(xmax)*sum(exp(X-xmax))
-        logF = xmax + log(sum(exp(X-xmax)));
-        F_cache.table{2}(zi,zi2) = exp(logF - z);
-        %[z,z2,logF-z]
-        %plot(X);
-        %input(':');
-    end
-end
-%F_cache.table{2}
-
-
-
-% 1F1(1/2; 4/2; z1,z2,z3) for z1,z2,z3 < 0
-F_cache.table{3} = zeros(length(Z), length(Z), length(Z));
-a = 1/2;
-b = 2;  % (d+1)/2
-nmax = 0;
-for zi1=1:length(Z)
-    fprintf('.');
-    z1 = Z(zi1);
-    logz1 = log(z1);
-    F_cache.table{3}(zi1,zi1,zi1) = exp(2*gammaln(a) + F_cache.btable{1}(2*b,zi1) - z1);  % z1=z2=z3
-    n1 = 10;
-    for zi2=1:zi1
-        %z2 = Z(zi2);
-        %logz2 = log(z1-z2);
-        n2 = 10;
-        for zi3=1:zi2
-            if zi1==zi3  % z1=z2=z3
-                continue;
-            end
-            z3 = Z(zi3);
-            logz3 = log(z1-z3);
-            while 1
-                [I2,I1] = meshgrid(0:n2-1, 0:n1-1);
-                BI = 2*(b+I1+I2);
-                X = gammaln(I1+a) + gammaln(I2+a) + I1*logz1 + I2*logz3 - gammaln(I1+1) - gammaln(I2+1);
-                X = X + reshape(F_cache.btable{2}(BI(1:end),zi1,zi2), [n1,n2]);
-                xmax = max(max(X));
-                if max(X(end,:)) < xmax-16 && max(X(:,end)) < xmax-16
-                    break
-                end
-                if max(X(end,:)) > max(X(:,end))
-                    n1 = n1+10;
-                    if n1 > nmax
-                        nmax = n1
-                    end
-                else
-                    n2 = n2+10;
-                    if n2 > nmax
-                        nmax = n2
-                    end
-                end
-            end
-            %F = exp(c)*sum(exp(X-c))
-            logF = xmax + log(sum(sum(exp(X-xmax))));
-            F_cache.table{3}(zi1,zi2,zi3) = exp(logF - z1);
-            %[b,z,z2,logF]
-            %plot(X);  %hold on;  plot(F_cache.table{1}(bi2,zi2), 'r-');  hold off;
-            %input(':');
-        end
-    end
-end
-
-
-
-% (d/dZ) 1F1(1/2; 2/2; z) for z < 0
-F_cache.dF{1} = zeros(1,length(Z));
-a = 1/2;
-b = 2/2;
-n = 10;
-F_cache.dF{1}(1) = 2*sqrt(pi)*gamma(a+1)/gamma(b+1);
-for zi=2:length(Z)
-    z = Z(zi);
-    logz = log(z);
-    % compute dF1
-    while 1
-        i = 0:n-1;
-        X = gammaln(a+i+1) - gammaln(b+i+1) + log(i+1) + i*logz - gammaln(i+2);
-        xmax = max(X);
-        if X(end) < xmax-16
-            break
-        end
-        n = n + 10;
-    end
-    %F = 2*sqrt(pi)*exp(xmax)*sum(exp(X-xmax))
-    logF = log(2*sqrt(pi)) + xmax + log(sum(exp(X-xmax)));
-    dF1 = exp(logF - z);
-
-    F_cache.dF{1}(zi) = F_cache.table{1}(zi) - dF1;
-end
-%F_cache.dF{1}
-
-
-% (d/dZ) 1F1(1/2; 3/2; z1,z2) for z1,z2 < 0
-F_cache.dF{2} = zeros(2, length(Z), length(Z));
-a = 1/2;
-b = 3/2;
-F_cache.dF{2}(:,1,1) = 2*sqrt(pi)*gamma(a)*gamma(a+1)/gamma(b+1); % z1=z2=0
-nmax = 0;
-for zi=2:length(Z)
-    z = Z(zi);
-    logz = log(z);
-    n = 10;
-    for zi2=1:zi
-        
-        % compute dF1
-        while 1
-            i = 0:n-1;
-            bi = 2*(b+i+1);
-            X = gammaln(a+i+1) + log(i+1) + i*logz - gammaln(i+2) + F_cache.btable{2}(bi,zi,zi2)';
-            xmax = max(X);
-            if X(end) < xmax-16
-                break
-            end
-            n = n + 10;
-            if n > nmax
-                nmax = n
-            end
-        end
-        %F = exp(xmax)*sum(exp(X-xmax))
-        logF = xmax + log(sum(exp(X-xmax)));
-        dF1 = exp(logF - z);
-        
-        % compute dF2
-        if zi==zi2
-            logF = gammaln(a+1) + F_cache.btable{1}(2*(b+1), zi);
-            dF2 = exp(logF - z);
-        else
-            z2 = Z(zi2);
-            logdz = log(z-z2);
-            while 1
-                i = 0:n-1;
-                bi = 2*(b+i+1);
-                X = gammaln(a+i+1) + log(i+1) + i*logdz - gammaln(i+2) + F_cache.btable{1}(bi,zi)';
-                xmax = max(X);
-                if X(end) < xmax-16
-                    break
-                end
-                n = n + 10;
-                if n > nmax
-                    nmax = n
-                end
-            end
-            %F = exp(xmax)*sum(exp(X-xmax))
-            logF = xmax + log(sum(exp(X-xmax)));
-            dF2 = exp(logF - z);
-        end
-        
-        F_cache.dF{2}(1,zi,zi2) = F_cache.table{2}(zi,zi2) - dF1 - dF2;
-        F_cache.dF{2}(2,zi,zi2) = dF2;
-        
-        %[z,z2,logF-z]
-        %plot(X);
-        %input(':');
-    end
-end
-%F_cache.dF{2}
-
-
-
-% (d/dZ) 1F1(1/2; 4/2; z1,z2,z3) for z1,z2,z3 < 0
-F_cache.dF{3} = zeros(3, length(Z), length(Z), length(Z));
-a = 1/2;
-b = 4/2;
-F_cache.dF{3}(:,1,1,1) = 2*sqrt(pi)*gamma(a)^2*gamma(a+1)/gamma(b+1); % z1=z2=z3=0
-nmax = 0;
-for zi1=2:length(Z)
-    z1 = Z(zi1);
-    logz1 = log(z1);
-    fprintf('zi1=%d, z1=%f\n', zi1, z1);
-    for zi2=1:zi1
-        fprintf('.');
-        z2 = Z(zi2);
-        logz2 = log(z1-z2);
-        n1 = 10;
-        n2 = 10;
-        for zi3=1:zi2
-            z3 = Z(zi3);
-            logz3 = log(z1-z3);
-        
-            % compute dF1
-            while 1
-                [I2,I1] = meshgrid(0:n2-1, 0:n1-1);
-                BI = 2*(b+I1+I2+1);
-                if z1==z3
-                    X = repmat(-inf,[n1,n2]);
-                    X0 = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I1*logz1 - gammaln(I1+2) - gammaln(I2+1);
-                    X(~I2) = X0(~I2);
-                else
-                    X = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I1*logz1 + I2*logz3 - gammaln(I1+2) - gammaln(I2+1);
-                end
-                X = X + reshape(F_cache.btable{2}(BI(1:end),zi1,zi2), [n1,n2]);
-                xmax = max(max(X));
-                if max(X(end,:)) < xmax-16 && max(X(:,end)) < xmax-16
-                    break
-                end
-                if max(X(end,:)) > max(X(:,end))
-                    n1 = n1+10;
-                    if n1 > nmax
-                        nmax = n1
-                    end
-                else
-                    n2 = n2+10;
-                    if n2 > nmax
-                        nmax = n2
-                    end
-                end
-            end
-            %F = exp(c)*sum(exp(X-c))
-            logF = xmax + log(sum(sum(exp(X-xmax))));
-            dF1 = exp(logF - z1);
-
-            % compute dF2
-            while 1
-                [I2,I1] = meshgrid(0:n2-1, 0:n1-1);
-                BI = 2*(b+I1+I2+1);
-                if z1==z2
-                    X = repmat(-inf,[n1,n2]);
-                    X0 = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I2*logz1 - gammaln(I1+2) - gammaln(I2+1);
-                    X(~I1) = X0(~I1);
-                else
-                    X = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I1*logz2 + I2*logz1 - gammaln(I1+2) - gammaln(I2+1);
-                end
-                X = X + reshape(F_cache.btable{2}(BI(1:end),zi1,zi3), [n1,n2]);
-                xmax = max(max(X));
-                if max(X(end,:)) < xmax-16 && max(X(:,end)) < xmax-16
-                    break
-                end
-                if max(X(end,:)) > max(X(:,end))
-                    n1 = n1+10;
-                    if n1 > nmax
-                        nmax = n1
-                    end
-                else
-                    n2 = n2+10;
-                    if n2 > nmax
-                        nmax = n2
-                    end
-                end
-            end
-            %F = exp(c)*sum(exp(X-c))
-            logF = xmax + log(sum(sum(exp(X-xmax))));
-            dF2 = exp(logF - z1);
-        
-            % compute dF3
-            while 1
-                [I2,I1] = meshgrid(0:n2-1, 0:n1-1);
-                BI = 2*(b+I1+I2+1);
-                if z1==z3
-                    X = repmat(-inf,[n1,n2]);
-                    X0 = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I2*logz1 - gammaln(I1+2) - gammaln(I2+1);
-                    X(~I1) = X0(~I1);
-                else
-                    X = gammaln(a+I1+1) + gammaln(a+I2) + log(I1+1) + I1*logz3 + I2*logz1 - gammaln(I1+2) - gammaln(I2+1);
-                end
-                X = X + reshape(F_cache.btable{2}(BI(1:end),zi1,zi2), [n1,n2]);
-                xmax = max(max(X));
-                if max(X(end,:)) < xmax-16 && max(X(:,end)) < xmax-16
-                    break
-                end
-                if max(X(end,:)) > max(X(:,end))
-                    n1 = n1+10;
-                    if n1 > nmax
-                        nmax = n1
-                    end
-                else
-                    n2 = n2+10;
-                    if n2 > nmax
-                        nmax = n2
-                    end
-                end
-            end
-            %F = exp(c)*sum(exp(X-c))
-            logF = xmax + log(sum(sum(exp(X-xmax))));
-            dF3 = exp(logF - z1);
-        
-            F_cache.dF{3}(1,zi1,zi2,zi3) = F_cache.table{3}(zi1,zi2,zi3) - dF1 - dF2 - dF3;
-            F_cache.dF{3}(2,zi1,zi2,zi3) = dF2;
-            F_cache.dF{3}(3,zi1,zi2,zi3) = dF3;
-        
-            %[z,z2,logF-z]
-            %plot(X);
-            %input(':');
-        end
-    end
-    if zi1==50 || zi1==60 || zi1==70
         save F_cache.mat F_cache
+        fprintf('\n');
     end
 end
-%F_cache.dF{3}
 
 
-%bingham_constants = rmfield(F_cache, 'btable');
-%save bingham_constants.mat bingham_constants
+% log 3F1(a1,a2,a3; b; z1,z1-z2,z1-z3) for z1 >= z2 >= z3 >= 0 and b = a1+a2+a3+.5
+A = [.5, 1.5, 2.5]; NA = length(A); nmax = 0;
+F_cache.log3F1 = zeros(NA,NA,NA,NZ,NZ,NZ);
+for ai1=1:NA, a1 = A(ai1);
+    for ai2=1:NA-ai1+1, a2 = A(ai2);
+        for ai3=1:NA-ai1-ai2+2, a3 = A(ai3);
+            b = a1+a2+a3+.5; n = 10;
+            for zi1=1:length(Z), fprintf('.');
+                for zi2=1:zi1, dz = Z(zi1) - Z(zi2);
+                    for zi3=1:zi2
+                        while 1
+                            i = 0:n-1; ilogdz = i*log(dz); if dz==0, ilogdz(1) = 0; end
+                            %====================================================================================================%
+                            X = ilogdz - gammaln(i+1) + gammaln(a2+i) + reshape(F_cache.log2F1(ai1,ai3, 2*(b+i), zi1,zi3), [1,n]);
+                            %====================================================================================================%
+                            xmax = max(X); if X(end) < xmax-16, break, end, n = n+10; if n > nmax, nmax = n; end
+                        end
+                        F_cache.log3F1(ai1,ai2,ai3,zi1,zi2,zi3) = xmax + log(sum(exp(X-xmax)));
+                    end
+                end
+                fprintf('zi1=%d, n=%d\n', zi1, n);
+            end
+        end
+    end
+end
+
+
+
+
+%==================================================================%
+
+%------------------  Normalization Constant (F)  ------------------%
+
+%==================================================================%
+
+% 2*1F1(1/2; 1; z) for z <= 0
+F_cache.F{1} = 2*exp(reshape(F_cache.log1F1(1,2,:),[1,NZ]) - Z);   % 2*exp(z)*1F1(a; b; -z)
+
+% 2*1F1(1/2; 3/2; z1,z2) for z1 <= z2 <= 0
+F_cache.F{2} = 2*exp(reshape(F_cache.log2F1(1,1,3,:,:),[NZ,NZ]) - repmat(Z',[1,NZ]));  % 2*exp(z1)*2F1(a,a; b; -z1, z2-z1)
+for z=1:NZ-1
+    F_cache.F{2}(z,z+1:end) = 0;
+end
+
+% 2*1F1(1/2; 4/2; z1,z2,z3) for z1 <= z2 <= z3 <= 0
+F_cache.F{3} = 2*exp(reshape(F_cache.log3F1(1,1,1,:,:,:),[NZ,NZ,NZ]) - repmat(Z', [1,NZ,NZ]));  % 2*exp(z1)*2F1(a,a,a; b; -z1, z2-z1, z3-z1)
+for z1=1:NZ-1
+    F_cache.F{3}(z1,z1+1:end,:) = 0;
+    for z2=1:z1
+        F_cache.F{3}(z1,z2,z2+1:end) = 0;
+    end
+end
+
+save F_cache.mat F_cache
+
+
+
+
+%=============================================================%
+
+%-----------------  First-order Derivatives  -----------------%
+
+%=============================================================%
+
+% (d/dz) 2*1F1(1/2; 1; z) for z <= 0
+b = 2/2;
+F = F_cache.F{1};
+dF1 = 2*exp(reshape(F_cache.log1F1(2,2*(b+1),:),[1,NZ]) - Z);  % 2*exp(z)*1F1(a+1; b+1; -z)
+F_cache.dF{1} = F - dF1;
+
+% (d/dZ) 2*1F1(1/2; 3/2; z1,z2) for z1 <= z2 <= 0
+b = 3/2;
+F = reshape(F_cache.F{2}, [1,NZ,NZ]);
+dF1 = 2*exp(reshape(F_cache.log2F1(2,1,2*(b+1),:,:),[1,NZ,NZ]) - repmat(Z,[1,1,NZ]));  % 2*exp(z1)*2F1(a+1,a; b+1; -z1, z2-z1)
+dF2 = 2*exp(reshape(F_cache.log2F1(1,2,2*(b+1),:,:),[1,NZ,NZ]) - repmat(Z,[1,1,NZ]));  % 2*exp(z1)*2F1(a,a+1; b+1; -z1, z2-z1)
+F_cache.dF{2}(1,:,:) = F - dF1 - dF2;
+F_cache.dF{2}(2,:,:) = dF2;
+for z=1:NZ-1
+    F_cache.dF{2}(:,z,z+1:end) = 0;
+end
+
+% (d/dZ) 2*1F1(1/2; 4/2; z1,z2,z3) for z1 <= z2 <= z3 <= 0
+F = reshape(F_cache.F{3}, [1,NZ,NZ,NZ]);
+dF1 = 2*exp(reshape(F_cache.log3F1(2,1,1,:,:,:),[1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a+1,a,a; b+1; -z1, z2-z1, z3-z1)
+dF2 = 2*exp(reshape(F_cache.log3F1(1,2,1,:,:,:),[1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a,a+1,a; b+1; -z1, z2-z1, z3-z1)
+dF3 = 2*exp(reshape(F_cache.log3F1(1,1,2,:,:,:),[1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a,a,a+1; b+1; -z1, z2-z1, z3-z1)
+F_cache.dF{3}(1,:,:,:) = F - dF1 - dF2 - dF3;
+F_cache.dF{3}(2,:,:,:) = dF2;
+F_cache.dF{3}(3,:,:,:) = dF3;
+for z1=1:NZ-1
+    F_cache.dF{3}(:,z1,z1+1:end,:) = 0;
+    for z2=1:z1
+        F_cache.dF{3}(:,z1,z2,z2+1:end) = 0;
+    end
+end
+
+save F_cache.mat F_cache
+
+
+
+
+%==============================================================%
+
+%-----------------  Second-order Derivatives  -----------------%
+
+%==============================================================%
+
+
+% (d^2/dz^2) 1F1(1/2; 2/2; z) for z <= 0
+b = 2/2;
+F = F_cache.F{1};
+dF1 = F_cache.dF{1};
+ddF11 = 2*exp(reshape(F_cache.log1F1(3,2*(b+2),:), [1,NZ]) - Z);  % 2*exp(z)*1F1(a+2; b+2; -z)
+F_cache.ddF{1} = -F + 2*dF1 + ddF11;
+
+% (d/dZ) 2*1F1(1/2; 3/2; z1,z2) for z1 <= z2 <= 0
+b = 3/2;
+F = reshape(F_cache.F{2}, [1,NZ,NZ]);
+dF1 = F_cache.dF{2}(1,:,:);
+dF2 = F_cache.dF{2}(2,:,:);
+ddF11 = 2*exp(reshape(F_cache.log2F1(3,1,2*(b+2),:,:), [1,NZ,NZ]) - repmat(Z,[1,1,NZ]));  % 2*exp(z1)*2F1(a+2,a; b+2; -z1, z2-z1)
+ddF12 = 2*exp(reshape(F_cache.log2F1(2,2,2*(b+2),:,:), [1,NZ,NZ]) - repmat(Z,[1,1,NZ]));  % 2*exp(z1)*2F1(a+1,a+1; b+2; -z1, z2-z1)
+ddF22 = 2*exp(reshape(F_cache.log2F1(1,3,2*(b+2),:,:), [1,NZ,NZ]) - repmat(Z,[1,1,NZ]));  % 2*exp(z1)*2F1(a,a+1; b+2; -z1, z2-z1)
+F_cache.ddF{2}(1,:,:) = -F + 2*dF1 + ddF11 + 2*ddF12 + ddF22;
+F_cache.ddF{2}(2,:,:) = dF2 - ddF12 - ddF22;
+F_cache.ddF{2}(3,:,:) = ddF22;
+for z=1:NZ-1
+    F_cache.ddF{2}(:,z,z+1:end) = 0;
+end
+
+% (d^2/dZ^2) 1F1(1/2; 4/2; z1,z2,z3) for z1 <= z2 <= z3 <= 0
+b = 4/2;
+F = reshape(F_cache.F{3}, [1,NZ,NZ,NZ]);
+dF1 = F_cache.dF{3}(1,:,:,:);
+dF2 = F_cache.dF{3}(2,:,:,:);
+dF3 = F_cache.dF{3}(3,:,:,:);
+ddF11 = 2*exp(reshape(F_cache.log3F1(3,1,1,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a+2,a,a; b+2; -z1, z2-z1, z3-z1)
+ddF12 = 2*exp(reshape(F_cache.log3F1(2,2,1,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a+1,a+1,a; b+2; -z1, z2-z1, z3-z1)
+ddF13 = 2*exp(reshape(F_cache.log3F1(2,1,2,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a+1,a,a+1; b+2; -z1, z2-z1, z3-z1)
+ddF22 = 2*exp(reshape(F_cache.log3F1(1,3,1,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a,a+2,a; b+2; -z1, z2-z1, z3-z1)
+ddF23 = 2*exp(reshape(F_cache.log3F1(1,2,2,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a,a+1,a+1; b+2; -z1, z2-z1, z3-z1)
+ddF33 = 2*exp(reshape(F_cache.log3F1(1,1,3,:,:,:), [1,NZ,NZ,NZ]) - repmat(Z,[1,1,NZ,NZ]));  % 2*exp(z1)*3F1(a,a,a+2; b+2; -z1, z2-z1, z3-z1)
+F_cache.ddF{3}(1,:,:,:) = -F + 2*dF1 + ddF11 + 2*ddF12 + 2*ddF13 + ddF22 + 2*ddF23 + ddF33;
+F_cache.ddF{3}(2,:,:,:) = dF2 - ddF12 - ddF22 - ddF23;
+F_cache.ddF{3}(3,:,:,:) = dF3 - ddF13 - ddF23 - ddF33;
+F_cache.ddF{3}(4,:,:,:) = ddF22;
+F_cache.ddF{3}(5,:,:,:) = ddF23;
+F_cache.ddF{3}(6,:,:,:) = ddF33;
+for z1=1:NZ-1
+    F_cache.ddF{3}(:,z1,z1+1:end,:) = 0;
+    for z2=1:z1
+        F_cache.ddF{3}(:,z1,z2,z2+1:end) = 0;
+    end
+end
+
+save F_cache.mat F_cache
+
+
+
+
+%=============================================================%
+
+%-----------------  Third-order Derivatives  -----------------%
+
+%=============================================================%
+
+
+% % (d^2/dz^2) 1F1(1/2; 2/2; z) for z <= 0
+% b = 2/2;
+% F = F_cache.F{1};
+% dF1 = F_cache.dF{1};
+% ddF11 = F_cache.ddF{1};
+% F_cache.dddF111{1} = -F + 2*dF1 + ddF11;
+
+
+
+
+
+bingham_constants = [];
+bingham_constants.Z = Z;
+bingham_constants.F = F_cache.F;
+bingham_constants.dF = F_cache.dF;
+bingham_constants.ddF = F_cache.ddF;
+save bingham_constants.mat bingham_constants
 
 
 

@@ -28,10 +28,12 @@ ch_balls = find(strcmp(columns, 'balls'));
 ch_segments = find(strcmp(columns, 'segments'));
 ch_surfdist = find(strcmp(columns, 'surfdist'));
 ch_surfwidth = find(strcmp(columns, 'surfwidth'));
+ch_normalvar = find(strcmp(columns, 'normalvar'));
 
-ch_m = find(strncmp(columns, 'm', 1));
-ch_cov = find(strncmp(columns, 'cov', 3));
-ch_cnt = find(strncmp(columns, 'cnt', 3));
+% ch_m = find(strncmp(columns, 'm', 1));
+% ch_cov = find(strncmp(columns, 'cov', 3));
+% ch_cnt = find(strncmp(columns, 'cnt', 3));
+
 
 if ~isempty(ch_cluster)
    data(:, ch_cluster) = pcd.L;
@@ -105,12 +107,16 @@ end
 if ~isempty(ch_surfwidth)
    data(:, ch_surfwidth) = pcd.surfwidth;
 end
-
-if ~isempty(ch_m)
-   data(:, ch_m(1:3)) = pcd.M1;
-   data(:, ch_m(4:6)) = pcd.M2;   
-   data(:, ch_cov(1:6)) = pcd.C1(:, [1, 2, 3, 5, 6, 9]);
-   data(:, ch_cov(7:12)) = pcd.C2(:, [1, 2, 3, 5, 6, 9]);
-   data(:, ch_cnt(1)) = pcd.CNT1;
-   data(:, ch_cnt(2)) = pcd.CNT2;
+if ~isempty(ch_normalvar)
+   data(:, ch_normalvar) = pcd.normalvar;
 end
+
+
+% if ~isempty(ch_m)
+%    data(:, ch_m(1:3)) = pcd.M1;
+%    data(:, ch_m(4:6)) = pcd.M2;   
+%    data(:, ch_cov(1:6)) = pcd.C1(:, [1, 2, 3, 5, 6, 9]);
+%    data(:, ch_cov(7:12)) = pcd.C2(:, [1, 2, 3, 5, 6, 9]);
+%    data(:, ch_cnt(1)) = pcd.CNT1;
+%    data(:, ch_cnt(2)) = pcd.CNT2;
+% end
