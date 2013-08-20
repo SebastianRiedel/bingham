@@ -46,6 +46,9 @@ char **split(char *s, const char *delim, int *k);    /* splits a string into k w
 int wordcmp(char *s1, char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
 void replace_word(char **words, int num_words, const char *from, const char *to);   /* replace a word in a string array */
 
+int solve_quadratic(double *x, double a, double b, double c);
+//int solve_cubic(double *x, double a, double b, double c, double d);
+
 double fact(int x);                                     /* computes the factorial of x */
 double lfact(int x);                                    /* computes the log factorial of x */
 double surface_area_sphere(int d);                      /* computes the surface area of a unit sphere with dimension d */
@@ -119,6 +122,8 @@ void reorderi(int *y, int *x, int *idx, int n);                       /* reorder
 
 double ***new_matrix3(int n, int m, int p);                                 /* create a new n-by-m-by-p 3d matrix of doubles */
 void free_matrix3(double ***X);                                             /* free a 3d matrix of doubles */
+float ***new_matrix3f(int n, int m, int p);                                 /* create a new n-by-m-by-p 3d matrix of floats */
+void free_matrix3f(float ***X);                                             /* free a 3d matrix of floats */
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
@@ -127,8 +132,9 @@ float **new_matrix2f_data(int n, int m, float *data);                       /* c
 int **new_matrix2i_data(int n, int m, int *data);                           /* create a new n-by-m 2d matrix of ints */
 double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                         /* create a new n-by-n 2d indetity matrix of ints */
+//void resize_matrix2(double ***X, int n, int m, int n2, int m2);
 void add_rows_matrix2(double ***X, int n, int m, int new_n);                 /* add multiple rows to the matrix */
-void add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
+//double **add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                                  /* free a 2d matrix of doubles */

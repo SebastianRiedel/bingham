@@ -27,7 +27,7 @@ CFLAGS += -static -mno-cygwin -I"C:\Program Files\GnuWin32\include" -DHAVE_WINDO
 #CFLAGS = -I$(IDIR) -I"C:\Program*\GnuWin32\include" -DHAVE_WINDOWS
 endif
 
-LFLAGS=-lm #-lflann #-lduma
+LFLAGS=-lm -llapacke -llapack -lblas -lgfortran #-lflann #-lduma
 
 _DEPS = bingham.h bingham/bingham_constants.h bingham/bingham_constant_tables.h \
 	bingham/util.h bingham/tetramesh.h bingham/octetramesh.h bingham/hypersphere.h bingham/hll.h bingham/olf.h bingham/cuda_wrapper.h #bingham/gauss_mix.h
