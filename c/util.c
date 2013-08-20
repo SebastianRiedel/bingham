@@ -6,7 +6,8 @@
 #include <math.h>
 #include <float.h>
 #include "bingham/util.h"
-
+//#include <lapacke.h>
+//#undef I  // fuck C99!
 
 const color_t colormap[256] =
   {{0, 0, 131},
@@ -1371,6 +1372,27 @@ void free_matrix3(double ***X)
   free(X);
 }
 
+// create a new n-by-m-by-p 3d matrix of floats
+float ***new_matrix3f(int n, int m, int p)
+{
+  if (n*m*p == 0) return NULL;
+  int i;
+  float **X2 = new_matrix2f(n*m, p);
+  float ***X;
+  safe_malloc(X, n, float**);
+  for (i = 0; i < n; i++)
+    X[i] = X2 + m*i;
+
+  return X;
+}
+
+// free a 3d matrix
+void free_matrix3f(float ***X)
+{
+  free_matrix2f(X[0]);
+  free(X);
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {
@@ -1386,19 +1408,26 @@ double **new_matrix2(int n, int m)
   return X;
 }
 
-void add_rows_matrix2(double ***X, int n, int m, int new_n) {
-  if (new_n < n) {
-    printf("Invalid new n.\n");
-  }
+void add_rows_matrix2(double ***X, int n, int m, int new_n)
+{
   int i;
   double *raw = (*X)[0];
   safe_realloc(raw, m * new_n, double);
   safe_realloc(*X, new_n, double*);
-  for (i = 0; i < new_n; i++) {
-    //printf("Added row!\n");
+  for (i = 0; i < new_n; i++)
     (*X)[i] = raw + m*i;
+}
+
+/*
+void resize_matrix2(double ***X, int n, int m, int n2, int m2)
+{
+  if (m2 == m)
+    add_rows_matrix2(X, n, m, n2);
+  else {
+    
   }
 }
+*/
 
 // create a new n-by-m 2d matrix of floats
 float **new_matrix2f(int n, int m)
@@ -1453,13 +1482,18 @@ int **new_matrix2i_data(int n, int m, int *data)
   return X;
 }
 
-void add_matrix_row(double **X, int n, int m) {
-  printf("DANGER! Reallocating matrix rows is not tested yet!\n");
+/*
+double **add_matrix_row(double **X, int n, int m)
+{
+  //printf("DANGER! Reallocating matrix rows is not tested yet!\n");
   double *raw = X[0];
   safe_realloc(raw, (n + 1) * m, double);
   safe_realloc(X, n+1, double*);
   X[n] = raw + m * n;
+
+  return X;
 }
+*/
 
 double **new_identity_matrix2(int n) {
   double **mat = new_matrix2(n, n);
@@ -1843,7 +1877,37 @@ void variance(double *vars, double **X, int n, int m)
 // compute the covariance of the rows of X, given mean mu
 void cov(double **S, double **X, double *mu, int n, int m)
 {
-  int i;
+  int i, j, k;
+
+  memset(S[0], 0, m*m*sizeof(double));
+  double dx[m];
+
+  if (m == 3) {
+    for (i = 0; i < n; i++) {
+      dx[0] = X[i][0] - mu[0];
+      dx[1] = X[i][1] - mu[1];
+      dx[2] = X[i][2] - mu[2];
+      S[0][0] += dx[0]*dx[0];
+      S[0][1] += dx[0]*dx[1];
+      S[0][2] += dx[0]*dx[2];
+      S[1][0] += dx[1]*dx[0];
+      S[1][1] += dx[1]*dx[1];
+      S[1][2] += dx[1]*dx[2];
+      S[2][0] += dx[2]*dx[0];
+      S[2][1] += dx[2]*dx[1];
+      S[2][2] += dx[2]*dx[2];
+    }
+  }
+  else {
+    for (i = 0; i < n; i++) {
+      sub(dx, X[i], mu, m);
+      for (j = 0; j < m; j++)
+	for (k = 0; k < m; k++)
+	  S[j][k] += dx[j]*dx[k];
+    }
+  }
+
+  /*
   double **dX = matrix_clone(X, n, m);
   if (mu != NULL)
     for (i = 0; i < n; i++)
@@ -1851,10 +1915,11 @@ void cov(double **S, double **X, double *mu, int n, int m)
   double **dXt = new_matrix2(m, n);
   transpose(dXt, dX, n, m);
   matrix_mult(S, dXt, dX, m, n, m);
+  */
   mult(S[0], S[0], 1/(double)n, m*m);
 
-  free_matrix2(dX);
-  free_matrix2(dXt);
+  //free_matrix2(dX);
+  //free_matrix2(dXt);
 }
 
 
@@ -1980,7 +2045,7 @@ void inv(double **Y, double **X, int n)
     Y[0][0] = X[1][1] / d;
     Y[0][1] = -X[0][1] / d;
     Y[1][0] = -X[1][0] / d;
-    Y[1][1] = -X[0][0] / d;
+    Y[1][1] = X[0][0] / d;
   }
 
   else if (n == 3) {
@@ -2037,6 +2102,38 @@ void inv(double **Y, double **X, int n)
   }
 }
 
+/**
+ * Solves the quadratic equation: f(x) = a*x^2 + b*x + c
+ * Sets x[0] and x[1] to be the real roots of f(x), if found.
+ * Returns the number of real roots found.
+ */
+int solve_quadratic(double *x, double a, double b, double c)
+{
+  double s2 = b*b - 4*a*c;
+  if (s2 < 0.0)
+    return 0;
+
+  double s = sqrt(s2);
+  x[0] = .5*(-b + s)/a;
+  x[1] = .5*(-b - s)/a;
+
+  return 2;
+}
+
+/**
+ * Solves the cubic equation: f(x) = a*x^3 + b*x^2 + c*x + d
+ * Sets x[0], x[1], and x[2] to be the real roots of f(x), if found.
+ * Returns the number of real roots found.
+ *
+int solve_cubic(double *x, double a, double b, double c, double d)
+{
+  double p = -b/(3.0*a);
+  double q = p*p*p + (b*c - 3.0*a*d)/(6*a*a);
+  double r = c/(3.0*a);
+    
+}
+*/
+
 
 /**
  * Compute the eigenvalues z and eigenvectors V of a real symmetric n-by-n matrix X
@@ -2047,6 +2144,37 @@ void inv(double **Y, double **X, int n)
  * @param z (output) Eigenvalues of X, from smallest to largest in magnitude
  * @param V (output) Eigenvectors of X, in the rows
  */
+
+/*
+void eigen_symm(double z[], double **V, double **X, int n)
+{
+  double **Vt = matrix_clone(X,n,n);
+  double z2[n];
+  int i, j;
+
+  //TODO: replace this with solve_cubic() for n < 4
+
+  int info = LAPACKE_dsyevd(LAPACK_COL_MAJOR, 'V', 'U', n, Vt[0], n, z2);
+  if (info)
+    fprintf(stderr, "Error: eigen_symm failed to converge!\n");
+
+  // sort eigenvalues
+  double tolerance = 1e-10;
+  int idx[n];
+  sort_indices(z2, idx, n);
+  if (z2[idx[0]] < -tolerance)  // negative eigenvalues --> sort in reverse order
+    reversei(idx, idx, n);
+  for (i = 0; i < n; i++)
+    z[i] = z2[idx[i]];
+  for (i = 0; i < n; i++)
+    for (j = 0; j < n; j++)
+      V[i][j] = Vt[j][idx[i]];
+
+  //cleanup
+  free_matrix2(Vt);
+}
+*/
+
 void eigen_symm(double z[], double **V, double **X, int n)
 {
   // naive Jacobi method
@@ -2245,7 +2373,7 @@ void blur_matrix(double **dst, double **src, int n, int m)
   double G[3] = {.6193, .0838, .0113};
 
   double **I = (dst==src ? new_matrix2(n,m) : dst);
-  memcpy(dst[0], src[0], n*m*sizeof(double));
+  memcpy(I[0], src[0], n*m*sizeof(double));
 
   int i,j;
   for (i = 1; i < n-1; i++)
@@ -2266,7 +2394,7 @@ void blur_matrix_masked(double **dst, double **src, int **mask, int n, int m)
   double G[3] = {.6193, .0838, .0113};
 
   double **I = (dst==src ? new_matrix2(n,m) : dst);
-  memcpy(dst[0], src[0], n*m*sizeof(double));
+  memcpy(I[0], src[0], n*m*sizeof(double));
 
   int i,j;
   for (i = 1; i < n-1; i++) {
