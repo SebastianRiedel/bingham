@@ -19,6 +19,8 @@ extern "C" {
 #define min(x,n) arr_min(x,n)
 #define maxi(x,n) arr_max_i(x,n)
 #define mini(x,n) arr_min_i(x,n)
+#define max_masked(x,mask,n) arr_max_masked(x,mask,n)
+#define min_masked(x,mask,n) arr_min_masked(x,mask,n)
 
 
 #define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
@@ -79,10 +81,12 @@ int findinv(int *k, int x[], int n);                                  /* compute
 int findeq(int *k, int x[], int a, int n);                            /* computes a dense array of the indices of x==a */
 double sum(double x[], int n);                                        /* computes the sum of x's elements */
 double prod(double x[], int n);                                       /* computes the product of x's elements */
-double arr_max(double x[], int n);                                        /* computes the max of x */
-double arr_min(double x[], int n) ;                                       /* computes the min of x */
-double arr_max_i(int x[], int n);                                        /* computes the max of x */
-double arr_min_i(int x[], int n) ;                                       /* computes the min of x */
+double arr_max(double x[], int n);                                    /* computes the max of x */
+double arr_min(double x[], int n);                                    /* computes the min of x */
+double arr_max_i(int x[], int n);                                     /* computes the max of x */
+double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
+double arr_max_masked(double x[], int mask[], int n);                 /* computes the masked max of x */
+double arr_min_masked(double x[], int mask[], int n);                 /* computes the masked min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */

@@ -510,6 +510,25 @@ double arr_max_i(int x[], int n)
   return y;
 }
 
+// computes the masked max of x
+double arr_max_masked(double x[], int mask[], int n)
+{
+  int i;
+
+  for (i = 0; i < n; i++)
+    if (mask[i])
+      break;
+  if (i==n)
+    return NAN;
+
+  double y = x[i++];
+  for (; i < n; i++)
+    if (mask[i] && (x[i] > y))
+      y = x[i];
+
+  return y;
+}
+
 // computes the min of x
 double arr_min(double x[], int n)
 {
@@ -531,6 +550,25 @@ double arr_min_i(int x[], int n)
   int y = x[0];
   for (i = 1; i < n; i++)
     if (x[i] < y)
+      y = x[i];
+
+  return y;
+}
+
+// computes the masked min of x
+double arr_min_masked(double x[], int mask[], int n)
+{
+  int i;
+
+  for (i = 0; i < n; i++)
+    if (mask[i])
+      break;
+  if (i==n)
+    return NAN;
+
+  double y = x[i++];
+  for (; i < n; i++)
+    if (mask[i] && (x[i] < y))
       y = x[i];
 
   return y;
