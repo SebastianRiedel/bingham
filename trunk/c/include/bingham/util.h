@@ -21,6 +21,8 @@ extern "C" {
 #define mini(x,n) arr_min_i(x,n)
 #define max_masked(x,mask,n) arr_max_masked(x,mask,n)
 #define min_masked(x,mask,n) arr_min_masked(x,mask,n)
+#define maxf_masked(x,mask,n) arr_maxf_masked(x,mask,n)
+#define minf_masked(x,mask,n) arr_minf_masked(x,mask,n)
 
 
 #define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
@@ -87,6 +89,8 @@ double arr_max_i(int x[], int n);                                     /* compute
 double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
 double arr_max_masked(double x[], int mask[], int n);                 /* computes the masked max of x */
 double arr_min_masked(double x[], int mask[], int n);                 /* computes the masked min of x */
+float arr_maxf_masked(float x[], int mask[], int n);                  /* computes the masked max of x */
+float arr_minf_masked(float x[], int mask[], int n);                  /* computes the masked min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
