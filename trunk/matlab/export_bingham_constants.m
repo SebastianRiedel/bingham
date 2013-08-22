@@ -12,14 +12,14 @@ fprintf(f, '#define BINGHAM_CONSTANT_TABLES\n\n');
 fprintf(f, 'const int BINGHAM_TABLE_LENGTH = %d;\n\n', N);
 
 write_array_1d(f, sqrt(bingham_constants.Z), 'bingham_table_range');
-write_array_1d(f, bingham_constants.table{1}, 'bingham_F_table_1d');
+write_array_1d(f, bingham_constants.F{1}, 'bingham_F_table_1d');
 write_array_1d(f, bingham_constants.dF{1}, 'bingham_dF_table_1d');
 
-write_array_2d(f, bingham_constants.table{2}, 'bingham_F_table_2d');
+write_array_2d(f, bingham_constants.F{2}, 'bingham_F_table_2d');
 write_array_2d(f, reshape(bingham_constants.dF{2}(1,:,:), [N,N]), 'bingham_dF1_table_2d');
 write_array_2d(f, reshape(bingham_constants.dF{2}(2,:,:), [N,N]), 'bingham_dF2_table_2d');
 
-write_array_3d(f, bingham_constants.table{3}, 'bingham_F_table_3d');
+write_array_3d(f, bingham_constants.F{3}, 'bingham_F_table_3d');
 write_array_3d(f, reshape(bingham_constants.dF{3}(1,:,:,:), [N,N,N]), 'bingham_dF1_table_3d');
 write_array_3d(f, reshape(bingham_constants.dF{3}(2,:,:,:), [N,N,N]), 'bingham_dF2_table_3d');
 write_array_3d(f, reshape(bingham_constants.dF{3}(3,:,:,:), [N,N,N]), 'bingham_dF3_table_3d');

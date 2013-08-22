@@ -9,20 +9,20 @@ bingham_constants = data.bingham_constants;
 for i=1:length(bingham_constants.Z)
     for j=1:i
         for k=1:j
-            F = bingham_constants.table{3}(i,j,k);
-            bingham_constants.table{3}(i,k,j) = F;
-            bingham_constants.table{3}(j,i,k) = F;
-            bingham_constants.table{3}(j,k,i) = F;
-            bingham_constants.table{3}(k,i,j) = F;
-            bingham_constants.table{3}(k,j,i) = F;
+            F = bingham_constants.F{3}(i,j,k);
+            bingham_constants.F{3}(i,k,j) = F;
+            bingham_constants.F{3}(j,i,k) = F;
+            bingham_constants.F{3}(j,k,i) = F;
+            bingham_constants.F{3}(k,i,j) = F;
+            bingham_constants.F{3}(k,j,i) = F;
         end
     end
 end
 % 2-D
 for i=1:length(bingham_constants.Z)
     for j=1:i
-        F = bingham_constants.table{2}(i,j);
-        bingham_constants.table{2}(j,i) = F;
+        F = bingham_constants.F{2}(i,j);
+        bingham_constants.F{2}(j,i) = F;
     end
 end
 
@@ -56,7 +56,7 @@ end
 %%%  compute dY = dF/F lookup tables  %%%
 % 1-D
 n = length(bingham_constants.Z);
-bingham_constants.dY{1} = (bingham_constants.dF{1} ./ bingham_constants.table{1});
+bingham_constants.dY{1} = (bingham_constants.dF{1} ./ bingham_constants.F{1});
 bingham_constants.dY_indices{1} = 1:n;
 
 % 2-D
@@ -66,7 +66,7 @@ cnt=0;
 for i=1:n
     for j=1:i
         cnt=cnt+1;
-        dY(cnt,:) = bingham_constants.dF{2}(:,i,j)' / bingham_constants.table{2}(i,j);
+        dY(cnt,:) = bingham_constants.dF{2}(:,i,j)' / bingham_constants.F{2}(i,j);
         dY_indices(cnt,:) = [i,j];
     end
 end
@@ -81,7 +81,7 @@ for i=1:n
     for j=1:i
         for k=1:j
             cnt=cnt+1;
-            dY(cnt,:) = bingham_constants.dF{3}(:,i,j,k)' / bingham_constants.table{3}(i,j,k);
+            dY(cnt,:) = bingham_constants.dF{3}(:,i,j,k)' / bingham_constants.F{3}(i,j,k);
             dY_indices(cnt,:) = [i,j,k];
         end
     end
