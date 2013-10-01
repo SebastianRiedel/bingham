@@ -2251,8 +2251,57 @@ void eigen_symm(double z[], double **V, double **X, int n)
 }
 */
 
+
+void eigen_symm_2d(double z[], double **V, double **X)
+{
+  double a = X[0][0];
+  double b = X[0][1];
+  double c = X[1][1];
+
+  if (b == 0.0) {
+    if (fabs(a) < fabs(c)) {
+      z[0] = a;
+      z[1] = c;
+      V[0][0] = V[1][1] = 1.0;
+      V[0][1] = V[1][0] = 0.0;
+    }
+    else {
+      z[0] = c;
+      z[1] = a;
+      V[0][0] = V[1][1] = 0.0;
+      V[0][1] = V[1][0] = 1.0;
+    }
+    return;
+  }
+
+  double s = sqrt((a+c)*(a+c) + 4.*(b*b-a*c));
+  double z1 = (a+c+s)/2.;
+  double z2 = (a+c-s)/2.;
+  if (fabs(z1) < fabs(z2)) {
+    z[0] = z1;
+    z[1] = z2;
+  }
+  else {
+    z[1] = z1;
+    z[0] = z2;
+  }
+
+  double d0 = hypot(b, z[0]-a);
+  double d1 = hypot(b, z[1]-a);
+  V[0][0] = b/d0;
+  V[0][1] = (z[0]-a)/d0;
+  V[1][0] = b/d1;
+  V[1][1] = (z[1]-a)/d1;
+}
+
+
 void eigen_symm(double z[], double **V, double **X, int n)
 {
+  if (n == 2) {
+    eigen_symm_2d(z,V,X);
+    return;
+  }
+
   // naive Jacobi method
   int i, j;
   double tolerance = 1e-10;

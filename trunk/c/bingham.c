@@ -924,6 +924,8 @@ void bingham_compose(bingham_t *B, bingham_t *B1, bingham_t *B2)
   S[3][3] =
     2*a14*b14 - 2*a13*b24 + 2*a24*b13 + 2*a12*b34 - 2*a23*b23 - 2*a34*b12 + a11*b44 + a22*b33 + a33*b22 + a44*b11;
 
+  int i = 0; printf("S = ["); for (i = 0; i < 16; i++) printf("%f ", S[0][i]); printf("]\n");  //dbug
+
   if (B == B1 || B == B2)
     bingham_free(B);
 
