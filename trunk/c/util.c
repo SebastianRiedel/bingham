@@ -2258,7 +2258,9 @@ void eigen_symm_2d(double z[], double **V, double **X)
   double b = X[0][1];
   double c = X[1][1];
 
-  if (b == 0.0) {
+  const double epsilon = 1e-16;
+
+  if (b*b < epsilon * fabs(a*c)) {
     if (fabs(a) < fabs(c)) {
       z[0] = a;
       z[1] = c;
