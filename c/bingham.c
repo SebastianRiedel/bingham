@@ -423,12 +423,23 @@ void bingham_copy(bingham_t *dst, bingham_t *src)
  */
 void bingham_stats_free(bingham_stats_t *stats)
 {
-  if (stats->mode)
-    free(stats->mode);
-  if (stats->dF)
-    free(stats->dF);
-  if (stats->scatter)
-    free_matrix2(stats->scatter);
+  if (stats) {
+    if (stats->mode)
+      free(stats->mode);
+    if (stats->dF)
+      free(stats->dF);
+    if (stats->scatter)
+      free_matrix2(stats->scatter);
+  }
+}
+
+void bingham_free_stats(bingham_t *B)
+{
+  if (B->stats) {
+    bingham_stats_free(B->stats);
+    free(B->stats);
+    B->stats = NULL;
+  }
 }
 
 
@@ -439,10 +450,7 @@ void bingham_free(bingham_t *B)
 {
   free_matrix2(B->V);
   free(B->Z);
-  if (B->stats) {
-    bingham_stats_free(B->stats);
-    free(B->stats);
-  }
+  bingham_free_stats(B);
 }
 
 

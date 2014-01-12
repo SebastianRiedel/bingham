@@ -15,10 +15,10 @@ extern "C" {
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 
 //TODO: check for cuda
-#define max(x,n) arr_max(x,n)
-#define min(x,n) arr_min(x,n)
-#define maxi(x,n) arr_max_i(x,n)
-#define mini(x,n) arr_min_i(x,n)
+//#define max(x,n) arr_max(x,n)
+//#define min(x,n) arr_min(x,n)
+//#define maxi(x,n) arr_max_i(x,n)
+//#define mini(x,n) arr_min_i(x,n)
 #define max_masked(x,mask,n) arr_max_masked(x,mask,n)
 #define min_masked(x,mask,n) arr_min_masked(x,mask,n)
 #define maxf_masked(x,mask,n) arr_maxf_masked(x,mask,n)
@@ -85,8 +85,8 @@ double sum(double x[], int n);                                        /* compute
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double arr_max(double x[], int n);                                    /* computes the max of x */
 double arr_min(double x[], int n);                                    /* computes the min of x */
-double arr_max_i(int x[], int n);                                     /* computes the max of x */
-double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
+  //double arr_max_i(int x[], int n);                                     /* computes the max of x */
+  //double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
 double arr_max_masked(double x[], int mask[], int n);                 /* computes the masked max of x */
 double arr_min_masked(double x[], int mask[], int n);                 /* computes the masked min of x */
 float arr_maxf_masked(float x[], int mask[], int n);                  /* computes the masked max of x */

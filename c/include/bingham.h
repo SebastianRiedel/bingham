@@ -58,6 +58,8 @@ double bingham_L(bingham_t *B, double **X, int n);
 int bingham_is_uniform(bingham_t *B);
 void bingham_mode(double *mode, bingham_t *B);
 void bingham_stats(bingham_t *B);
+void bingham_free_stats(bingham_t *B);
+void bingham_stats_free(bingham_stats_t *stats);
 double bingham_cross_entropy(bingham_t *B1, bingham_t *B2);
 double bingham_KL_divergence(bingham_t *B1, bingham_t *B2);
 void bingham_merge(bingham_t *B, bingham_t *B1, bingham_t *B2, double alpha);
