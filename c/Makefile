@@ -2,7 +2,7 @@ IDIR=include
 ODIR=.
 LDIR=lib
 
-INSTALL_DIR=/usr
+INSTALL_DIR=/volume/USERSTORE/ried_sa/compiled_packages/bingham
 
 CC=gcc
 CPP=g++
@@ -10,7 +10,7 @@ NVCC=nvcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2
+CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -fPIC
 #CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 

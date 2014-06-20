@@ -95,6 +95,7 @@ void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src);
 double bingham_mixture_peak(bingham_mix_t *BM);
 void bingham_mixture_thresh_peaks(bingham_mix_t *BM, double pthresh);
 void bingham_mixture_thresh_weights(bingham_mix_t *BM, double wthresh);
+void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components);
 bingham_mix_t *load_bmx(char *f_bmx, int *k);
 void save_bmx(bingham_mix_t *BM, int num_clusters, char *fout);
 

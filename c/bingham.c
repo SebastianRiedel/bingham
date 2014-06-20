@@ -1036,6 +1036,7 @@ void bingham_fit(bingham_t *B, double **X, int n, int d)
   bingham_fit_scatter(B, S, d);
 
   free_matrix2(S);
+  free_matrix2(Xt);
 }
 
 
@@ -2241,6 +2242,206 @@ void bingham_invert_3d(bingham_t *B_inv, bingham_t *B)
   quaternion_inverse(B_inv->V[0], B->V[0]);
   quaternion_inverse(B_inv->V[1], B->V[1]);
   quaternion_inverse(B_inv->V[2], B->V[2]);
+}
+
+void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components)
+{
+  if(BM->n <= reduced_n_components)
+    return
+
+  /**
+  * maps an idx in the score matrix to the corresponding bingham distribution,
+  * this mapping also represents the current bmm, when fusing two binghams
+  * one gets replaces the the merged one the other one with NULL pointer
+  **/
+  bingham_t *idx2bingham_map[BM->n];
+
+  /**
+  * weights for current bmm, when fusing two binghams, one gets replaced
+  * with the sum of the fused weights, the other one is set to -1
+  **/
+  int idx2weight_map[BM->n];
+
+  /**
+  * holds the computed discrimination score between the mixture before the merge 
+  * of components i and j and after the merge of components ij
+  **/
+  double **B_ij = new_matrix2(BM->n, BM->n);
+  unsigned int i_min = 0;
+  unsigned int j_min = 0;
+  double b_ij_min_value = DBL_MAX-1.0;
+  unsigned int i_2nd_min = 0;
+  unsigned int j_2nd_min = 0;
+  double b_ij_2nd_min_value = DBL_MAX;  
+
+  /**
+  * holds the merged the bingham for components i and j
+  **/
+  bingham_t *merged_ij[BM->n][BM->n];
+
+  // initialize data structures
+  int i,j = 0;
+  for(i = 0; i < BM->n; ++i)
+  {
+    // store bingham into idx map
+    bingham_t *b_i;
+    safe_malloc(b_i, 1, bingham_t);
+    bingham_copy(b_i, &BM->B[i])
+    idx2bingham_map[i] = b_i;
+    idx2weight_map[i] = BM->w[i]
+
+
+    // calc and store merged bingham and merge score
+    for(j = i; j < BM->n; ++j)
+    {
+      if(i == j)
+      {
+        B_ij[i][j] = DBL_MAX;
+        B_ij[j][i] = DBL_MAX;
+        merged_ij[i][j] = NULL;
+        merged_ij[j][i] = NULL;
+      }
+      else
+      {
+        double w_i = idx2weight_map[i];
+        double w_j = idx2weight_map[j];
+
+        // calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
+        double alpha = (1.0 / (w_i + w_j)) * w_i;
+
+        // calc and store merged bingham
+        bingham_t *m_ij;
+        safe_malloc(m_ij, 1, bingham_t);
+        m_ij->d = 4;
+        bingham_merge(m_ij, idx2bingham_map[i], idx2bingham_map[j], alpha);
+        merged_ij[i][j] = m_ij;
+        merged_ij[j][i] = m_ij;
+
+        // calc and store merge score
+        double kl_i_ij = bingham_KL_divergence(idx2bingham_map[i], m_ij);
+        double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
+        double score = w_i * kl_i_ij + w_j * kl_j_ij;
+        B_ij[i][j] = score;
+        B_ij[j][i] = score;
+
+        if(score < b_ij_min_value)
+        {
+          // shift current min to 2nd best min
+          b_ij_2nd_min_value = b_ij_min_value;
+          i_2nd_min = i_min;
+          j_2nd_min = j_min;
+
+          // replace current min
+          b_ij_min_value = score;
+          i_min = i;
+          j_min = j;
+        }
+      }
+    }
+  }
+
+  // main reduction loop
+  unsigned int cur_n_components = BM->n;
+
+  while(cur_n_components > reduced_n_components)
+  {
+    // choose the two components with lowest score for merging
+    // and update data structures
+
+    // replace the two binghams by merged one
+    bingham_free(idx2bingham_map[i_min]);
+    free(idx2bingham_map[i_min]);
+    bingham_free(idx2bingham_map[j_min]);
+    free(idx2bingham_map[j_min]);
+    idx2bingham_map[i_min] = merged_ij[i_min][j_min];
+    idx2bingham_map[j_min] = NULL;
+
+    idx2weight_map[i_min] = idx2weight_map[i_min] + idx2weight_map[j_min];
+    idx2weight_map[j_min] = -1;
+
+    // free merged binghams and reset scores for merges with bingham j_min
+    int i;
+    for(i = 0; i<BM->n; ++i)
+    {
+      if(merged_ij[i][j_min] != NULL)
+      {
+        bingham_free(merged_ij[i][j_min]);
+        free(merged_ij[i][j_min]);
+        merged_ij[i][j_min] = NULL;
+        merged_ij[j_min][i]] = NULL;
+
+        B_ij[i][j_min] = DBL_MAX;
+        B_ij[j_min][i] = DBL_MAX;
+      }
+    }
+
+    // free merged binghams and reset scores for merges with bingham i_min
+    int j;
+    for(j = 0; j<BM->n; ++j)
+    {
+      if(merged_ij[i_min][j] != NULL)
+      {
+        bingham_free(merged_ij[i_min][j]);
+        free(merged_ij[i_min][j]);
+        merged_ij[i_min][j] = NULL;
+        merged_ij[j][i_min]] = NULL;
+
+        B_ij[i_min][j] = DBL_MAX;
+        B_ij[j][i_min] = DBL_MAX;
+      }
+    }
+
+    // minimum housekeeping
+    int was_i_min = i_min;
+    b_ij_min_value = b_ij_2nd_min_value
+    i_min = i_2nd_min
+    j_min = j_2nd_min
+    i_2nd_min = 0;
+    j_2nd_min = 0;
+    b_ij_2nd_min_value = DBL_MAX;  
+
+    // compute new merged binghams and new merged score for remaining components 
+    // with newly accepted merge
+    for(j = 0; j < BM->n; ++j)
+    {
+      if(idx2bingham_map[j] != NULL) // component exists
+      {
+        double w_i = idx2weight_map[was_i_min];
+        double w_j = idx2weight_map[j];
+
+        // calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
+        double alpha = (1.0 / (w_i + w_j)) * w_i;
+
+        // calc and store merged bingham
+        bingham_t *m_ij;
+        safe_malloc(m_ij, 1, bingham_t);
+        m_ij->d = 4;
+        bingham_merge(m_ij, idx2bingham_map[was_i_min], idx2bingham_map[j], alpha);
+        merged_ij[was_i_min][j] = m_ij;
+        merged_ij[j][was_i_min] = m_ij;
+
+        // calc and store merge score
+        double kl_i_ij = bingham_KL_divergence(idx2bingham_map[was_i_min], m_ij);
+        double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
+        double score = w_i * kl_i_ij + w_j * kl_j_ij;
+        B_ij[was_i_min][j] = score;
+        B_ij[j][was_i_min] = score;
+
+        if(score < b_ij_min_value)
+        {
+          // shift current min to 2nd best min
+          b_ij_2nd_min_value = b_ij_min_value;
+          i_2nd_min = i_min;
+          j_2nd_min = j_min;
+
+          // replace current min
+          b_ij_min_value = score;
+          i_min = was_i_min;
+          j_min = j;
+        }    
+      }
+    }
+  }
 }
 
 /*void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants) {
