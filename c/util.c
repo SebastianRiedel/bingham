@@ -2551,7 +2551,7 @@ void print_matrix(double **X, int n, int m)
   int i, j;
   for (i = 0; i < n; i++) {
     for (j = 0; j < m; j++)
-      printf("%f ", X[i][j]);
+      printf("%E ", X[i][j]);
     printf("\n");
   }
 }

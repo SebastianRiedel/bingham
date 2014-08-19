@@ -2,7 +2,7 @@ IDIR=include
 ODIR=.
 LDIR=lib
 
-INSTALL_DIR=/volume/USERSTORE/ried_sa/compiled_packages/bingham
+INSTALL_DIR=/volume/USERSTORE/ried_sa/compiled_packages/bingham/
 
 CC=gcc
 CPP=g++
@@ -10,7 +10,7 @@ NVCC=nvcc
 #MEX=mex
 MEX="C:/Program Files/MATLAB/R2009a/bin/mex.bat"
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -fPIC
+CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -fPIC -g -ggdb
 #CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
@@ -39,7 +39,7 @@ else
 LIBS = libbingham.a  #libolf.a
 endif
 ifndef WINDOWS
-PROGRAMS = fit_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3  #scope mope olf_pose_sample gauss_mix test_olf test_bingham test_hll test_util
+PROGRAMS = fit_bingham reduce_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3  #scope mope olf_pose_sample gauss_mix test_olf test_bingham test_hll test_util
 endif
 
 TARGETS = $(LIBS) $(PROGRAMS)
@@ -76,6 +76,9 @@ test_bingham: test_bingham.o libbingham.a
 
 fit_bingham: fit_bingham.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
+
+reduce_bingham: reduce_bingham.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)	
 
 bingham_lookup: bingham_lookup.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
