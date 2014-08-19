@@ -788,23 +788,40 @@ double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
   double *Z2 = B2->Z;
   double **V2 = B2->V;
 
-  // compute the full, transposed V1
-  double **V1_ft = new_matrix2(d, d);
-  for (i = 0; i < d; i++)
-    V1_ft[i][0] = B1->stats->mode[i];
-  for (i = 0; i < d; i++)
-    for (j = 1; j < d; j++)
-      V1_ft[i][j] = V1[j-1][i];
-
-  // rotate B2 into B1's coordinate frame
-  double **V1_ft_inv = new_matrix2(d, d);
-  inv(V1_ft_inv, V1_ft, d);
   double **A = new_matrix2(d-1, d);
-  for (i = 0; i < d-1; i++) {
-    for (j = 0; j < d; j++) {
-      A[i][j] = dot(V1_ft_inv[j], V2[i], d);
-      A[i][j] *= A[i][j];
+  if(bingham_is_uniform(B1))
+  {
+    // omit rotation of B2 into B1
+    for (i = 0; i < d-1; i++) {
+      for (j = 0; j < d; j++) {
+        A[i][j] = V2[i][j];
+        A[i][j] *= A[i][j];
+      }
+    }    
+  }
+  else
+  {
+    // compute the full, transposed V1
+    double **V1_ft = new_matrix2(d, d);
+    for (i = 0; i < d; i++)
+      V1_ft[i][0] = B1->stats->mode[i];
+    for (i = 0; i < d; i++)
+      for (j = 1; j < d; j++)
+        V1_ft[i][j] = V1[j-1][i];
+
+    // rotate B2 into B1's coordinate frame
+    double **V1_ft_inv = new_matrix2(d, d);
+    inv(V1_ft_inv, V1_ft, d);
+    // double **A = new_matrix2(d-1, d);
+    for (i = 0; i < d-1; i++) {
+      for (j = 0; j < d; j++) {
+        A[i][j] = dot(V1_ft_inv[j], V2[i], d);
+        A[i][j] *= A[i][j];
+      }
     }
+
+    free_matrix2(V1_ft);
+    free_matrix2(V1_ft_inv);
   }
 
   /*
@@ -824,8 +841,6 @@ double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
     H -= H_i;
   }
 
-  free_matrix2(V1_ft);
-  free_matrix2(V1_ft_inv);
   free_matrix2(A);
 
   return H;
@@ -2295,8 +2310,8 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     bingham_copy(b_i, &BM->B[i]);
     idx2bingham_map[i] = b_i;
     idx2weight_map[i] = BM->w[i];
-    printf("Allocated idx2bingham_map[%d]\n", i);
-    printf("Weight: %f\n", idx2weight_map[i]);
+    //printf("Allocated idx2bingham_map[%d]\n", i);
+    //printf("Weight: %f\n", idx2weight_map[i]);
   }
 
   for(i = 0; i < BM->n; ++i)
@@ -2325,14 +2340,14 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
         safe_malloc(m_ij, 1, bingham_t);
         m_ij->d = 4;
 
-        printf("alpha %f\n", alpha);
-        print_bingham(idx2bingham_map[i]);
-        print_bingham(idx2bingham_map[j]);
+        //printf("alpha %f\n", alpha);
+        //print_bingham(idx2bingham_map[i]);
+        //print_bingham(idx2bingham_map[j]);
         bingham_merge(m_ij, idx2bingham_map[i], idx2bingham_map[j], alpha);
         merged_ij[i][j] = m_ij;
         merged_ij[j][i] = m_ij;
 
-        printf("Allocated merged_ij[%d][%d]\n", i, j);
+        //printf("Allocated merged_ij[%d][%d]\n", i, j);
 
         // calc and store merge score
         double kl_i_ij = bingham_KL_divergence(idx2bingham_map[i], m_ij);
@@ -2373,13 +2388,13 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     // and update data structures
 
     // replace the two binghams by merged one
-    printf("Merging components %d and %d\n", i_min, j_min);
-    print_matrix(B_ij, BM->n, BM->n);
+    //printf("Merging components %d and %d\n", i_min, j_min);
+    //print_matrix(B_ij, BM->n, BM->n);
     bingham_copy(idx2bingham_map[i_min], merged_ij[i_min][j_min]); // copy merged bingham to i_min
     bingham_free(idx2bingham_map[j_min]);                          // free j_min bingham
     free(idx2bingham_map[j_min]);
     idx2bingham_map[j_min] = NULL;
-    printf("Freed idx2bingham_map[%d]\n", j_min);
+    //printf("Freed idx2bingham_map[%d]\n", j_min);
 
     idx2weight_map[i_min] = idx2weight_map[i_min] + idx2weight_map[j_min];
     idx2weight_map[j_min] = -1;
@@ -2396,7 +2411,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
         free(merged_ij[i][j_min]);
         merged_ij[i][j_min] = NULL;
         merged_ij[j_min][i] = NULL;
-        printf("Freed merged_ij[%d][%d]\n", i,j_min);
+        //printf("Freed merged_ij[%d][%d]\n", i,j_min);
 
         B_ij[i][j_min] = DBL_MAX;
         B_ij[j_min][i] = DBL_MAX;
@@ -2413,7 +2428,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
         free(merged_ij[i_min][j]);
         merged_ij[i_min][j] = NULL;
         merged_ij[j][i_min] = NULL;
-        printf("Freed merged_ij[%d][%d]\n", i_min,j);
+        //printf("Freed merged_ij[%d][%d]\n", i_min,j);
 
         B_ij[i_min][j] = DBL_MAX;
         B_ij[j][i_min] = DBL_MAX;
@@ -2435,7 +2450,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
 
     if(i_min == was_j_min || j_min == was_j_min || i_min == was_i_min || j_min == was_i_min) // 2nd kept minima was also involved the component just erased
     {
-      printf("Reaquiring correct minima.\n");
+      //printf("Reaquiring correct minima.\n");
       i_min = 0;
       j_min = 0;
       b_ij_min_value = DBL_MAX;
@@ -2489,7 +2504,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
         merged_ij[was_i_min][j] = m_ij;
         merged_ij[j][was_i_min] = m_ij;
 
-        printf("Allocated merged_ij[%d][%d]\n", was_i_min,j);
+        //printf("Allocated merged_ij[%d][%d]\n", was_i_min,j);
 
         // calc and store merge score
         double kl_i_ij = bingham_KL_divergence(idx2bingham_map[was_i_min], m_ij);
@@ -2525,10 +2540,10 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
   unsigned int bm_n = BM->n;
   bingham_mixture_free(BM);
   BM->n = reduced_n_components;
-  printf("Freed initial BMM\n");
+  //printf("Freed initial BMM\n");
   safe_malloc(BM->B, reduced_n_components, bingham_t);
   safe_malloc(BM->w, reduced_n_components, double);
-  printf("Allocated reduced BMM\n");
+  //printf("Allocated reduced BMM\n");
 
   unsigned int added_components = 0;
   for(i = 0; i < bm_n; ++i)
@@ -2538,12 +2553,12 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
       bingham_alloc(&BM->B[added_components], 4);
       bingham_copy(&BM->B[added_components], idx2bingham_map[i]);
       BM->w[added_components] = idx2weight_map[i];
-      printf("Copied reduced component %d <-- i==%d\n", added_components+1, i);
+      //printf("Copied reduced component %d <-- i==%d\n", added_components+1, i);
 
       // delete used bingham
       bingham_free(idx2bingham_map[i]);
       free(idx2bingham_map[i]);
-      printf("Freed idx2bingham_map[%d]\n", i);
+      //printf("Freed idx2bingham_map[%d]\n", i);
 
       added_components++;
     }
@@ -2566,7 +2581,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
         free(merged_ij[i][j]);
         merged_ij[i][j] = NULL;
         merged_ij[j][i] = NULL;        
-        printf("Freed merged_ij[%d][%d]\n", i, j);
+        //printf("Freed merged_ij[%d][%d]\n", i, j);
       }
     }
   }

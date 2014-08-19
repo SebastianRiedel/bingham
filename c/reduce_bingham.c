@@ -161,6 +161,7 @@ V:
   bmm.w[7] = 0.001;    
 
   bingham_mixture_reduce(&bmm, 5);
+  printf("Done\n");
 }
 
 void small_test()
