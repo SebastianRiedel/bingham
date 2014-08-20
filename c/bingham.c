@@ -497,6 +497,12 @@ void bingham_new(bingham_t *B, int d, double **V, double *Z)
   else
     bingham_F(B);
 
+  // somehow the lookup for Z=[0,0,0] differs from surface_area_sphere(d);
+  if(bingham_is_uniform(B))
+  {
+    B->F = surface_area_sphere(d);
+  }
+
   B->stats = NULL;
 }
 
@@ -776,6 +782,10 @@ void bingham_stats(bingham_t *B)
  */
 double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
 {
+  // printf("Freeing stats B1");
+  // printf("Freeing stats B2");
+  // bingham_free_stats(B1);
+  // bingham_free_stats(B2);
   bingham_stats(B1);
   bingham_stats(B2);
 
@@ -1172,10 +1182,14 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, int n)
     // apportion samples to each mixture component
     int ni[BM->n];
     int ntot = 0;
-    for (i = 0; i < BM->n; i++) {
+    for (i = 0; i < BM->n; i++) {      
       ni[i] = round(n * BM->w[i]);
       ntot += ni[i];
+      // printf("w[i] / ni[i]: %f / %d\n", BM->w[i], ni[i]);
     }
+
+    // printf("n / ntot: %d / %d\n", n, ntot);
+
     if (ntot < n) {  // too few samples
       for (i = ntot; i < n; i++) {
 	j = pmfrand(BM->w, BM->n);
@@ -1918,6 +1932,13 @@ void bingham_mixture_add(bingham_mix_t *dst, bingham_mix_t *src)
     bingham_alloc(&dst->B[n+i], src->B[i].d);
     bingham_copy(&dst->B[n+i], &src->B[i]);
   }
+
+  // assuming both mixtures were normalized to 1.0
+  // normalize the resulting mixture
+  for (i = 0; i < dst->n; i++)
+  {
+    dst->w[i] = dst->w[i] / 2.0;
+  }
 }
 
 
@@ -2259,13 +2280,76 @@ void bingham_invert_3d(bingham_t *B_inv, bingham_t *B)
   quaternion_inverse(B_inv->V[2], B->V[2]);
 }
 
+void bingham_mixture_collapse_uniforms(bingham_mix_t *dst, bingham_mix_t *src)
+{
+  // first check if multiple uniform distributions can be packed into one
+  double total_uniform_weight = 0.0;
+  unsigned int n_uniforms = 0;
+  unsigned int d = 0;
+  unsigned int i;
+  for(i = 0; i < src->n; i++)
+  {
+    if(bingham_is_uniform(&src->B[i]))
+    {
+      total_uniform_weight += src->w[i];
+      n_uniforms++;
+      d = src->B[i].d;
+    }
+  }
+
+  if(n_uniforms > 1)
+  {
+    
+    unsigned int n = src->n - n_uniforms + 1; // only one uniform remains
+    dst->n = n;
+    safe_malloc(dst->w, n, double);
+    safe_malloc(dst->B, n, bingham_t);
+
+    unsigned int dst_i = 0;
+    for (i = 0; i < src->n; i++) {
+      if(!bingham_is_uniform(&src->B[i]))
+      {
+        dst->w[dst_i] = src->w[i];
+        bingham_alloc(&dst->B[dst_i], src->B[i].d);
+        bingham_copy(&dst->B[dst_i], &src->B[i]);
+        dst_i++;        
+      }
+    }
+
+    if(dst_i != dst->n - 1)
+    {
+      printf("Something is wrong, dst_i should be dst->n - 1");
+      exit(-1);
+    }
+
+    bingham_t b_uniform;
+    bingham_new_uniform(&b_uniform, d);
+    dst->w[dst_i] = total_uniform_weight;
+    bingham_alloc(&dst->B[dst_i], d);
+    bingham_copy(&dst->B[dst_i], &b_uniform);
+    bingham_free(&b_uniform);
+
+    // printf("Collapsed %d uniform binghams.\n", n_uniforms);
+  }
+  else
+  {
+    bingham_mixture_copy(dst, src);
+  }
+}
+
 void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components)
 {
+  bingham_mix_t BM_collapsed;
+  bingham_mixture_collapse_uniforms(&BM_collapsed, BM);
+
+  bingham_mixture_free(BM);
+  bingham_mixture_copy(BM, &BM_collapsed);
+  bingham_mixture_free(&BM_collapsed);
+
   if(BM->n <= reduced_n_components)
   {
     return;    
-  }
-    
+  } 
 
   /**
   * maps an idx in the score matrix to the corresponding bingham distribution,
