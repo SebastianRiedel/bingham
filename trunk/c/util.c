@@ -498,7 +498,7 @@ double arr_max(double x[], int n)
 }
 
 // computes the max of x
-double arr_max_i(int x[], int n)
+int arr_max_i(int x[], int n)
 {
   int i;
 
@@ -562,7 +562,7 @@ double arr_min(double x[], int n)
 }
 
 // computes the min of x
-double arr_min_i(int x[], int n)
+int arr_min_i(int x[], int n)
 {
   int i;
 
@@ -580,7 +580,7 @@ double arr_min_masked(double x[], int mask[], int n)
   int i;
 
   for (i = 0; i < n; i++)
-    if (mask[i])
+    if (mask[i] != 0)
       break;
   if (i==n)
     return NAN;
@@ -1469,6 +1469,21 @@ void free_matrix3f(float ***X)
   free(X);
 }
 
+// copy a 3d matrix of doubles: Y = X
+void matrix3_copy(double ***Y, double ***X, int n, int m, int p)
+{
+  memcpy(Y[0][0], X[0][0], n*m*p*sizeof(double));
+}
+
+// clone a 3d matrix of doubles: Y = new(X)
+double ***matrix3_clone(double ***X, int n, int m, int p)
+{
+  double ***Y = new_matrix3(n,m,p);
+  matrix3_copy(Y, X, n, m, p);
+
+  return Y;
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {
@@ -1672,6 +1687,36 @@ void save_matrixi(char *fout, int **X, int n, int m)
 }
 
 /*
+ * Write a 3d matrix in the following format.
+ *
+ * <ntabs> <nrows> <ncols>
+ * <tab 1 row 1>
+ * <tab 1 row 2>
+ * ...
+ * <tab 2 row 1>
+ * <tab 2 row 2>
+ * ...
+ */
+void save_matrix3(char *fout, double ***X, int n, int m, int p)
+{
+  //fprintf(stderr, "saving matrix3 to %s\n", fout);
+
+  FILE *f = fopen(fout, "w");
+  int i, j, k;
+
+  fprintf(f, "%d %d %d\n", n, m, p);
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++) {
+      for (k = 0; k < p; k++)
+	fprintf(f, "%f ", X[i][j][k]);
+      fprintf(f, "\n");
+    }
+  }
+
+  fclose(f);
+}
+
+/*
  * Load a matrix in the following format.
  *
  * <nrows> <ncols>
@@ -1723,6 +1768,64 @@ double **load_matrix(char *fin, int *n, int *m)
   return X;
 }
 
+/*
+ * Load a 3d matrix in the following format.
+ *
+ * <ntabs> <nrows> <ncols>
+ * <tab 1 row 1>
+ * <tab 1 row 2>
+ * ...
+ * <tab 2 row 1>
+ * <tab 2 row 2>
+ * ...
+ */
+double ***load_matrix3(char *fin, int *n, int *m, int *p)
+{
+  FILE *f = fopen(fin, "r");
+
+  if (f == NULL) {
+    fprintf(stderr, "Invalid filename: %s", fin);
+    return NULL;
+  }
+
+  char sbuf0[128], *s = sbuf0;
+  if (fgets(s, 128, f) == NULL || sscanf(s, "%d %d %d", n, m, p) < 3) {
+    fprintf(stderr, "Corrupt matrix header in file %s\n", fin);
+    fclose(f);
+    return NULL;
+  }
+
+  double ***X = new_matrix3(*n, *m, *p);
+
+  const int CHARS_PER_FLOAT = 20;
+  char sbuf[CHARS_PER_FLOAT * (*p)];
+
+  int i, j, k;
+  for (i = 0; i < *n; i++) {
+    for (j = 0; j < *m; j++) {
+      s = sbuf;
+      if (fgets(s, 10000, f) == NULL)
+	break;
+      for (k = 0; k < *p; k++) {
+	if (sscanf(s, "%lf", &X[i][j][k]) < 1)
+	  break;
+	s = sword(s, " \t", 1);
+      }
+      if (k < *p)
+	break;
+    }
+    if (j < *m)
+      break;
+  }
+  if (i < *n) {
+    fprintf(stderr, "Corrupt matrix file '%s' at line %d\n", fin, i*(*m)+j+2);
+    fclose(f);
+    free_matrix3(X);
+    return NULL;
+  }
+
+  return X;
+}
 
 
 // calculate the area of a triangle
@@ -1798,6 +1901,28 @@ void transpose(double **Y, double **X, int n, int m)
     free_matrix2(X2);
 }
 
+
+/*
+int test_matrix_copy()
+{
+  double X_data[6] = {1,2,3,4,5,6};
+  double **X = new_matrix2_data(3,2, X_data);
+
+  //double **X = new_matrix2(2,2);
+  //X[0][0] = 1;
+  //X[0][1] = 2;
+  //X[1][0] = 3;
+  //X[1][1] = 4;
+
+  
+
+  
+  // 1 2
+  // 3 4
+
+
+}
+*/
 
 // matrix copy, Y = X 
 void matrix_copy(double **Y, double **X, int n, int m)

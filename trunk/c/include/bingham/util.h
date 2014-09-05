@@ -85,8 +85,8 @@ double sum(double x[], int n);                                        /* compute
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double arr_max(double x[], int n);                                    /* computes the max of x */
 double arr_min(double x[], int n);                                    /* computes the min of x */
-  //double arr_max_i(int x[], int n);                                     /* computes the max of x */
-  //double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
+int  arr_max_i(int x[], int n);                                     /* computes the max of x */
+int  arr_min_i(int x[], int n) ;                                    /* computes the min of x */
 double arr_max_masked(double x[], int mask[], int n);                 /* computes the masked max of x */
 double arr_min_masked(double x[], int mask[], int n);                 /* computes the masked min of x */
 float arr_maxf_masked(float x[], int mask[], int n);                  /* computes the masked max of x */
@@ -132,6 +132,10 @@ double ***new_matrix3(int n, int m, int p);                                 /* c
 void free_matrix3(double ***X);                                             /* free a 3d matrix of doubles */
 float ***new_matrix3f(int n, int m, int p);                                 /* create a new n-by-m-by-p 3d matrix of floats */
 void free_matrix3f(float ***X);                                             /* free a 3d matrix of floats */
+void matrix3_copy(double ***Y, double ***X, int n, int m, int p);           /* copy a 3d matrix of doubles: Y = X */
+double ***matrix3_clone(double ***X, int n, int m, int p);                  /* clone a 3d matrix of doubles: Y = new(X) */
+
+
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
@@ -150,7 +154,9 @@ void free_matrix2f(float **X);                                                  
 void free_matrix2i(int **X);                                                    /* free a 2d matrix of ints */
 void save_matrix(char *fout, double **X, int n, int m);                         /* save a matrix to a file */
 void save_matrixi(char *fout, int **X, int n, int m);                           /* save a matrix to a file */
+void save_matrix3(char *fout, double ***X, int n, int m, int p);                /* save a 3d matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                                /* load a matrix from a file */
+double ***load_matrix3(char *fin, int *n, int *m, int *p);                      /* load a 3d matrix from a file */
 void transpose(double **Y, double **X, int n, int m);                           /* transpose a matrix */
 void solve(double *x, double **A, double *b, int n);                            /* solve the equation Ax = b, where A is a square n-by-n matrix */
 double det(double **X, int n);                                                  /* compute the determinant of the n-by-n matrix X */
