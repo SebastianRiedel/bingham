@@ -39,7 +39,7 @@ else
 LIBS = libbingham.a  #libolf.a
 endif
 ifndef WINDOWS
-PROGRAMS = fit_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3  #scope mope olf_pose_sample gauss_mix test_olf test_bingham test_hll test_util
+PROGRAMS = fit_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3 test_util  #scope mope olf_pose_sample gauss_mix test_olf test_bingham test_hll
 endif
 
 TARGETS = $(LIBS) $(PROGRAMS)

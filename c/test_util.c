@@ -368,3 +368,78 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+
+
+
+/* jing
+
+int test_sum()
+{
+  double a[5] = {1, 2, 4, 5.1, 2};
+  double res = sum(a, 5);
+  if (!double_is_equal(res, 14.1))
+    return 0;
+
+  double b[2] = {2,3};
+  if (!double_is_equal(sum(b,2), 5))
+    return 0;  
+
+  return 1;
+}
+
+
+int test_prod()
+{
+  double a[3] = {2, 2, 4};
+
+  if (!double_is_equal(prod(a,3), 16))
+    return 0;  
+  return 1;
+}
+
+
+
+int test_arr_max()
+{
+  double a[5] = {1, 2, 4, 5.1, 2};
+
+  if (!double_is_equal(arr_max(a,5), 5.1))
+    return 0;  
+  return 1;
+}
+
+
+int test_arr_max_i()
+{
+  int a[5] = {1, 2, 4, 70, 89};
+
+  if (arr_max_i(a,5) != 89)
+    return 0;  
+  return 1;
+}
+
+
+
+
+
+
+
+int test_arr_min_masked()
+{
+  double a[5] = {1, 2.1, 4, 70.1, 89};
+  int mask[5] = {1,1,1,1,0};
+
+  if (!double_is_equal(arr_min_masked(a,mask,5),1))
+      return 0;
+      
+  int mask2[5] = {0,0,0,0,0};
+  if (arr_min_masked(a, mask2, 5) != NAN)
+    return 0;
+
+  //assert( arr_min_masked(a, mask2, 5) == NAN );
+
+  
+  return 1;
+}
+
+*/
