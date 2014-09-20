@@ -1729,7 +1729,7 @@ double **load_matrix(char *fin, int *n, int *m)
   FILE *f = fopen(fin, "r");
 
   if (f == NULL) {
-    fprintf(stderr, "Invalid filename: %s", fin);
+    fprintf(stderr, "Invalid filename: %s\n", fin);
     return NULL;
   }
 
@@ -1765,6 +1765,8 @@ double **load_matrix(char *fin, int *n, int *m)
     return NULL;
   }
 
+  fclose(f);
+
   return X;
 }
 
@@ -1784,7 +1786,7 @@ double ***load_matrix3(char *fin, int *n, int *m, int *p)
   FILE *f = fopen(fin, "r");
 
   if (f == NULL) {
-    fprintf(stderr, "Invalid filename: %s", fin);
+    fprintf(stderr, "Invalid filename: %s\n", fin);
     return NULL;
   }
 
@@ -1823,6 +1825,8 @@ double ***load_matrix3(char *fin, int *n, int *m, int *p)
     free_matrix3(X);
     return NULL;
   }
+
+  fclose(f);
 
   return X;
 }
