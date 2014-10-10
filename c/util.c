@@ -1509,6 +1509,17 @@ void add_rows_matrix2(double ***X, int n, int m, int new_n)
     (*X)[i] = raw + m*i;
 }
 
+void add_rows_matrix2i(int ***X, int n, int m, int new_n)
+{
+  int i;
+  int *raw = (*X)[0];
+  safe_realloc(raw, m * new_n, int);
+  safe_realloc(*X, new_n, int*);
+  for (i = 0; i < new_n; i++)
+    (*X)[i] = raw + m*i;
+}
+
+
 /*
 void resize_matrix2(double ***X, int n, int m, int n2, int m2)
 {
