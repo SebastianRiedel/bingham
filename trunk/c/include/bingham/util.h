@@ -145,7 +145,8 @@ int **new_matrix2i_data(int n, int m, int *data);                           /* c
 double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                         /* create a new n-by-n 2d indetity matrix of ints */
 //void resize_matrix2(double ***X, int n, int m, int n2, int m2);
-void add_rows_matrix2(double ***X, int n, int m, int new_n);                 /* add multiple rows to the matrix */
+void add_rows_matrix2(double ***X, int n, int m, int new_n);                /* add multiple rows to the matrix */
+void add_rows_matrix2i(int ***X, int n, int m, int new_n);                  /* add multiple rows to the matrix */
 //double **add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
