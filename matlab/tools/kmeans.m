@@ -1,6 +1,10 @@
-function [M L ssd] = kmeans(X, k, num_restarts)
+function [M L ssd] = kmeans(X, k, num_restarts, verbose)
 % [M L ssd] = kmeans(X, k, num_restarts) -- applies kmeans to the rows of sample matrix X;
 % returns cluster means M (in the rows), and sample labels L
+
+if nargin < 4
+    verbose=0;
+end
 
 
 % kmeans with restarts
@@ -54,7 +58,7 @@ for j=1:iter
       ssd = ssd + sum(sum((Xi-Mi).*(Xi-Mi)));
    end
    %fprintf('%d. ssd = %f\n', j, ssd);
-   if mod(j,10)==0, fprintf('.'); end
+   if verbose, if mod(j,10)==0, fprintf('.'); end, end
    
    if abs(ssd - ssd_prev) < 1e-4
       break;
