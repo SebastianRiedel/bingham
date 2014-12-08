@@ -93,6 +93,8 @@ float arr_maxf_masked(float x[], int mask[], int n);                  /* compute
 float arr_minf_masked(float x[], int mask[], int n);                  /* computes the masked min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
+int find_maxi(int x[], int n);                                        /* returns index of the max of x */
+int find_mini(int x[], int n);                                        /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
 int find_first_lt(double *x, double a, int n);                        /* find the index of the first element of x such that x<a */
 int find_first_gt(double *x, double a, int n);                        /* find the index of the first element of x such that x>a */
