@@ -635,7 +635,7 @@ int find_min(double x[], int n)
 }
 
 // returns the index of the max of x
-int find_maxi(int x[], int n)
+int find_imax(int x[], int n)
 {
   int i;
   int idx = 0;
@@ -646,7 +646,7 @@ int find_maxi(int x[], int n)
 }
 
 // returns the index of the min of x
-int find_mini(int x[], int n)
+int find_imin(int x[], int n)
 {
   int i;
   int idx = 0;
