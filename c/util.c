@@ -928,6 +928,21 @@ int binary_search(double x, double *A, int n)
   return n-1;
 }
 
+void plane_from_3points(double *coeffs, double *p0, double *p1, double *p2)
+{
+    double diff1[3], diff2[3];
+    sub(diff1, p1, p0, 3);
+    sub(diff2, p2, p0, 3);
+    double normal[3];
+    cross(normal, diff1, diff2);
+    normalize(normal, normal, 3);
+    double flip = normal[2] > 0.0 ? -1.0 : 1.0; // flip normal towards camera
+    
+    coeffs[0] = normal[0] * flip;
+    coeffs[1] = normal[1] * flip;
+    coeffs[2] = normal[2] * flip;
+    coeffs[3] = -dot(normal, p0, 3) * flip;
+}
 
 // quaternion multiplication:  z = x*y
 void quaternion_mult(double z[4], double x[4], double y[4])
