@@ -328,7 +328,7 @@ char **split(char *s, const char *delim, int *k)
 
 
 // compare the first word of s1 with the first word of s2
-int wordcmp(char *s1, char *s2, const char *delim)
+int wordcmp(const char *s1, const char *s2, const char *delim)
 {
   int n1 = strcspn(s1, delim);
   int n2 = strcspn(s2, delim);
