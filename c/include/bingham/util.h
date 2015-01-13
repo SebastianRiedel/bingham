@@ -47,7 +47,7 @@ double get_time_ms();  /* get the current system time in millis */
 
 char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
 char **split(char *s, const char *delim, int *k);    /* splits a string into k words */
-int wordcmp(char *s1, char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
+int wordcmp(const char *s1, const char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
 void replace_word(char **words, int num_words, const char *from, const char *to);   /* replace a word in a string array */
 
 int solve_quadratic(double *x, double a, double b, double c);
@@ -120,6 +120,7 @@ void wavg(double z[], double x[], double y[], double w, int n);       /* average
 void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* averages three vectors, y = (x1+x2+x3)/3 */
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
 int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
+void plane_from_3points(double *coeffs, double *p0, double *p1, double *p2); /* finds the plane coefficients from 3 points */
 void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
 void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
