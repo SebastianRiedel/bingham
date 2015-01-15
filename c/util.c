@@ -280,7 +280,7 @@ double get_time_ms()
 
 
 // returns a pointer to the nth word (starting from 0) in string s
-char *sword(char *s, const char *delim, int n)
+char *sword(const char *s, const char *delim, int n)
 {
   if (s == NULL)
     return NULL;
@@ -293,14 +293,14 @@ char *sword(char *s, const char *delim, int n)
     s += strspn(s, delim);  // skip over delimeters
   }
 
-  return s;
+  return (char *)s;
 }
 
 
 // splits a string into k words
-char **split(char *s, const char *delim, int *k)
+char **split(const char *s, const char *delim, int *k)
 {
-  char *sbuf = s + strspn(s, delim);  // skip over initial whitespace
+  const char *sbuf = s + strspn(s, delim);  // skip over initial whitespace
   s = sbuf;
 
   // determine the number of words
@@ -1700,7 +1700,7 @@ void free_matrix2i(int **X)
  * <row 2>
  * ...
  */
-void save_matrix(char *fout, double **X, int n, int m)
+void save_matrix(const char *fout, double **X, int n, int m)
 {
   //fprintf(stderr, "saving matrix to %s\n", fout);
 
@@ -1717,7 +1717,7 @@ void save_matrix(char *fout, double **X, int n, int m)
   fclose(f);
 }
 
-void save_matrixi(char *fout, int **X, int n, int m)
+void save_matrixi(const char *fout, int **X, int n, int m)
 {
   //fprintf(stderr, "saving matrix to %s\n", fout);
 
@@ -1745,7 +1745,7 @@ void save_matrixi(char *fout, int **X, int n, int m)
  * <tab 2 row 2>
  * ...
  */
-void save_matrix3(char *fout, double ***X, int n, int m, int p)
+void save_matrix3(const char *fout, double ***X, int n, int m, int p)
 {
   //fprintf(stderr, "saving matrix3 to %s\n", fout);
 

@@ -45,8 +45,8 @@ short double_is_equal(double a, double b); /* Checks if two doubles are equal us
 
 double get_time_ms();  /* get the current system time in millis */
 
-char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
-char **split(char *s, const char *delim, int *k);    /* splits a string into k words */
+char *sword(const char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
+char **split(const char *s, const char *delim, int *k);    /* splits a string into k words */
 int wordcmp(const char *s1, const char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
 void replace_word(char **words, int num_words, const char *from, const char *to);   /* replace a word in a string array */
 
@@ -156,9 +156,9 @@ int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                                  /* free a 2d matrix of doubles */
 void free_matrix2f(float **X);                                                  /* free a 2d matrix of floats */
 void free_matrix2i(int **X);                                                    /* free a 2d matrix of ints */
-void save_matrix(char *fout, double **X, int n, int m);                         /* save a matrix to a file */
-void save_matrixi(char *fout, int **X, int n, int m);                           /* save a matrix to a file */
-void save_matrix3(char *fout, double ***X, int n, int m, int p);                /* save a 3d matrix to a file */
+void save_matrix(const char *fout, double **X, int n, int m);                         /* save a matrix to a file */
+void save_matrixi(const char *fout, int **X, int n, int m);                           /* save a matrix to a file */
+void save_matrix3(const char *fout, double ***X, int n, int m, int p);                /* save a 3d matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                                /* load a matrix from a file */
 double ***load_matrix3(char *fin, int *n, int *m, int *p);                      /* load a 3d matrix from a file */
 void transpose(double **Y, double **X, int n, int m);                           /* transpose a matrix */
