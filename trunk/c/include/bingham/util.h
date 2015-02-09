@@ -142,10 +142,12 @@ double ***matrix3_clone(double ***X, int n, int m, int p);                  /* c
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
+char **new_matrix2c(int n, int m);                                          /* create a new n-by-m 2d matrix of chars */
 double **new_matrix2_data(int n, int m, double *data);                      /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f_data(int n, int m, float *data);                       /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i_data(int n, int m, int *data);                           /* create a new n-by-m 2d matrix of ints */
-double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
+char **new_matrix2c_data(int n, int m, char *data);                         /* create a new n-by-m 2d matrix of chars */
+  double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                         /* create a new n-by-n 2d indetity matrix of ints */
 //void resize_matrix2(double ***X, int n, int m, int n2, int m2);
 void add_rows_matrix2(double ***X, int n, int m, int new_n);                /* add multiple rows to the matrix */
@@ -156,6 +158,7 @@ int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                                  /* free a 2d matrix of doubles */
 void free_matrix2f(float **X);                                                  /* free a 2d matrix of floats */
 void free_matrix2i(int **X);                                                    /* free a 2d matrix of ints */
+void free_matrix2c(char **X);                                                   /* free a 2d matrix of chars */
 void save_matrix(const char *fout, double **X, int n, int m);                         /* save a matrix to a file */
 void save_matrixi(const char *fout, int **X, int n, int m);                           /* save a matrix to a file */
 void save_matrix3(const char *fout, double ***X, int n, int m, int p);                /* save a 3d matrix to a file */
