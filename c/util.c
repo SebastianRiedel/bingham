@@ -1597,6 +1597,21 @@ int **new_matrix2i(int n, int m)
   return X;
 }
 
+// create a new n-by-m 2d matrix of chars
+char **new_matrix2c(int n, int m)
+{
+  if (n*m == 0) return NULL;
+  int i;
+  char *raw, **X;
+  safe_calloc(raw, n*m, char);
+  safe_malloc(X, n, char*);
+
+  for (i = 0; i < n; i++)
+    X[i] = raw + m*i;
+
+  return X;
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2_data(int n, int m, double *data)
 {
@@ -1618,6 +1633,14 @@ int **new_matrix2i_data(int n, int m, int *data)
 {
   int **X = new_matrix2i(n,m);
   memcpy(X[0], data, n*m*sizeof(int));
+  return X;
+}
+
+// create a new n-by-m 2d matrix of chars
+char **new_matrix2c_data(int n, int m, char *data)
+{
+  char **X = new_matrix2c(n,m);
+  memcpy(X[0], data, n*m*sizeof(char));
   return X;
 }
 
@@ -1686,6 +1709,14 @@ void free_matrix2f(float **X)
 
 // free a 2d matrix of ints
 void free_matrix2i(int **X)
+{
+  if (X == NULL) return;
+  free(X[0]);
+  free(X);
+}
+
+// free a 2d matrix of chars
+void free_matrix2c(char **X)
 {
   if (X == NULL) return;
   free(X[0]);
