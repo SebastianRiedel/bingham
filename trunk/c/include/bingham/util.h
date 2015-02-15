@@ -123,6 +123,8 @@ int binary_search(double x, double *A, int n);                        /* binary 
 void plane_from_3points(double *coeffs, double *p0, double *p1, double *p2); /* finds the plane coefficients from 3 points */
 void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
 void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
+void quaternion_pow(double q2[4], double q[4], double a);             /* quaternion exponentiation (q2 = q^a) */
+void quaternion_interpolation(double q[4], double q0[4], double q1[4], double t);  /* quaternion interpolation (slerp) */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 void quaternion_to_rotation_matrix(double **R, double *q);            /* convert a unit quaternion to a rotation matrix */
 int ismemberi(int x, int *y, int n);                                  /* checks if y contains x */
