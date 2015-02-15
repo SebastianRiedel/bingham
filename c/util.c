@@ -973,6 +973,30 @@ void quaternion_inverse(double q_inv[4], double q[4])
 }
 
 
+// quaternion exponentiation (q2 = q^a)
+void quaternion_pow(double q2[4], double q[4], double a)
+{
+  double u[3];  // axis of rotation
+  normalize(u, &q[1], 3);
+  double w = MIN(MAX(q[0], -1.0), 1.0);  // for numerical stability
+  double theta2 = acos(w);  // theta / 2.0
+  double s = sin(a*theta2);
+  q2[0] = cos(a*theta2);
+  mult(&q2[1], u, s, 3);
+}
+
+
+// quaternion interpolation (slerp)
+void quaternion_interpolation(double q[4], double q0[4], double q1[4], double t)
+{
+  double q0_inv[4], q01[4];
+  quaternion_inverse(q0_inv, q0);
+  quaternion_mult(q01, q1, q0_inv);
+  quaternion_pow(q01, q01, t);
+  quaternion_mult(q, q01, q0);
+}
+
+
 // convert a rotation matrix to a unit quaternion
 void rotation_matrix_to_quaternion(double *q, double **R)
 {
