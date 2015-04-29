@@ -3,6 +3,7 @@
 #define BINGHAM_UTIL_H
 
 #include <stdlib.h>
+#include <signal.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +26,8 @@ extern "C" {
 #define minf_masked(x,mask,n) arr_minf_masked(x,mask,n)
 
 
-#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
+  //#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
+#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); raise(SIGSEGV); }} while (0)
 #define safe_calloc(x, n, type) do{ x = (type*)calloc(n, sizeof(type)); test_alloc(x); } while (0)
 #define safe_malloc(x, n, type) do{ x = (type*)malloc((n)*sizeof(type)); test_alloc(x); } while (0)
 #define safe_realloc(x, n, type) do{ x = (type*)realloc(x,(n)*sizeof(type)); test_alloc(x); } while(0)
@@ -181,6 +183,8 @@ void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);         
 void matrix_pow(double **Y, double **X, int n, int m, double pw);               /* taking every element of a matrix to the power of pw */ 
 void matrix_sum(double y[], double **X, int n, int m);                          /* sums the columns of the matrix */
 void outer_prod(double **Z, double x[], double y[], int n, int m);              /* outer product of x and y, Z = x'*y */
+void row_min(double *y, double **X, int n, int m);                              /* row vector min */
+void row_max(double *y, double **X, int n, int m);                              /* row vector max */
 void mean(double *mu, double **X, int n, int m);                                /* row vector mean */
 void variance(double *vars, double **X, int n, int m);                          /* returns a row-vector of variances for each column */
 void cov(double **S, double **X, double *mu, int n, int m);                     /* compute the covariance of the rows of X, given mean mu */

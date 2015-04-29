@@ -2153,6 +2153,30 @@ void outer_prod(double **Z, double x[], double y[], int n, int m)
 }
 
 
+// row vector min
+void row_min(double *y, double **X, int n, int m)
+{
+  int i,j;
+  memcpy(y, X[0], m*sizeof(double));
+  for (i = 1; i < n; i++)
+    for (j = 0; j < m; j++)
+      if (X[i][j] < y[j])
+	y[j] = X[i][j];
+}
+
+
+// row vector max
+void row_max(double *y, double **X, int n, int m)
+{
+  int i,j;
+  memcpy(y, X[0], m*sizeof(double));
+  for (i = 1; i < n; i++)
+    for (j = 0; j < m; j++)
+      if (X[i][j] > y[j])
+	y[j] = X[i][j];
+}
+
+
 // row vector mean 
 // NOTE(sanja): this is adding up columns, not rows.
 void mean(double *mu, double **X, int n, int m)
@@ -2574,8 +2598,11 @@ void eigen_symm(double z[], double **V, double **X, int n)
       break;
 
     //dbug
-    if (cnt++ % 1000 == 0)
-      fprintf(stderr, "d_off = %e, d_diag = %e\n", d_off, d_diag);  //dbug
+    if (cnt++ % 1000 == 0) {
+      printf("d_off = %e, d_diag = %e\n", d_off, d_diag);  //dbug
+      if (!isfinite(d_off) || !isfinite(d_diag))
+	return;
+    }
 
     // find largest pivot
     double pivot = 0;
