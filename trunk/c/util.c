@@ -3265,8 +3265,10 @@ static int _sortable_cmp(const void *x1, const void *x2)
   if (v1 == v2)
     return 0;
 
-  return (v1 < v2 ? -1 : 1);
+  if (v1 < v2 || isnan(v1))
+    return -1;
 
+  return 1;
 }
 
 // sort an array of weighted data using qsort
