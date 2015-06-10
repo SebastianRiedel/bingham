@@ -609,7 +609,7 @@ int bingham_is_uniform(bingham_t *B)
 
 void bingham_mode(double *mode, bingham_t *B)
 {
-  int i, d = B->d;
+  int i, iter, d = B->d;
 
   if (bingham_is_uniform(B)) {
     mode[0] = 1;
@@ -621,7 +621,7 @@ void bingham_mode(double *mode, bingham_t *B)
   double **V = B->V;
 
   double epsilon = 1e-16;
-  while (1) {
+  for (iter = 0; iter < 1000; iter++) {
     for (i = 0; i < d; i++)
       mode[i] = frand() - .5;
 
@@ -632,7 +632,7 @@ void bingham_mode(double *mode, bingham_t *B)
     }
 
     double n = norm(mode,d);
-    if (n > epsilon) {
+    if (n > epsilon || !isfinite(n)) {
       mult(mode, mode, 1.0/n, d);
       break;
     }

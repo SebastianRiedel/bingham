@@ -3,6 +3,7 @@
 #define BINGHAM_UTIL_H
 
 #include <stdlib.h>
+#include <signal.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,7 +26,8 @@ extern "C" {
 #define minf_masked(x,mask,n) arr_minf_masked(x,mask,n)
 
 
-#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
+  //#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); exit(1); }} while (0)
+#define test_alloc(X) do{ if ((void *)(X) == NULL){ fprintf(stderr, "Out of memory in %s, (%s, line %d).\n", __FUNCTION__, __FILE__, __LINE__); raise(SIGSEGV); }} while (0)
 #define safe_calloc(x, n, type) do{ x = (type*)calloc(n, sizeof(type)); test_alloc(x); } while (0)
 #define safe_malloc(x, n, type) do{ x = (type*)malloc((n)*sizeof(type)); test_alloc(x); } while (0)
 #define safe_realloc(x, n, type) do{ x = (type*)realloc(x,(n)*sizeof(type)); test_alloc(x); } while(0)
@@ -45,9 +47,9 @@ short double_is_equal(double a, double b); /* Checks if two doubles are equal us
 
 double get_time_ms();  /* get the current system time in millis */
 
-char *sword(char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
-char **split(char *s, const char *delim, int *k);    /* splits a string into k words */
-int wordcmp(char *s1, char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
+char *sword(const char *s, const char *delim, int n);      /* returns a pointer to the nth word (starting from 0) in string s */
+char **split(const char *s, const char *delim, int *k);    /* splits a string into k words */
+int wordcmp(const char *s1, const char *s2, const char *delim);  /* compare the first word of s1 with the first word of s2 */
 void replace_word(char **words, int num_words, const char *from, const char *to);   /* replace a word in a string array */
 
 int solve_quadratic(double *x, double a, double b, double c);
@@ -85,14 +87,16 @@ double sum(double x[], int n);                                        /* compute
 double prod(double x[], int n);                                       /* computes the product of x's elements */
 double arr_max(double x[], int n);                                    /* computes the max of x */
 double arr_min(double x[], int n);                                    /* computes the min of x */
-  //double arr_max_i(int x[], int n);                                     /* computes the max of x */
-  //double arr_min_i(int x[], int n) ;                                    /* computes the min of x */
+int  arr_max_i(int x[], int n);                                     /* computes the max of x */
+int  arr_min_i(int x[], int n) ;                                    /* computes the min of x */
 double arr_max_masked(double x[], int mask[], int n);                 /* computes the masked max of x */
 double arr_min_masked(double x[], int mask[], int n);                 /* computes the masked min of x */
 float arr_maxf_masked(float x[], int mask[], int n);                  /* computes the masked max of x */
 float arr_minf_masked(float x[], int mask[], int n);                  /* computes the masked min of x */
 int find_max(double x[], int n);                                      /* returns index of the max of x */
 int find_min(double x[], int n);                                      /* returns index of the min of x */
+int find_imax(int x[], int n);                                      /* returns index of the max of x */
+int find_imin(int x[], int n);                                      /* returns index of the min of x */
 int find_first_non_zero(double *v, int n);                            /* finds an index of the first non-zero element. Returns -1 if none is found */
 int find_first_lt(double *x, double a, int n);                        /* find the index of the first element of x such that x<a */
 int find_first_gt(double *x, double a, int n);                        /* find the index of the first element of x such that x>a */
@@ -118,8 +122,11 @@ void wavg(double z[], double x[], double y[], double w, int n);       /* average
 void avg3(double y[], double x1[], double x2[], double x3[], int n);  /* averages three vectors, y = (x1+x2+x3)/3 */
 void proj(double z[], double x[], double y[], int n);                 /* calculates the projection of x onto y */
 int binary_search(double x, double *A, int n);                        /* binary search to find i s.t. A[i-1] <= x < A[i] */
+void plane_from_3points(double *coeffs, double *p0, double *p1, double *p2); /* finds the plane coefficients from 3 points */
 void quaternion_mult(double z[4], double x[4], double y[4]);          /* quaternion multiplication:  z = x*y */
 void quaternion_inverse(double q_inv[4], double q[4]);                /* invert a quaternion */
+void quaternion_pow(double q2[4], double q[4], double a);             /* quaternion exponentiation (q2 = q^a) */
+void quaternion_interpolation(double q[4], double q0[4], double q1[4], double t);  /* quaternion interpolation (slerp) */
 void rotation_matrix_to_quaternion(double *q, double **R);            /* convert a rotation matrix to a unit quaternion */
 void quaternion_to_rotation_matrix(double **R, double *q);            /* convert a unit quaternion to a rotation matrix */
 int ismemberi(int x, int *y, int n);                                  /* checks if y contains x */
@@ -132,25 +139,35 @@ double ***new_matrix3(int n, int m, int p);                                 /* c
 void free_matrix3(double ***X);                                             /* free a 3d matrix of doubles */
 float ***new_matrix3f(int n, int m, int p);                                 /* create a new n-by-m-by-p 3d matrix of floats */
 void free_matrix3f(float ***X);                                             /* free a 3d matrix of floats */
+void matrix3_copy(double ***Y, double ***X, int n, int m, int p);           /* copy a 3d matrix of doubles: Y = X */
+double ***matrix3_clone(double ***X, int n, int m, int p);                  /* clone a 3d matrix of doubles: Y = new(X) */
+
+
 double **new_matrix2(int n, int m);                                         /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f(int n, int m);                                         /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i(int n, int m);                                           /* create a new n-by-m 2d matrix of ints */
+char **new_matrix2c(int n, int m);                                          /* create a new n-by-m 2d matrix of chars */
 double **new_matrix2_data(int n, int m, double *data);                      /* create a new n-by-m 2d matrix of doubles */
 float **new_matrix2f_data(int n, int m, float *data);                       /* create a new n-by-m 2d matrix of floats */
 int **new_matrix2i_data(int n, int m, int *data);                           /* create a new n-by-m 2d matrix of ints */
-double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
+char **new_matrix2c_data(int n, int m, char *data);                         /* create a new n-by-m 2d matrix of chars */
+  double **new_identity_matrix2(int n);                                       /* create a new n-by-n 2d indetity matrix of doubles */
 int **new_identity_matrix2i(int n);                                         /* create a new n-by-n 2d indetity matrix of ints */
 //void resize_matrix2(double ***X, int n, int m, int n2, int m2);
-void add_rows_matrix2(double ***X, int n, int m, int new_n);                 /* add multiple rows to the matrix */
+void add_rows_matrix2(double ***X, int n, int m, int new_n);                /* add multiple rows to the matrix */
+void add_rows_matrix2i(int ***X, int n, int m, int new_n);                  /* add multiple rows to the matrix */
 //double **add_matrix_row(double **X, int n, int m);                              /* reallocate memory in order to add another matrix row */
 double **new_diag_matrix2(double *diag, int n);
 int **new_diag_matrix2i(int *diag, int n);
 void free_matrix2(double **X);                                                  /* free a 2d matrix of doubles */
 void free_matrix2f(float **X);                                                  /* free a 2d matrix of floats */
 void free_matrix2i(int **X);                                                    /* free a 2d matrix of ints */
-void save_matrix(char *fout, double **X, int n, int m);                         /* save a matrix to a file */
-void save_matrixi(char *fout, int **X, int n, int m);                           /* save a matrix to a file */
+void free_matrix2c(char **X);                                                   /* free a 2d matrix of chars */
+void save_matrix(const char *fout, double **X, int n, int m);                         /* save a matrix to a file */
+void save_matrixi(const char *fout, int **X, int n, int m);                           /* save a matrix to a file */
+void save_matrix3(const char *fout, double ***X, int n, int m, int p);                /* save a 3d matrix to a file */
 double **load_matrix(char *fin, int *n, int *m);                                /* load a matrix from a file */
+double ***load_matrix3(char *fin, int *n, int *m, int *p);                      /* load a 3d matrix from a file */
 void transpose(double **Y, double **X, int n, int m);                           /* transpose a matrix */
 void solve(double *x, double **A, double *b, int n);                            /* solve the equation Ax = b, where A is a square n-by-n matrix */
 double det(double **X, int n);                                                  /* compute the determinant of the n-by-n matrix X */
@@ -166,6 +183,8 @@ void matrix_elt_mult(double **Z, double **X, double **Y, int n, int m);         
 void matrix_pow(double **Y, double **X, int n, int m, double pw);               /* taking every element of a matrix to the power of pw */ 
 void matrix_sum(double y[], double **X, int n, int m);                          /* sums the columns of the matrix */
 void outer_prod(double **Z, double x[], double y[], int n, int m);              /* outer product of x and y, Z = x'*y */
+void row_min(double *y, double **X, int n, int m);                              /* row vector min */
+void row_max(double *y, double **X, int n, int m);                              /* row vector max */
 void mean(double *mu, double **X, int n, int m);                                /* row vector mean */
 void variance(double *vars, double **X, int n, int m);                          /* returns a row-vector of variances for each column */
 void cov(double **S, double **X, double *mu, int n, int m);                     /* compute the covariance of the rows of X, given mean mu */

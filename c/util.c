@@ -280,7 +280,7 @@ double get_time_ms()
 
 
 // returns a pointer to the nth word (starting from 0) in string s
-char *sword(char *s, const char *delim, int n)
+char *sword(const char *s, const char *delim, int n)
 {
   if (s == NULL)
     return NULL;
@@ -293,14 +293,14 @@ char *sword(char *s, const char *delim, int n)
     s += strspn(s, delim);  // skip over delimeters
   }
 
-  return s;
+  return (char *)s;
 }
 
 
 // splits a string into k words
-char **split(char *s, const char *delim, int *k)
+char **split(const char *s, const char *delim, int *k)
 {
-  char *sbuf = s + strspn(s, delim);  // skip over initial whitespace
+  const char *sbuf = s + strspn(s, delim);  // skip over initial whitespace
   s = sbuf;
 
   // determine the number of words
@@ -328,7 +328,7 @@ char **split(char *s, const char *delim, int *k)
 
 
 // compare the first word of s1 with the first word of s2
-int wordcmp(char *s1, char *s2, const char *delim)
+int wordcmp(const char *s1, const char *s2, const char *delim)
 {
   int n1 = strcspn(s1, delim);
   int n2 = strcspn(s2, delim);
@@ -498,7 +498,7 @@ double arr_max(double x[], int n)
 }
 
 // computes the max of x
-double arr_max_i(int x[], int n)
+int arr_max_i(int x[], int n)
 {
   int i;
 
@@ -562,7 +562,7 @@ double arr_min(double x[], int n)
 }
 
 // computes the min of x
-double arr_min_i(int x[], int n)
+int arr_min_i(int x[], int n)
 {
   int i;
 
@@ -580,7 +580,7 @@ double arr_min_masked(double x[], int mask[], int n)
   int i;
 
   for (i = 0; i < n; i++)
-    if (mask[i])
+    if (mask[i] != 0)
       break;
   if (i==n)
     return NAN;
@@ -625,6 +625,28 @@ int find_max(double x[], int n)
 
 // returns the index of the min of x
 int find_min(double x[], int n)
+{
+  int i;
+  int idx = 0;
+  for (i = 1; i < n; i++)
+    if (x[i] < x[idx])
+      idx = i;
+  return idx;
+}
+
+// returns the index of the max of x
+int find_imax(int x[], int n)
+{
+  int i;
+  int idx = 0;
+  for (i = 1; i < n; i++)
+    if (x[i] > x[idx])
+      idx = i;
+  return idx;
+}
+
+// returns the index of the min of x
+int find_imin(int x[], int n)
 {
   int i;
   int idx = 0;
@@ -906,6 +928,21 @@ int binary_search(double x, double *A, int n)
   return n-1;
 }
 
+void plane_from_3points(double *coeffs, double *p0, double *p1, double *p2)
+{
+    double diff1[3], diff2[3];
+    sub(diff1, p1, p0, 3);
+    sub(diff2, p2, p0, 3);
+    double normal[3];
+    cross(normal, diff1, diff2);
+    normalize(normal, normal, 3);
+    double flip = normal[2] > 0.0 ? -1.0 : 1.0; // flip normal towards camera
+    
+    coeffs[0] = normal[0] * flip;
+    coeffs[1] = normal[1] * flip;
+    coeffs[2] = normal[2] * flip;
+    coeffs[3] = -dot(normal, p0, 3) * flip;
+}
 
 // quaternion multiplication:  z = x*y
 void quaternion_mult(double z[4], double x[4], double y[4])
@@ -933,6 +970,30 @@ void quaternion_inverse(double q_inv[4], double q[4])
   q_inv[1] = -q[1];
   q_inv[2] = -q[2];
   q_inv[3] = -q[3];
+}
+
+
+// quaternion exponentiation (q2 = q^a)
+void quaternion_pow(double q2[4], double q[4], double a)
+{
+  double u[3];  // axis of rotation
+  normalize(u, &q[1], 3);
+  double w = MIN(MAX(q[0], -1.0), 1.0);  // for numerical stability
+  double theta2 = acos(w);  // theta / 2.0
+  double s = sin(a*theta2);
+  q2[0] = cos(a*theta2);
+  mult(&q2[1], u, s, 3);
+}
+
+
+// quaternion interpolation (slerp)
+void quaternion_interpolation(double q[4], double q0[4], double q1[4], double t)
+{
+  double q0_inv[4], q01[4];
+  quaternion_inverse(q0_inv, q0);
+  quaternion_mult(q01, q1, q0_inv);
+  quaternion_pow(q01, q01, t);
+  quaternion_mult(q, q01, q0);
 }
 
 
@@ -1469,6 +1530,21 @@ void free_matrix3f(float ***X)
   free(X);
 }
 
+// copy a 3d matrix of doubles: Y = X
+void matrix3_copy(double ***Y, double ***X, int n, int m, int p)
+{
+  memcpy(Y[0][0], X[0][0], n*m*p*sizeof(double));
+}
+
+// clone a 3d matrix of doubles: Y = new(X)
+double ***matrix3_clone(double ***X, int n, int m, int p)
+{
+  double ***Y = new_matrix3(n,m,p);
+  matrix3_copy(Y, X, n, m, p);
+
+  return Y;
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2(int n, int m)
 {
@@ -1493,6 +1569,17 @@ void add_rows_matrix2(double ***X, int n, int m, int new_n)
   for (i = 0; i < new_n; i++)
     (*X)[i] = raw + m*i;
 }
+
+void add_rows_matrix2i(int ***X, int n, int m, int new_n)
+{
+  int i;
+  int *raw = (*X)[0];
+  safe_realloc(raw, m * new_n, int);
+  safe_realloc(*X, new_n, int*);
+  for (i = 0; i < new_n; i++)
+    (*X)[i] = raw + m*i;
+}
+
 
 /*
 void resize_matrix2(double ***X, int n, int m, int n2, int m2)
@@ -1534,6 +1621,21 @@ int **new_matrix2i(int n, int m)
   return X;
 }
 
+// create a new n-by-m 2d matrix of chars
+char **new_matrix2c(int n, int m)
+{
+  if (n*m == 0) return NULL;
+  int i;
+  char *raw, **X;
+  safe_calloc(raw, n*m, char);
+  safe_malloc(X, n, char*);
+
+  for (i = 0; i < n; i++)
+    X[i] = raw + m*i;
+
+  return X;
+}
+
 // create a new n-by-m 2d matrix of doubles
 double **new_matrix2_data(int n, int m, double *data)
 {
@@ -1555,6 +1657,14 @@ int **new_matrix2i_data(int n, int m, int *data)
 {
   int **X = new_matrix2i(n,m);
   memcpy(X[0], data, n*m*sizeof(int));
+  return X;
+}
+
+// create a new n-by-m 2d matrix of chars
+char **new_matrix2c_data(int n, int m, char *data)
+{
+  char **X = new_matrix2c(n,m);
+  memcpy(X[0], data, n*m*sizeof(char));
   return X;
 }
 
@@ -1629,6 +1739,14 @@ void free_matrix2i(int **X)
   free(X);
 }
 
+// free a 2d matrix of chars
+void free_matrix2c(char **X)
+{
+  if (X == NULL) return;
+  free(X[0]);
+  free(X);
+}
+
 /*
  * Write a matrix in the following format.
  *
@@ -1637,7 +1755,7 @@ void free_matrix2i(int **X)
  * <row 2>
  * ...
  */
-void save_matrix(char *fout, double **X, int n, int m)
+void save_matrix(const char *fout, double **X, int n, int m)
 {
   //fprintf(stderr, "saving matrix to %s\n", fout);
 
@@ -1654,7 +1772,7 @@ void save_matrix(char *fout, double **X, int n, int m)
   fclose(f);
 }
 
-void save_matrixi(char *fout, int **X, int n, int m)
+void save_matrixi(const char *fout, int **X, int n, int m)
 {
   //fprintf(stderr, "saving matrix to %s\n", fout);
 
@@ -1666,6 +1784,36 @@ void save_matrixi(char *fout, int **X, int n, int m)
     for (j = 0; j < m; j++)
       fprintf(f, "%d ", X[i][j]);
     fprintf(f, "\n");
+  }
+
+  fclose(f);
+}
+
+/*
+ * Write a 3d matrix in the following format.
+ *
+ * <ntabs> <nrows> <ncols>
+ * <tab 1 row 1>
+ * <tab 1 row 2>
+ * ...
+ * <tab 2 row 1>
+ * <tab 2 row 2>
+ * ...
+ */
+void save_matrix3(const char *fout, double ***X, int n, int m, int p)
+{
+  //fprintf(stderr, "saving matrix3 to %s\n", fout);
+
+  FILE *f = fopen(fout, "w");
+  int i, j, k;
+
+  fprintf(f, "%d %d %d\n", n, m, p);
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < m; j++) {
+      for (k = 0; k < p; k++)
+	fprintf(f, "%f ", X[i][j][k]);
+      fprintf(f, "\n");
+    }
   }
 
   fclose(f);
@@ -1684,7 +1832,7 @@ double **load_matrix(char *fin, int *n, int *m)
   FILE *f = fopen(fin, "r");
 
   if (f == NULL) {
-    fprintf(stderr, "Invalid filename: %s", fin);
+    fprintf(stderr, "Invalid filename: %s\n", fin);
     return NULL;
   }
 
@@ -1720,9 +1868,71 @@ double **load_matrix(char *fin, int *n, int *m)
     return NULL;
   }
 
+  fclose(f);
+
   return X;
 }
 
+/*
+ * Load a 3d matrix in the following format.
+ *
+ * <ntabs> <nrows> <ncols>
+ * <tab 1 row 1>
+ * <tab 1 row 2>
+ * ...
+ * <tab 2 row 1>
+ * <tab 2 row 2>
+ * ...
+ */
+double ***load_matrix3(char *fin, int *n, int *m, int *p)
+{
+  FILE *f = fopen(fin, "r");
+
+  if (f == NULL) {
+    fprintf(stderr, "Invalid filename: %s\n", fin);
+    return NULL;
+  }
+
+  char sbuf0[128], *s = sbuf0;
+  if (fgets(s, 128, f) == NULL || sscanf(s, "%d %d %d", n, m, p) < 3) {
+    fprintf(stderr, "Corrupt matrix header in file %s\n", fin);
+    fclose(f);
+    return NULL;
+  }
+
+  double ***X = new_matrix3(*n, *m, *p);
+
+  const int CHARS_PER_FLOAT = 20;
+  char sbuf[CHARS_PER_FLOAT * (*p)];
+
+  int i, j, k;
+  for (i = 0; i < *n; i++) {
+    for (j = 0; j < *m; j++) {
+      s = sbuf;
+      if (fgets(s, 10000, f) == NULL)
+	break;
+      for (k = 0; k < *p; k++) {
+	if (sscanf(s, "%lf", &X[i][j][k]) < 1)
+	  break;
+	s = sword(s, " \t", 1);
+      }
+      if (k < *p)
+	break;
+    }
+    if (j < *m)
+      break;
+  }
+  if (i < *n) {
+    fprintf(stderr, "Corrupt matrix file '%s' at line %d\n", fin, i*(*m)+j+2);
+    fclose(f);
+    free_matrix3(X);
+    return NULL;
+  }
+
+  fclose(f);
+
+  return X;
+}
 
 
 // calculate the area of a triangle
@@ -1798,6 +2008,28 @@ void transpose(double **Y, double **X, int n, int m)
     free_matrix2(X2);
 }
 
+
+/*
+int test_matrix_copy()
+{
+  double X_data[6] = {1,2,3,4,5,6};
+  double **X = new_matrix2_data(3,2, X_data);
+
+  //double **X = new_matrix2(2,2);
+  //X[0][0] = 1;
+  //X[0][1] = 2;
+  //X[1][0] = 3;
+  //X[1][1] = 4;
+
+  
+
+  
+  // 1 2
+  // 3 4
+
+
+}
+*/
 
 // matrix copy, Y = X 
 void matrix_copy(double **Y, double **X, int n, int m)
@@ -1918,6 +2150,30 @@ void outer_prod(double **Z, double x[], double y[], int n, int m)
   for (i = 0; i < n; i++)
     for (j = 0; j < m; j++)
       Z[i][j] = x[i]*y[j];
+}
+
+
+// row vector min
+void row_min(double *y, double **X, int n, int m)
+{
+  int i,j;
+  memcpy(y, X[0], m*sizeof(double));
+  for (i = 1; i < n; i++)
+    for (j = 0; j < m; j++)
+      if (X[i][j] < y[j])
+	y[j] = X[i][j];
+}
+
+
+// row vector max
+void row_max(double *y, double **X, int n, int m)
+{
+  int i,j;
+  memcpy(y, X[0], m*sizeof(double));
+  for (i = 1; i < n; i++)
+    for (j = 0; j < m; j++)
+      if (X[i][j] > y[j])
+	y[j] = X[i][j];
 }
 
 
@@ -2342,8 +2598,11 @@ void eigen_symm(double z[], double **V, double **X, int n)
       break;
 
     //dbug
-    if (cnt++ % 1000 == 0)
-      fprintf(stderr, "d_off = %e, d_diag = %e\n", d_off, d_diag);  //dbug
+    if (cnt++ % 1000 == 0) {
+      printf("d_off = %e, d_diag = %e\n", d_off, d_diag);  //dbug
+      if (!isfinite(d_off) || !isfinite(d_diag))
+	return;
+    }
 
     // find largest pivot
     double pivot = 0;
@@ -3006,8 +3265,10 @@ static int _sortable_cmp(const void *x1, const void *x2)
   if (v1 == v2)
     return 0;
 
-  return (v1 < v2 ? -1 : 1);
+  if (v1 < v2 || isnan(v1))
+    return -1;
 
+  return 1;
 }
 
 // sort an array of weighted data using qsort
