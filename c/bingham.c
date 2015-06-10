@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -700,7 +699,7 @@ void bingham_mode(double *mode, bingham_t *B)
       mode[i+1] = x[i];
   }
   mode[cut_axis] = 1;
-  
+
   normalize(mode, mode, d);
 }
 */
@@ -804,10 +803,10 @@ double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
     // omit rotation of B2 into B1
     for (i = 0; i < d-1; i++) {
       for (j = 0; j < d; j++) {
-        A[i][j] = V2[i][j];
-        A[i][j] *= A[i][j];
+	A[i][j] = V2[i][j];
+	A[i][j] *= A[i][j];
       }
-    }    
+    }
   }
   else
   {
@@ -817,7 +816,7 @@ double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
       V1_ft[i][0] = B1->stats->mode[i];
     for (i = 0; i < d; i++)
       for (j = 1; j < d; j++)
-        V1_ft[i][j] = V1[j-1][i];
+	V1_ft[i][j] = V1[j-1][i];
 
     // rotate B2 into B1's coordinate frame
     double **V1_ft_inv = new_matrix2(d, d);
@@ -825,8 +824,8 @@ double bingham_cross_entropy(bingham_t *B1, bingham_t *B2)
     // double **A = new_matrix2(d-1, d);
     for (i = 0; i < d-1; i++) {
       for (j = 0; j < d; j++) {
-        A[i][j] = dot(V1_ft_inv[j], V2[i], d);
-        A[i][j] *= A[i][j];
+	A[i][j] = dot(V1_ft_inv[j], V2[i], d);
+	A[i][j] *= A[i][j];
       }
     }
 
@@ -1182,7 +1181,7 @@ void bingham_mixture_sample(double **X, bingham_mix_t *BM, int n)
     // apportion samples to each mixture component
     int ni[BM->n];
     int ntot = 0;
-    for (i = 0; i < BM->n; i++) {      
+    for (i = 0; i < BM->n; i++) {
       ni[i] = round(n * BM->w[i]);
       ntot += ni[i];
       // printf("w[i] / ni[i]: %f / %d\n", BM->w[i], ni[i]);
@@ -1443,7 +1442,7 @@ void bingham_sample_ridge(double **X, bingham_t *B, int n, double pthresh)
   for (i = 0; i < d-1; i++)
     W[i] = W_raw + (d-1)*i;
   inv(W, Vcut, d-1);
- 
+
   double x[d-1];
   double c[d-1];
   double dc[d-1];
@@ -1757,10 +1756,10 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
   //double **Z = new_matrix2(d-1, d-1);
   //double **ZV = new_matrix2(d-1, d);
   //double **Vt = new_matrix2(d, d-1);
-  
+
   double **v;
   double *vt[d];
-  
+
 
   // compute C1
   for (i = 0; i < d-1; i++) {
@@ -1771,7 +1770,7 @@ void bingham_mult(bingham_t *B, bingham_t *B1, bingham_t *B2)
     mult(C[0], C[0], B1->Z[i], d*d);
     matrix_add(C1, C1, C, d, d);
   }
-	
+
   // compute C2
   for (i = 0; i < d-1; i++) {
     v = &B2->V[i];
@@ -1874,7 +1873,7 @@ void bingham_mult_array(bingham_t *B, bingham_t *B_array, int n, int compute_F)
     for (j = 0; j < d-1; j++) {
       v = &B_array[i].V[j];
       for (k = 0; k < d; k++)
-        vt[k] = &v[0][k];
+	vt[k] = &v[0][k];
       matrix_mult(C2, vt, v, d, 1, d);
       mult(C2[0], C2[0], B_array[i].Z[j], d*d);
       matrix_add(C, C, C2, d, d);
@@ -2143,7 +2142,7 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
 	if (sscanf(s, "%lf", &BM[c].B[i].F) < 1)  // read F
 	  break;
 	s = sword(s, " \t", 1);
-	
+
 	for (j = 0; j < d-1; j++) {  // read dF -- dbug: add dF to bingham_t
 	  if (sscanf(s, "%lf", &xxx) < 1)
 	    break;
@@ -2151,7 +2150,7 @@ bingham_mix_t *load_bmx(char *f_bmx, int *k)
 	}
 	if (j < d-1)  // error
 	  break;
-	
+
 	for (j = 0; j < d-1; j++) {  // read Z
 	  if (sscanf(s, "%lf", &BM[c].B[i].Z[j]) < 1)
 	    break;
@@ -2280,6 +2279,13 @@ void bingham_invert_3d(bingham_t *B_inv, bingham_t *B)
   quaternion_inverse(B_inv->V[2], B->V[2]);
 }
 
+/*
+ * Collapses multiple uniformly distributed binghams in a mixture to a single uniformly distributed
+ * component with weight equal to the sum of the multiple ones.
+ *
+ * bingham_mix_t *dst is where the resulting mixture will be stored
+ * bingham_mix_t *src represents the inpur mixture
+ */
 void bingham_mixture_collapse_uniforms(bingham_mix_t *dst, bingham_mix_t *src)
 {
   // first check if multiple uniform distributions can be packed into one
@@ -2299,7 +2305,7 @@ void bingham_mixture_collapse_uniforms(bingham_mix_t *dst, bingham_mix_t *src)
 
   if(n_uniforms > 1)
   {
-    
+
     unsigned int n = src->n - n_uniforms + 1; // only one uniform remains
     dst->n = n;
     safe_malloc(dst->w, n, double);
@@ -2309,10 +2315,10 @@ void bingham_mixture_collapse_uniforms(bingham_mix_t *dst, bingham_mix_t *src)
     for (i = 0; i < src->n; i++) {
       if(!bingham_is_uniform(&src->B[i]))
       {
-        dst->w[dst_i] = src->w[i];
-        bingham_alloc(&dst->B[dst_i], src->B[i].d);
-        bingham_copy(&dst->B[dst_i], &src->B[i]);
-        dst_i++;        
+	dst->w[dst_i] = src->w[i];
+	bingham_alloc(&dst->B[dst_i], src->B[i].d);
+	bingham_copy(&dst->B[dst_i], &src->B[i]);
+	dst_i++;
       }
     }
 
@@ -2337,6 +2343,15 @@ void bingham_mixture_collapse_uniforms(bingham_mix_t *dst, bingham_mix_t *src)
   }
 }
 
+/*
+ * Reduces the given quaternion (3d rotation) mixture to a maximum number of components. Reduction is performed by
+ * iteratively merging the two 'closest' components until the desired number of remaining
+ * components is reached. Reduction is based on the algorithm presented in 'Andrew R.
+ * Runnalls: Kullback-Leibler Approach to Gaussian Mixture Reduction'.
+ *
+ * bingham_mix_t *BM the input mixture, will hold the reduced mixture at the end
+ * unsigned int reduced_n_components maximum number of components in the mixture after mixture reduction
+ */
 void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components)
 {
   bingham_mix_t BM_collapsed;
@@ -2348,8 +2363,8 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
 
   if(BM->n <= reduced_n_components)
   {
-    return;    
-  } 
+    return;
+  }
 
   /**
   * maps an idx in the score matrix to the corresponding bingham distribution,
@@ -2365,7 +2380,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
   double idx2weight_map[BM->n];
 
   /**
-  * holds the computed discrimination score between the mixture before the merge 
+  * holds the computed discrimination score between the mixture before the merge
   * of components i and j and after the merge of components ij
   **/
   double **B_ij = new_matrix2(BM->n, BM->n);
@@ -2374,7 +2389,7 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
   double b_ij_min_value = DBL_MAX-1.0;
   unsigned int i_2nd_min = 0;
   unsigned int j_2nd_min = 0;
-  double b_ij_2nd_min_value = DBL_MAX;  
+  double b_ij_2nd_min_value = DBL_MAX;
 
   /**
   * holds the merged the bingham for components i and j
@@ -2405,59 +2420,59 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     {
       if(i == j)
       {
-        B_ij[i][j] = DBL_MAX;
-        B_ij[j][i] = DBL_MAX;
-        merged_ij[i][j] = NULL;
-        merged_ij[j][i] = NULL; 
+	B_ij[i][j] = DBL_MAX;
+	B_ij[j][i] = DBL_MAX;
+	merged_ij[i][j] = NULL;
+	merged_ij[j][i] = NULL;
       }
       else
       {
-        double w_i = idx2weight_map[i];
-        double w_j = idx2weight_map[j];
+	double w_i = idx2weight_map[i];
+	double w_j = idx2weight_map[j];
 
-        // calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
-        double alpha = (1.0 / (w_i + w_j)) * w_i;
-        
+	// calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
+	double alpha = (1.0 / (w_i + w_j)) * w_i;
 
-        // calc and store merged bingham
-        bingham_t *m_ij;
-        safe_malloc(m_ij, 1, bingham_t);
-        m_ij->d = 4;
 
-        //printf("alpha %f\n", alpha);
-        //print_bingham(idx2bingham_map[i]);
-        //print_bingham(idx2bingham_map[j]);
-        bingham_merge(m_ij, idx2bingham_map[i], idx2bingham_map[j], alpha);
-        merged_ij[i][j] = m_ij;
-        merged_ij[j][i] = m_ij;
+	// calc and store merged bingham
+	bingham_t *m_ij;
+	safe_malloc(m_ij, 1, bingham_t);
+	m_ij->d = 4;
 
-        //printf("Allocated merged_ij[%d][%d]\n", i, j);
+	//printf("alpha %f\n", alpha);
+	//print_bingham(idx2bingham_map[i]);
+	//print_bingham(idx2bingham_map[j]);
+	bingham_merge(m_ij, idx2bingham_map[i], idx2bingham_map[j], alpha);
+	merged_ij[i][j] = m_ij;
+	merged_ij[j][i] = m_ij;
 
-        // calc and store merge score
-        double kl_i_ij = bingham_KL_divergence(idx2bingham_map[i], m_ij);
-        double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
-        double score = w_i * kl_i_ij + w_j * kl_j_ij;
-        B_ij[i][j] = score;
-        B_ij[j][i] = score;
+	//printf("Allocated merged_ij[%d][%d]\n", i, j);
 
-        if(score < b_ij_min_value)
-        {
-          // shift current min to 2nd best min
-          b_ij_2nd_min_value = b_ij_min_value;
-          i_2nd_min = i_min;
-          j_2nd_min = j_min;
+	// calc and store merge score
+	double kl_i_ij = bingham_KL_divergence(idx2bingham_map[i], m_ij);
+	double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
+	double score = w_i * kl_i_ij + w_j * kl_j_ij;
+	B_ij[i][j] = score;
+	B_ij[j][i] = score;
 
-          // replace current min
-          b_ij_min_value = score;
-          i_min = i;
-          j_min = j;
-        }
-        else if(score < b_ij_2nd_min_value)
-        {
-          b_ij_2nd_min_value = score;
-          i_2nd_min = i;
-          j_2nd_min = j;
-        }
+	if(score < b_ij_min_value)
+	{
+	  // shift current min to 2nd best min
+	  b_ij_2nd_min_value = b_ij_min_value;
+	  i_2nd_min = i_min;
+	  j_2nd_min = j_min;
+
+	  // replace current min
+	  b_ij_min_value = score;
+	  i_min = i;
+	  j_min = j;
+	}
+	else if(score < b_ij_2nd_min_value)
+	{
+	  b_ij_2nd_min_value = score;
+	  i_2nd_min = i;
+	  j_2nd_min = j;
+	}
       }
     }
   }
@@ -2491,14 +2506,14 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     {
       if(merged_ij[i][j_min] != NULL)
       {
-        bingham_free(merged_ij[i][j_min]);
-        free(merged_ij[i][j_min]);
-        merged_ij[i][j_min] = NULL;
-        merged_ij[j_min][i] = NULL;
-        //printf("Freed merged_ij[%d][%d]\n", i,j_min);
+	bingham_free(merged_ij[i][j_min]);
+	free(merged_ij[i][j_min]);
+	merged_ij[i][j_min] = NULL;
+	merged_ij[j_min][i] = NULL;
+	//printf("Freed merged_ij[%d][%d]\n", i,j_min);
 
-        B_ij[i][j_min] = DBL_MAX;
-        B_ij[j_min][i] = DBL_MAX;
+	B_ij[i][j_min] = DBL_MAX;
+	B_ij[j_min][i] = DBL_MAX;
       }
     }
 
@@ -2508,14 +2523,14 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     {
       if(merged_ij[i_min][j] != NULL)
       {
-        bingham_free(merged_ij[i_min][j]);
-        free(merged_ij[i_min][j]);
-        merged_ij[i_min][j] = NULL;
-        merged_ij[j][i_min] = NULL;
-        //printf("Freed merged_ij[%d][%d]\n", i_min,j);
+	bingham_free(merged_ij[i_min][j]);
+	free(merged_ij[i_min][j]);
+	merged_ij[i_min][j] = NULL;
+	merged_ij[j][i_min] = NULL;
+	//printf("Freed merged_ij[%d][%d]\n", i_min,j);
 
-        B_ij[i_min][j] = DBL_MAX;
-        B_ij[j][i_min] = DBL_MAX;
+	B_ij[i_min][j] = DBL_MAX;
+	B_ij[j][i_min] = DBL_MAX;
       }
     }
 
@@ -2543,78 +2558,78 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
       unsigned int l, p;
       for(l = 0; l < BM->n; ++l)
       {
-        for(p = l; p < BM->n; ++p)
-        {
-          double score = B_ij[l][p];
-          if(score < b_ij_min_value)
-          {
-            // shift current min to 2nd best min
-            b_ij_2nd_min_value = b_ij_min_value;
-            i_2nd_min = i_min;
-            j_2nd_min = j_min;
+	for(p = l; p < BM->n; ++p)
+	{
+	  double score = B_ij[l][p];
+	  if(score < b_ij_min_value)
+	  {
+	    // shift current min to 2nd best min
+	    b_ij_2nd_min_value = b_ij_min_value;
+	    i_2nd_min = i_min;
+	    j_2nd_min = j_min;
 
-            // replace current min
-            b_ij_min_value = score;
-            i_min = l;
-            j_min = p;
-          }
-          else if(score < b_ij_2nd_min_value)
-          {
-            b_ij_2nd_min_value = score;
-            i_2nd_min = l;
-            j_2nd_min = p;
-          }          
-        }
+	    // replace current min
+	    b_ij_min_value = score;
+	    i_min = l;
+	    j_min = p;
+	  }
+	  else if(score < b_ij_2nd_min_value)
+	  {
+	    b_ij_2nd_min_value = score;
+	    i_2nd_min = l;
+	    j_2nd_min = p;
+	  }
+	}
       }
     }
 
-    // compute new merged binghams and new merged score for remaining components 
+    // compute new merged binghams and new merged score for remaining components
     // with newly accepted merge
     for(j = 0; j < BM->n; ++j)
     {
       if(idx2bingham_map[j] != NULL && j != was_i_min) // component exists
       {
-        double w_i = idx2weight_map[was_i_min];
-        double w_j = idx2weight_map[j];
+	double w_i = idx2weight_map[was_i_min];
+	double w_j = idx2weight_map[j];
 
-        // calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
-        double alpha = (1.0 / (w_i + w_j)) * w_i;
+	// calc relative merge alpha for bingham_merged = a*B_i + (1-a)*B_j
+	double alpha = (1.0 / (w_i + w_j)) * w_i;
 
-        // calc and store merged bingham
-        bingham_t *m_ij;
-        safe_malloc(m_ij, 1, bingham_t);
-        m_ij->d = 4;
-        bingham_merge(m_ij, idx2bingham_map[was_i_min], idx2bingham_map[j], alpha);
-        merged_ij[was_i_min][j] = m_ij;
-        merged_ij[j][was_i_min] = m_ij;
+	// calc and store merged bingham
+	bingham_t *m_ij;
+	safe_malloc(m_ij, 1, bingham_t);
+	m_ij->d = 4;
+	bingham_merge(m_ij, idx2bingham_map[was_i_min], idx2bingham_map[j], alpha);
+	merged_ij[was_i_min][j] = m_ij;
+	merged_ij[j][was_i_min] = m_ij;
 
-        //printf("Allocated merged_ij[%d][%d]\n", was_i_min,j);
+	//printf("Allocated merged_ij[%d][%d]\n", was_i_min,j);
 
-        // calc and store merge score
-        double kl_i_ij = bingham_KL_divergence(idx2bingham_map[was_i_min], m_ij);
-        double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
-        double score = w_i * kl_i_ij + w_j * kl_j_ij;
-        B_ij[was_i_min][j] = score;
-        B_ij[j][was_i_min] = score;
+	// calc and store merge score
+	double kl_i_ij = bingham_KL_divergence(idx2bingham_map[was_i_min], m_ij);
+	double kl_j_ij = bingham_KL_divergence(idx2bingham_map[j], m_ij);
+	double score = w_i * kl_i_ij + w_j * kl_j_ij;
+	B_ij[was_i_min][j] = score;
+	B_ij[j][was_i_min] = score;
 
-        if(score < b_ij_min_value)
-        {
-          // shift current min to 2nd best min
-          b_ij_2nd_min_value = b_ij_min_value;
-          i_2nd_min = i_min;
-          j_2nd_min = j_min;
+	if(score < b_ij_min_value)
+	{
+	  // shift current min to 2nd best min
+	  b_ij_2nd_min_value = b_ij_min_value;
+	  i_2nd_min = i_min;
+	  j_2nd_min = j_min;
 
-          // replace current min
-          b_ij_min_value = score;
-          i_min = was_i_min;
-          j_min = j;
-        }
-        else if(score < b_ij_2nd_min_value)
-        {
-          b_ij_2nd_min_value = score;
-          i_2nd_min = was_i_min;
-          j_2nd_min = j;
-        }
+	  // replace current min
+	  b_ij_min_value = score;
+	  i_min = was_i_min;
+	  j_min = j;
+	}
+	else if(score < b_ij_2nd_min_value)
+	{
+	  b_ij_2nd_min_value = score;
+	  i_2nd_min = was_i_min;
+	  j_2nd_min = j;
+	}
       }
     }
   }
@@ -2661,17 +2676,25 @@ void bingham_mixture_reduce(bingham_mix_t *BM, unsigned int reduced_n_components
     {
       if(merged_ij[i][j] != NULL)
       {
-        bingham_free(merged_ij[i][j]);
-        free(merged_ij[i][j]);
-        merged_ij[i][j] = NULL;
-        merged_ij[j][i] = NULL;        
-        //printf("Freed merged_ij[%d][%d]\n", i, j);
+	bingham_free(merged_ij[i][j]);
+	free(merged_ij[i][j]);
+	merged_ij[i][j] = NULL;
+	merged_ij[j][i] = NULL;
+	//printf("Freed merged_ij[%d][%d]\n", i, j);
       }
     }
   }
 
   free_matrix2(B_ij);
 }
+
+/*
+ * Creates a single quaternion (3d rotation) bingham with concentration parameters in
+ * the range [min_z_value, 0] and the mode oriented at a (kind of) random 3d rotation.
+ *
+ * bingham_t *B is assumed to be unallocated when calling the function, will hold the output afterwards
+ * int min_z_value is assumed to be negative in the range [-900, 0]
+ */
 
 void bingham_new_random(bingham_t *B, int min_z_value)
 {
@@ -2695,11 +2718,19 @@ void bingham_new_random(bingham_t *B, int min_z_value)
   normalize(q_norm, q, 4);
 
   bingham_alloc(B, 4);
-  bingham_post_rotate_3d(B, &b, q_norm);  
+  bingham_post_rotate_3d(B, &b, q_norm);
 
   bingham_free(&b);
 }
 
+/*
+ * Creates a random bingham mixture with using 'bingham_new_random' for the creation
+ * of the individual components (cf. description of that function for further details)
+ *
+ * bingham_mix_t *B is assumed to be unallocated when calling this function, will hold the output afterwards
+ * unsigned int n_components is the number of components of the created mixture
+ * int min_z_value (see function bingham_new_random)
+ */
 void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int min_z_value)
 {
   bingham_t binghams[n_components];
@@ -2729,7 +2760,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
 }
 
 /*void olf_to_bingham(bingham_t *B, double *normal, double *pc, double pc1, double pc2, int lookup_constants) {
-  
+
   B->d = 4;
 
   double **r = new_matrix2(3, 3);
@@ -2740,7 +2771,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
     r[i][0] = normal[i];
     r[i][1] = pc[i];
     r[i][2] = tmp_cross[i];
-  }  
+  }
   double *v1, *v2;
   safe_malloc(v1, 4, double);
   safe_malloc(v2, 4, double);
@@ -2750,7 +2781,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
     r[i][2] *= -2;
   }
   rotation_matrix_to_quaternion(v2, r);
-  
+
   double *v3;
   safe_calloc(v3, 4, double);
   double **m1 = new_matrix2(4, 4);
@@ -2770,7 +2801,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
   matrix_mult(m1, m1, m2, 4, 4, 4);
   matrix_vec_mult(v3, m1, v3, 4, 4);
   normalize(v3, v3, 4);
-  
+
   double *v4;
   safe_malloc(v4, 4, double);
   cross4d(v4, v1, v2, v3);
@@ -2780,7 +2811,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
     free(B->V[i]);
     safe_malloc(B->V[i], 4, double);
   }
-  
+
   for (i = 0; i < 4; ++i) {
     B->V[0][i] = v3[i];
     B->V[1][i] = v4[i];
@@ -2795,7 +2826,7 @@ void bingham_mixture_new_random(bingham_mix_t *B, unsigned int n_components, int
   if (lookup_constants) {
     bingham_F(B); // NOTE(sanja): this bingham_F doesn't populate dF field in the stats unlike MATLAB. Intentional?
   }
-  
+
   free_matrix2(r);
   free(v1);
   free(v2);
@@ -2858,7 +2889,6 @@ void bingham_discretize_mres(bingham_pmf_t *pmf, bingham_t *B, double resolution
   else {
     printf("Warning: bingham_discretize() doesn't know how to discretize distributions in %d dimensions.\n", d);
     return;
-  }    
+  }
 }
 */
-
