@@ -2,7 +2,7 @@ IDIR=include
 ODIR=.
 LDIR=lib
 
-INSTALL_DIR=/volume/USERSTORE/ried_sa/compiled_packages/bingham/
+INSTALL_DIR=/usr
 
 CC=gcc
 CPP=g++
