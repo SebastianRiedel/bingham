@@ -3,6 +3,7 @@ ODIR=.
 LDIR=lib
 
 INSTALL_DIR=/usr
+#$(info $$INSTALL_DIR is [$(INSTALL_DIR)])
 
 CC=gcc
 CPP=g++
@@ -100,7 +101,9 @@ clean:
 	rm -f $(TARGETS) $(ODIR)/*.o *.a *~ core *.exe $(IDIR)/*~ $(IDIR)/*/*~
 
 install:
-	if [ ! -d $(INSTALL_DIR)/include/bingham ] ; then mkdir $(INSTALL_DIR)/include/bingham ; fi
+	if [ ! -d $(INSTALL_DIR)/include/bingham ] ; then mkdir -p $(INSTALL_DIR)/include/bingham ; fi
+	if [ ! -d $(INSTALL_DIR)/lib ] ; then mkdir -p $(INSTALL_DIR)/lib ; fi
+	if [ ! -d $(INSTALL_DIR)/bin ] ; then mkdir -p $(INSTALL_DIR)/bin ; fi
 	cp $(DEPS) $(INSTALL_DIR)/include/bingham/
 	mv $(INSTALL_DIR)/include/bingham/bingham.h $(INSTALL_DIR)/include/
 	cp $(LIBS) $(INSTALL_DIR)/lib/

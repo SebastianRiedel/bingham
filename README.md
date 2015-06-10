@@ -3,6 +3,8 @@ Bingham Statistics Library (BSL)
 
 The Bingham statistics library contains implementations of the Bingham distribution for directional (axial) statistics on the unit spheres S1, S2, and S3. In addition, finite element approximations are available via tessellations of S2 and S3.
 
+This repository was exported from the original and **now to be abandoned** [SVN repository](https://code.google.com/p/bingham/) on google code with consent of the original author Jared Glover.
+
 News
 ====
 
