@@ -35,7 +35,7 @@ for i=1:d
 end
 
 if d==1
-    X = F_cache.F{d}([zi0(1),zi1(1)]);
+    X = F_cache.F{d}([zi0(1),zi1(1)])';
 elseif d==2
     X = F_cache.F{d}([zi0(1),zi1(1)], [zi0(2),zi1(2)]);
 elseif d==3
