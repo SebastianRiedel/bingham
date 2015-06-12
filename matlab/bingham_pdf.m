@@ -1,22 +1,20 @@
 function p = bingham_pdf(x,B)
 % p = bingham_pdf(x,B)
-
-d = length(x);
+% 
+% INPUTS:
+% x   should be N-by-D
+% B.V should be D-by-(D-1)
+% B.Z should be (D-1)-by-1 or 1-by-(D-1)
+%
+% OUTPUT:
+% p   is N-by-1
 
 if B.Z==0  % uniform
     p = 1/B.F;
     return
 end
 
-% make x a row vector
-if size(x,1)>1
-    x = x';
-end
+% make z a column vector
+z = B.Z(:);
 
-% make z a row vector
-z = B.Z;
-if size(z,1)>1
-    z = z';
-end
-
-p = exp(sum(z.*(x*B.V).^2)) / B.F;
+p = exp((x*B.V).^2*z) / B.F;
