@@ -6,9 +6,12 @@ if nargin < 2
 end
 
 for i=1:100 %max no of clusters
+  fprintf('Bingham distrubution #: %d', i);
   [B(i) outliers] = bingham_fit_mlesac(X);
-  %   ouliers is a row vector
+  % outliers is a row vector
   weights(i) = size(X,1) - length(outliers);
+  
+  fprintf('no of points left are', weights(i));
   % weight of a particular bingham is no of points left - no of ouliers
   if length(outliers) < min_points
     break;
