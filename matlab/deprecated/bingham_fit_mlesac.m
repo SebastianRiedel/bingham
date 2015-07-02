@@ -1,8 +1,8 @@
 function [B outliers] = bingham_fit_mlesac(X)
 % [B outliers] = bingham_fit_mlesac(X) -- where B = B.{V, Z, F}
-
-d = size(X,1);
-n = size(X,2);
+X = X';
+d = size(X,1)
+n = size(X,2)
 
 iter = 100;
 p0 = 1 / surface_area_hypersphere(d-1);  % uniform density for outliers
@@ -14,17 +14,24 @@ for i=1:iter
 
    % pick d points at random from X
    r = randperm(n);
-   r = r(1:d);
-   Xi = X(:,r);
-   
+   r = r(1:d)
+   for j=1:d
+        eval(['X_' num2str(j) '= X(:,r(j));'])
+%    Xi = X(:,r);
+   end   
    % fit a Bingham to the d points
-   [V Z F] = bingham_fit(Xi);
+   X_combined = [X_1 X_2 X_3 X_4];
+   X_combined = X_combined';
+   bing_X_combined = bingham_fit(X_combined);
    %[V Z F] = bingham_fit_scatter(Xi*Xi')
-   
+   V = bing_X_combined.V;
+   Z = bing_X_combined.Z;
+   F = bing_X_combined.F;
    % compute data log likelihood
    logp = 0;
+  
    for j=1:n
-      p = bingham_pdf(X(:,j), V, Z, F);
+      p = bingham_pdf(X(:,j)', bing_X_combined);
       if p > p0
          logp = logp + log(p);
       else
@@ -34,9 +41,9 @@ for i=1:iter
    
    if logp > pmax
       pmax = logp;
-      B.V = V;
-      B.Z = Z;
-      B.F = F;
+      bing_X_combined.V = V;
+      bing_X_combined.Z = Z;
+      bing_X_combined.F = F;
       
       %fprintf('*** found new best with log likelihood %f ***\n', logp);
       
@@ -52,7 +59,7 @@ end
 
 L = zeros(1,n);
 for j=1:n
-   p = bingham_pdf(X(:,j), B.V, B.Z, B.F);
+   p = bingham_pdf(X(:,j), bing_X_combined);
    if p > p0
       L(j) = 1;
    else
@@ -63,9 +70,8 @@ end
 inliers = find(L);
 outliers = find(~L);
 
-[B.V B.Z B.F] = bingham_fit(X(:,inliers));
-
-
+bing_return = bingham_fit(X(:,inliers)');
+B = bing_return; 
 
 
 
