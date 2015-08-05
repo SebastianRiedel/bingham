@@ -26,6 +26,9 @@ int main(int argc, char *argv[])
   bingham_t B;
   bingham_new(&B, 4, Vp, Z);
 
+  printf("Sampling from bingham:\n");
+  print_bingham(&B);
+
   double **X = new_matrix2(nsamples, 4);
   bingham_sample(X, &B, nsamples);
 
