@@ -39,7 +39,7 @@ else
 LIBS = libbingham.a
 endif
 ifndef WINDOWS
-PROGRAMS = fit_bingham reduce_bingham cluster_bingham bingham_lookup bingham_sample tessellate_S3 test_util
+PROGRAMS = fit_bingham reduce_bingham cross_entropy_test cluster_bingham bingham_lookup bingham_sample tessellate_S3 test_util
 endif
 
 TARGETS = $(LIBS) $(PROGRAMS)
@@ -75,6 +75,9 @@ fit_bingham: fit_bingham.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 reduce_bingham: reduce_bingham.o libbingham.a
+	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)	
+
+cross_entropy_test: cross_entropy_test.o libbingham.a
 	$(CC) -o $@ $^ $(CFLAGS) $(LFLAGS)	
 
 bingham_lookup: bingham_lookup.o libbingham.a
