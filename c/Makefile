@@ -8,6 +8,8 @@ INSTALL_DIR=/usr
 CC=gcc
 CPP=g++
 NVCC=nvcc
+GCCVERSION := $(shell expr `$(CC) -dumpversion | cut -f1 -d.`)
+GCC5NEWER := $(shell expr `echo $(GCCVERSION)` \>= 5)
 #MEX=mex
 LINK=ar rcs
 CFLAGS=-Wall -I$(IDIR) -O3 -msse2
@@ -21,6 +23,9 @@ CUDAFLAGS=-O3 -lcuda -lcudart -lcurand -arch=compute_20
 #CYGWIN=1
 #WINDOWS=1
 
+ifeq "$(GCC5NEWER)" "1"
+CFLAGS += -fgnu89-inline
+endif
 
 ifdef WINDOWS
 CFLAGS += -static -mno-cygwin -I"C:\Program Files\GnuWin32\include" -DHAVE_WINDOWS #-mwindows -I/usr/include
