@@ -1,0 +1,9 @@
+*~
+c/*.o
+c/bingham_lookup
+c/bingham_sample
+c/cluster_bingham
+c/fit_bingham
+c/libbingham.a
+c/tessellate_S3
+c/test_util
