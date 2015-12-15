@@ -12,7 +12,7 @@ GCCVERSION := $(shell expr `$(CC) -dumpversion | cut -f1 -d.`)
 GCC5NEWER := $(shell expr `echo $(GCCVERSION)` \>= 5)
 #MEX=mex
 LINK=ar rcs
-CFLAGS=-Wall -I$(IDIR) -O3 -msse2
+CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -fPIC
 #CFLAGS=-Wall -I$(IDIR) -O3 -msse2 -pg
 #CFLAGS=-Wall -I$(IDIR) -O0 -g -pg
 
