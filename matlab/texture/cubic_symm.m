@@ -1,6 +1,10 @@
 function Q = cubic_symm(q)
 %Q = cubic_symm(q) -- Replicate q with the cubic symmetry operator.
 
+if nargin < 1
+    q = [1 0 0 0];
+end
+
 S =   [[0    0    0    1];  ...
        [1    0    0    0];  ...
        [0    1    0    0];  ...
@@ -33,3 +37,4 @@ Q = zeros(size(S));
 for i=1:size(S,1)
     Q(i,:) = quaternion_mult(q, S(i,:));
 end
+

@@ -1,6 +1,8 @@
 IDIR=include
 ODIR=.
 LDIR=lib
+MATLABDIR=../matlab
+
 
 INSTALL_DIR=/usr
 #$(info $$INSTALL_DIR is [$(INSTALL_DIR)])
@@ -105,11 +107,13 @@ clean:
 install:
 	if [ ! -d $(INSTALL_DIR)/include/bingham ] ; then mkdir -p $(INSTALL_DIR)/include/bingham ; fi
 	if [ ! -d $(INSTALL_DIR)/lib ] ; then mkdir -p $(INSTALL_DIR)/lib ; fi
+	if [ ! -d $(INSTALL_DIR)/lib/bingham ] ; then mkdir -p $(INSTALL_DIR)/lib/bingham ; fi
 	if [ ! -d $(INSTALL_DIR)/bin ] ; then mkdir -p $(INSTALL_DIR)/bin ; fi
 	cp $(DEPS) $(INSTALL_DIR)/include/bingham/
 	mv $(INSTALL_DIR)/include/bingham/bingham.h $(INSTALL_DIR)/include/
 	cp $(LIBS) $(INSTALL_DIR)/lib/
 	cp $(PROGRAMS) $(INSTALL_DIR)/bin/
+	cp -r $(MATLABDIR) $(INSTALL_DIR)/lib/bingham/
 
 doc:
 	doxygen Doxyfile
