@@ -1846,12 +1846,13 @@ double **load_matrix(char *fin, int *n, int *m)
   double **X = new_matrix2(*n, *m);
 
   const int CHARS_PER_FLOAT = 20;
-  char sbuf[CHARS_PER_FLOAT * (*m)];
+  const int buflen = CHARS_PER_FLOAT * (*m);
+  char sbuf[buflen];
 
   int i, j;
   for (i = 0; i < *n; i++) {
     s = sbuf;
-    if (fgets(s, 10000, f) == NULL)
+    if (fgets(s, buflen, f) == NULL)
       break;
     for (j = 0; j < *m; j++) {
       if (sscanf(s, "%lf", &X[i][j]) < 1)
@@ -1862,7 +1863,7 @@ double **load_matrix(char *fin, int *n, int *m)
       break;
   }
   if (i < *n) {
-    fprintf(stderr, "Corrupt matrix file '%s' at line %d\n", fin, i+2);
+    fprintf(stderr, "Corrupt matrix file '%s' at line %d, element %d\n", fin, i+2, j+1);
     fclose(f);
     free_matrix2(X);
     return NULL;
