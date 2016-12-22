@@ -1904,13 +1904,14 @@ double ***load_matrix3(char *fin, int *n, int *m, int *p)
   double ***X = new_matrix3(*n, *m, *p);
 
   const int CHARS_PER_FLOAT = 20;
-  char sbuf[CHARS_PER_FLOAT * (*p)];
+  const int buflen = CHARS_PER_FLOAT * (*p);
+  char sbuf[buflen];
 
   int i, j, k;
   for (i = 0; i < *n; i++) {
     for (j = 0; j < *m; j++) {
       s = sbuf;
-      if (fgets(s, 10000, f) == NULL)
+      if (fgets(s, buflen, f) == NULL)
 	break;
       for (k = 0; k < *p; k++) {
 	if (sscanf(s, "%lf", &X[i][j][k]) < 1)
